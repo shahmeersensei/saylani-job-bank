@@ -53,11 +53,21 @@ export function RoleShell({
     <DashboardLayout
       navigation={navigationFor(role)}
       sidebarFooter={
-        <p className="text-fg-subtle px-3 text-xs">
-          {switchableBranches
-            ? 'All branches (oversight)'
-            : branchNames.join(' · ') || ROLE_LABELS[role]}
-        </p>
+        <div
+          className="mx-1 rounded-xl p-3"
+          style={{
+            background: 'linear-gradient(135deg, #0d7a3e 0%, #16a050 100%)',
+          }}
+        >
+          <p className="mb-0.5 truncate text-xs font-bold" style={{ color: '#fff' }}>
+            {switchableBranches
+              ? 'All branches (oversight)'
+              : branchNames.join(' · ') || ROLE_LABELS[role]}
+          </p>
+          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>
+            {ROLE_LABELS[role]} · Saylani Job Bank
+          </p>
+        </div>
       }
       topBar={{
         user: { name: user.name, role: ROLE_LABELS[role] },

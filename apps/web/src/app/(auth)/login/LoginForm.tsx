@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, KeyRound, Lock, Mail } from 'lucide-react';
+import { ArrowLeft, Briefcase, KeyRound, Lock, Mail, Shield, UserRound } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
@@ -51,7 +51,6 @@ function Alert({ message }: { message: string | null }) {
   );
 }
 
-/** Shared "enter the 6-digit code" step with resend + back. */
 function CodeStep({
   destination,
   onVerify,
@@ -111,7 +110,7 @@ function CodeStep({
 
 // ─── Job seekers: phone + SMS ──────────────────────────────────────────
 
-function PhoneSignIn({ next }: { next: string | null }) {
+function PhoneSignIn({ next, onBack }: { next: string | null; onBack: () => void }) {
   const finish = useFinishSignIn(next);
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [phone, setPhone] = useState<string | null>(null);
@@ -171,25 +170,36 @@ function PhoneSignIn({ next }: { next: string | null }) {
   }
 
   return (
-    <form
-      className="grid gap-4"
-      onSubmit={(event: FormEvent) => {
-        event.preventDefault();
-        void sendCode();
-      }}
-    >
-      <FormField
-        label="Mobile number"
-        required
-        error={error ?? undefined}
-        hint="New here? Your account is created when you verify."
+    <div className="grid gap-4">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex w-fit items-center gap-1.5 text-sm"
+        style={{ color: 'var(--fg-muted)' }}
       >
-        <PhoneInput autoFocus onChange={(change) => setPhone(change.e164)} />
-      </FormField>
-      <Button type="submit" fullWidth disabled={!phone} loading={pending}>
-        Send code
-      </Button>
-    </form>
+        <ArrowLeft className="size-4" />
+        Change role
+      </button>
+      <form
+        className="grid gap-4"
+        onSubmit={(event: FormEvent) => {
+          event.preventDefault();
+          void sendCode();
+        }}
+      >
+        <FormField
+          label="Mobile number"
+          required
+          error={error ?? undefined}
+          hint="New here? Your account is created when you verify."
+        >
+          <PhoneInput autoFocus onChange={(change) => setPhone(change.e164)} />
+        </FormField>
+        <Button type="submit" fullWidth disabled={!phone} loading={pending}>
+          Send code
+        </Button>
+      </form>
+    </div>
   );
 }
 
@@ -384,7 +394,7 @@ function EmailCodeSignIn({ next, onBack }: { next: string | null; onBack: () => 
   );
 }
 
-function StaffSignIn({ next }: { next: string | null }) {
+function StaffSignIn({ next, onBack }: { next: string | null; onBack: () => void }) {
   const finish = useFinishSignIn(next);
   const [mode, setMode] = useState<'password' | 'two_factor' | 'email_code'>('password');
   const [email, setEmail] = useState('');
@@ -420,52 +430,147 @@ function StaffSignIn({ next }: { next: string | null }) {
   };
 
   return (
-    <form className="grid gap-4" onSubmit={submit} noValidate>
-      <FormField label="Email" required>
-        <Input
-          type="email"
-          autoComplete="username"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          startAdornment={<Mail aria-hidden="true" />}
-        />
-      </FormField>
-      <FormField label="Password" required>
-        <Input
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          startAdornment={<Lock aria-hidden="true" />}
-        />
-      </FormField>
-      <div className="-mt-2 text-end text-sm">
-        <NextLink
-          href="/forgot-password"
-          className="text-accent focus-visible:focus-ring rounded-sm underline-offset-4 hover:underline"
+    <div className="grid gap-4">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex w-fit items-center gap-1.5 text-sm"
+        style={{ color: 'var(--fg-muted)' }}
+      >
+        <ArrowLeft className="size-4" />
+        Change role
+      </button>
+      <form className="grid gap-4" onSubmit={submit} noValidate>
+        <FormField label="Email" required>
+          <Input
+            type="email"
+            autoComplete="username"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            startAdornment={<Mail aria-hidden="true" />}
+          />
+        </FormField>
+        <FormField label="Password" required>
+          <Input
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            startAdornment={<Lock aria-hidden="true" />}
+          />
+        </FormField>
+        <div className="-mt-2 text-end text-sm">
+          <NextLink
+            href="/forgot-password"
+            className="text-accent focus-visible:focus-ring rounded-sm underline-offset-4 hover:underline"
+          >
+            Forgot password?
+          </NextLink>
+        </div>
+        <Alert message={error} />
+        <Button type="submit" fullWidth loading={pending} disabled={!email || !password}>
+          Sign in
+        </Button>
+        <Button
+          variant="link"
+          onClick={() => setMode('email_code')}
+          className="justify-self-center"
         >
-          Forgot password?
-        </NextLink>
-      </div>
-      <Alert message={error} />
-      <Button type="submit" fullWidth loading={pending} disabled={!email || !password}>
-        Sign in
-      </Button>
-      <Button variant="link" onClick={() => setMode('email_code')} className="justify-self-center">
-        Employer? Email me a sign-in code instead
-      </Button>
-    </form>
+          Employer? Email me a sign-in code instead
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+// ─── Role selector ─────────────────────────────────────────────────────
+
+type RoleType = 'applicant' | 'employer' | 'staff';
+
+const ROLE_CARDS: {
+  id: RoleType;
+  icon: typeof UserRound;
+  label: string;
+  desc: string;
+  color: string;
+  bg: string;
+  border: string;
+}[] = [
+  {
+    id: 'applicant',
+    icon: UserRound,
+    label: 'Job Seeker',
+    desc: 'Sign in with your mobile number to access your profile and job matches.',
+    color: '#0d7a3e',
+    bg: 'rgba(13,122,62,0.07)',
+    border: 'rgba(13,122,62,0.2)',
+  },
+  {
+    id: 'employer',
+    icon: Briefcase,
+    label: 'Employer',
+    desc: 'Sign in to manage your company listings and applicant pipeline.',
+    color: '#1a5fac',
+    bg: 'rgba(26,95,172,0.07)',
+    border: 'rgba(26,95,172,0.2)',
+  },
+  {
+    id: 'staff',
+    icon: Shield,
+    label: 'Staff / Admin',
+    desc: 'Branch staff, verifiers, and administrators sign in here.',
+    color: '#7c3a0d',
+    bg: 'rgba(180,83,9,0.07)',
+    border: 'rgba(180,83,9,0.2)',
+  },
+];
+
+function RoleSelector({ onSelect }: { onSelect: (role: RoleType) => void }) {
+  return (
+    <div className="grid gap-3">
+      <p className="text-fg-muted text-sm">Choose your role to continue:</p>
+      {ROLE_CARDS.map((card) => {
+        const Icon = card.icon;
+        return (
+          <button
+            key={card.id}
+            type="button"
+            onClick={() => onSelect(card.id)}
+            className="group flex items-center gap-4 rounded-2xl border p-4 text-left transition-all hover:scale-[1.01]"
+            style={{
+              background: card.bg,
+              borderColor: card.border,
+            }}
+          >
+            <span
+              className="grid size-11 shrink-0 place-items-center rounded-xl transition-colors"
+              style={{ background: card.color + '18' }}
+              aria-hidden="true"
+            >
+              <Icon className="size-5" style={{ color: card.color }} />
+            </span>
+            <div className="grid gap-0.5">
+              <span className="text-fg text-sm font-semibold">{card.label}</span>
+              <span className="text-fg-muted text-xs leading-relaxed">{card.desc}</span>
+            </div>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
 export function LoginForm({ next }: { next: string | null }) {
-  return (
-    <Tabs
-      label="Sign-in method"
-      items={[
-        { value: 'applicant', label: 'Job seekers', content: <PhoneSignIn next={next} /> },
-        { value: 'staff', label: 'Staff & employers', content: <StaffSignIn next={next} /> },
-      ]}
-    />
-  );
+  const [role, setRole] = useState<RoleType | null>(null);
+
+  if (!role) {
+    return <RoleSelector onSelect={setRole} />;
+  }
+
+  if (role === 'applicant') {
+    return <PhoneSignIn next={next} onBack={() => setRole(null)} />;
+  }
+
+  // employer and staff both use email/password (with different secondary options)
+  return <StaffSignIn next={next} onBack={() => setRole(null)} />;
 }

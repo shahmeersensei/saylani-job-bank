@@ -51,6 +51,9 @@ export const statusChangeSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
   reason: z.string().trim().min(5, 'Give a short reason (at least 5 characters)').max(500),
 });
+export const deleteStaffSchema = z.object({
+  reason: z.string().trim().min(5, 'Give a short reason (at least 5 characters)').max(500),
+});
 export const staffProfileSchema = z.object({
   name: z.string().trim().min(2).max(120).optional(),
   title: z.string().trim().max(80).nullable().optional(),
@@ -499,6 +502,27 @@ export async function updateStaffProfile(
     });
   });
   return getStaffMember(ctx.actor, userId);
+}
+
+/** Permanently delete a staff account. Requires a reason; prevents deleting the last Super Admin. */
+export async function deleteStaff(ctx: SignedIn, userId: string, reason: string): Promise<void> {
+  await runCommand(ctx, async ({ tx, audit }) => {
+    const { row, assignments } = await loadTarget(tx, ctx.actor, userId);
+    assertAllowed(canManageUser(ctx.actor, userId, assignments));
+    if (assignments.some((a) => a.role === 'SUPER_ADMIN')) {
+      await assertNotLastSuperAdmin(tx, userId);
+    }
+    audit({
+      action: 'user.delete',
+      entityType: 'user',
+      entityId: userId,
+      branchId: assignments[0]?.branchId ?? null,
+      before: { name: row.name, email: row.email, status: row.status },
+      after: null,
+      reason,
+    });
+    await tx.delete(u).where(eq(u.id, userId));
+  });
 }
 
 /** For a lost phone: removes their authenticator so they enrol again at next sign-in. */

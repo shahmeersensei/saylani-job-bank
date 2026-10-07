@@ -98,6 +98,30 @@ export async function findMasterDataByCodes(
 }
 
 /**
+ * Checks that every code exists in `type` and is active; returns the items by code.
+ * Issues point at `path(index)` so the form can highlight the right row.
+ */
+export async function assertActiveMasterData(
+  executor: DbExecutor,
+  type: MasterDataType,
+  codes: readonly string[],
+  path: (index: number) => string,
+) {
+  const found = new Map(
+    (await findMasterDataByCodes(type, codes, executor)).map((item) => [item.code, item]),
+  );
+  const issues = codes.flatMap((code, index) => {
+    const item = found.get(code);
+    if (!item) return [{ path: path(index), message: 'Choose an option from the list' }];
+    if (!item.isActive)
+      return [{ path: path(index), message: `"${item.label}" is no longer offered; remove it` }];
+    return [];
+  });
+  if (issues.length > 0) throw new ValidationError(issues);
+  return found;
+}
+
+/**
  * code → label for the given types, including inactive items, so records that still hold a
  * retired code keep a readable label.
  */

@@ -13,12 +13,14 @@ export const TYPE_SINGULAR: Record<MasterDataType, string> = {
   BLACKLIST_REASON: 'blacklist reason',
   VERIFICATION_REJECTION_REASON: 'verification rejection reason',
   WITHDRAWAL_REASON: 'withdrawal reason',
+  INDUSTRY: 'industry',
 };
 
 /** Groups for the type navigation. */
 export const TYPE_GROUPS: { title: string; types: MasterDataType[] }[] = [
   { title: 'Jobs & skills', types: ['JOB_CATEGORY', 'SKILL', 'EDUCATION_LEVEL', 'LANGUAGE'] },
   { title: 'Places & documents', types: ['CITY', 'AREA', 'DOCUMENT_TYPE'] },
+  { title: 'Companies', types: ['INDUSTRY'] },
   {
     title: 'Reason codes',
     types: [
@@ -66,7 +68,12 @@ export function metaSummary(item: MasterDataItem): string | null {
         : '';
       return [
         m.appliesTo === 'COMPANY' ? 'Companies' : 'Applicants',
-        m.required ? 'required' : 'optional',
+        // Company requirements depend on the business type (Settings → Company documents).
+        m.appliesTo === 'COMPANY'
+          ? 'required per business type'
+          : m.required
+            ? 'required'
+            : 'optional',
         `${types} ≤ ${String(m.maxSizeMb)} MB`,
       ].join(' · ');
     }

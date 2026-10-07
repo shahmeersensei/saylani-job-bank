@@ -65,3 +65,106 @@ export function signInCodeEmail(input: { code: string; expiresMinutes: number })
     html: layout('Your sign-in code', lines),
   };
 }
+
+// ─── Employers (M7) ────────────────────────────────────────────────────
+
+export function signupCodeEmail(input: { code: string; expiresMinutes: number }) {
+  const lines = [
+    `Your code to create a Saylani Job Bank employer account is ${input.code}.`,
+    `It expires in ${input.expiresMinutes} minutes. If you did not start registering, you can ignore this email.`,
+  ];
+  return {
+    subject: `${input.code} is your Saylani Job Bank confirmation code`,
+    text: lines.join('\n\n'),
+    html: layout('Confirm your email', lines),
+  };
+}
+
+/** Sent instead of a code when the email already has an account (no account discovery). */
+export function signupExistingAccountEmail(input: { url: string }) {
+  const lines = [
+    'Someone tried to create a Saylani Job Bank employer account with this email address, but it already has an account.',
+    'If that was you, sign in instead — you can reset your password from the sign-in page. If not, you can ignore this email.',
+  ];
+  return {
+    subject: 'You already have a Saylani Job Bank account',
+    text: `${lines.join('\n\n')}\n\n${input.url}\n`,
+    html: layout('You already have an account', lines, { label: 'Sign in', url: input.url }),
+  };
+}
+
+export function companySubmittedEmail(input: {
+  name: string;
+  companyName: string;
+  dueDate: string;
+  url: string;
+}) {
+  const lines = [
+    `Assalam-o-Alaikum ${input.name},`,
+    `Thank you — we received ${input.companyName}'s registration. A verification officer will review it, usually by ${input.dueDate}.`,
+    'We will email you if we need anything else. You can follow the progress on your company page.',
+  ];
+  return {
+    subject: `${input.companyName}: registration received`,
+    text: `${lines.join('\n\n')}\n\n${input.url}\n`,
+    html: layout('Registration received', lines, { label: 'View status', url: input.url }),
+  };
+}
+
+export function companyInfoRequestedEmail(input: {
+  name: string;
+  companyName: string;
+  request: string;
+  url: string;
+}) {
+  const lines = [
+    `Assalam-o-Alaikum ${input.name},`,
+    `Our verification officer needs more information before ${input.companyName} can be verified:`,
+    input.request,
+    'Please update your registration and press "Send for review" when done.',
+  ];
+  return {
+    subject: `${input.companyName}: more information needed`,
+    text: `${lines.join('\n\n')}\n\n${input.url}\n`,
+    html: layout('More information needed', lines, {
+      label: 'Update registration',
+      url: input.url,
+    }),
+  };
+}
+
+export function companyVerifiedEmail(input: { name: string; companyName: string; url: string }) {
+  const lines = [
+    `Assalam-o-Alaikum ${input.name},`,
+    `Good news: ${input.companyName} is now verified with the Saylani Job Bank.`,
+    'You can now post jobs, and our branch team will refer suitable candidates to you.',
+  ];
+  return {
+    subject: `${input.companyName} is verified`,
+    text: `${lines.join('\n\n')}\n\n${input.url}\n`,
+    html: layout('Your company is verified', lines, {
+      label: 'Go to your dashboard',
+      url: input.url,
+    }),
+  };
+}
+
+export function companyRejectedEmail(input: {
+  name: string;
+  companyName: string;
+  reason: string;
+  note: string;
+  url: string;
+}) {
+  const lines = [
+    `Assalam-o-Alaikum ${input.name},`,
+    `We could not verify ${input.companyName}. Reason: ${input.reason}.`,
+    input.note,
+    'You can correct your registration and submit it again, or contact your Job Bank branch.',
+  ];
+  return {
+    subject: `${input.companyName}: registration not approved`,
+    text: `${lines.join('\n\n')}\n\n${input.url}\n`,
+    html: layout('Registration not approved', lines, { label: 'View details', url: input.url }),
+  };
+}

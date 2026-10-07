@@ -20,7 +20,7 @@ export async function StaffListPage({
 }) {
   const { actor } = await requireRole(role);
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6">
+    <div className="grid w-full gap-6">
       <header className="grid gap-1">
         <h1 className="text-fg text-2xl font-semibold">Staff</h1>
         <p className="text-fg-muted text-sm">
@@ -64,6 +64,7 @@ export async function StaffDetailPage({
       <StaffDetailView
         staff={staff}
         branches={branches.filter((b) => b.isActive).map((b) => ({ id: b.id, name: b.name }))}
+        listPath={basePath}
       />
     </DetailPageLayout>
   );

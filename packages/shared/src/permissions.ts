@@ -17,6 +17,8 @@ export const PERMISSIONS = {
   'company:read': 'View companies',
   'company:register': 'Register and edit own company',
   'company:verify': 'Verify, reject or request info for companies',
+  'company:suspend': 'Suspend or reinstate verified companies',
+  'company:manage': 'Correct locked company details, transfer companies, assign verifiers',
 
   'applicant:read': 'View applicant profiles',
   'applicant:self': 'Manage own applicant profile',
@@ -25,6 +27,7 @@ export const PERMISSIONS = {
   'applicant:transfer': 'Move an applicant to another branch',
 
   'job:read': 'View jobs',
+  'job:manage': 'Post and manage jobs for branch companies',
   'job:manage_own': "Post and manage own company's jobs",
 
   'match_case:read': 'View match cases',
@@ -63,6 +66,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'settings:manage',
     'master_data:manage',
     'company:read',
+    'company:manage',
     'applicant:read',
     'applicant:transfer',
     'job:read',
@@ -77,10 +81,13 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'user:manage',
     'settings:manage',
     'company:read',
+    'company:manage',
+    'company:suspend',
     'applicant:read',
     'applicant:manage',
     'applicant:transfer',
     'job:read',
+    'job:manage',
     'match_case:read',
     'blacklist:request',
     'blacklist:decide',

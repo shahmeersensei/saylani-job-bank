@@ -123,6 +123,34 @@ export const otpChallenges = pgTable(
   ],
 );
 
+export const EMAIL_CHALLENGE_PURPOSES = ['EMPLOYER_SIGNUP'] as const;
+
+/**
+ * Email confirmation codes for new accounts (M7 employer sign-up: the email is confirmed
+ * before the account exists, so Better Auth's per-user email OTP cannot be used). Same rules
+ * as `otp_challenges`: HMAC only, short expiry, limited attempts, single use.
+ */
+export const emailChallenges = pgTable(
+  'email_challenges',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    email: text().notNull(),
+    purpose: text({ enum: EMAIL_CHALLENGE_PURPOSES }).notNull(),
+    codeHash: text().notNull(),
+    attempts: integer().notNull().default(0),
+    maxAttempts: integer().notNull().default(5),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    consumedAt: timestamp({ withTimezone: true }),
+    ipAddress: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('email_challenges_open_idx')
+      .on(t.email, t.purpose)
+      .where(sql`${t.consumedAt} is null`),
+  ],
+);
+
 /**
  * Authenticator-app (TOTP) secrets — Better Auth two-factor plugin. `secret` is encrypted
  * with the auth secret; backup codes are encrypted too. `verified` stays false until the

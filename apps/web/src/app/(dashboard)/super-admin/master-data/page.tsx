@@ -22,7 +22,7 @@ export default async function MasterDataPage({ searchParams }: { searchParams: S
     params.type === 'HOLIDAYS' ? 'HOLIDAYS' : parsed.success ? parsed.data : 'JOB_CATEGORY';
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6">
+    <div className="grid w-full gap-6">
       <header className="grid gap-1">
         <h1 className="text-fg text-2xl font-semibold">Master data</h1>
         <p className="text-fg-muted text-sm">

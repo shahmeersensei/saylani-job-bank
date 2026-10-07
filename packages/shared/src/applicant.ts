@@ -82,6 +82,7 @@ export const JOB_TYPES = [
   'PART_TIME',
   'CONTRACT',
   'INTERNSHIP',
+  'TEMPORARY',
   'DAILY_WAGE',
 ] as const;
 export type JobType = (typeof JOB_TYPES)[number];
@@ -91,6 +92,7 @@ export const JOB_TYPE_LABELS: Record<JobType, string> = {
   PART_TIME: 'Part time',
   CONTRACT: 'Contract',
   INTERNSHIP: 'Internship',
+  TEMPORARY: 'Temporary',
   DAILY_WAGE: 'Daily wage',
 };
 

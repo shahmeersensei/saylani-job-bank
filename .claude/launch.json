@@ -4,8 +4,17 @@
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@jobbank/web", "dev"],
-      "port": 3000
+      "runtimeArgs": [
+        "--filter",
+        "@jobbank/web",
+        "exec",
+        "next",
+        "dev",
+        "--turbopack",
+        "-p",
+        "3009"
+      ],
+      "port": 3009
     },
     {
       "name": "web-verify",

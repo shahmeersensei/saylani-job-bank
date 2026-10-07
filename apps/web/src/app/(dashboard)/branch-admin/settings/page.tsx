@@ -27,7 +27,7 @@ export default async function BranchSettingsPage() {
   ]);
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-8">
+    <div className="grid w-full gap-8">
       <header className="grid gap-1">
         <h1 className="text-fg text-2xl font-semibold">Branch settings</h1>
         <p className="text-fg-muted text-sm">

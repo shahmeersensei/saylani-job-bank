@@ -1,12 +1,7 @@
 import { WelcomePanel } from '../_components/WelcomePanel';
 
-export const metadata = { title: 'Branch Admin' };
+export const metadata = { title: 'Branch Admin Dashboard — Saylani Job Bank' };
 
 export default function BranchAdminHomePage() {
-  return (
-    <WelcomePanel
-      role="BRANCH_ADMIN"
-      upcoming="Manage your branch staff from the sidebar. Verified companies (M7) and the blacklist queue (M14) arrive later."
-    />
-  );
+  return <WelcomePanel role="BRANCH_ADMIN" />;
 }

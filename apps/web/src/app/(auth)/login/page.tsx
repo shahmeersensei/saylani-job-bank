@@ -17,10 +17,7 @@ export default async function LoginPage({
 
   const { next } = await searchParams;
   return (
-    <AuthLayout
-      title="Sign in"
-      subtitle="Job seekers sign in with their mobile number. Staff and employers use email."
-    >
+    <AuthLayout title="Welcome back" subtitle="Select your role to sign in to Saylani Job Bank.">
       <LoginForm next={next ?? null} />
     </AuthLayout>
   );

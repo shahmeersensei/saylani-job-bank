@@ -13,7 +13,7 @@ import type {
 } from '@jobbank/shared';
 import { eq } from 'drizzle-orm';
 import { getBranchContact, listBranchOptions, type BranchOption } from '@/domains/branch';
-import { resolveMatchRadius } from '@/domains/settings';
+import { assertActiveMasterData, resolveMatchRadius } from '@/domains/settings';
 import { recordAudit, runCommand, type CommandScope } from '@/domains/shared/audit';
 import {
   ConflictError,
@@ -27,7 +27,6 @@ import { applicantMachine } from './machine';
 import {
   a,
   addr,
-  assertActiveCodes,
   branchLocked,
   buildProfile,
   cert,
@@ -223,13 +222,13 @@ export async function setMyLocation(
   await runCommand(ctx, async (cmd) => {
     const { tx, audit } = cmd;
     const row = await requireOwnApplicant(tx, ctx.actor, { forUpdate: true });
-    const city = (await assertActiveCodes(tx, 'CITY', [input.cityCode], () => 'cityCode')).get(
+    const city = (await assertActiveMasterData(tx, 'CITY', [input.cityCode], () => 'cityCode')).get(
       input.cityCode,
     )!;
     if (input.areaCode) {
-      const area = (await assertActiveCodes(tx, 'AREA', [input.areaCode], () => 'areaCode')).get(
-        input.areaCode,
-      )!;
+      const area = (
+        await assertActiveMasterData(tx, 'AREA', [input.areaCode], () => 'areaCode')
+      ).get(input.areaCode)!;
       if (area.parentId !== city.id) {
         throw new ValidationError([
           { path: 'areaCode', message: `This area is not in ${city.label}` },
@@ -300,7 +299,7 @@ async function saveSection(
 
 export function saveMyEducation(ctx: SignedIn, input: EducationInput) {
   return saveSection(ctx, 'education', input, async ({ tx }, row) => {
-    await assertActiveCodes(
+    await assertActiveMasterData(
       tx,
       'EDUCATION_LEVEL',
       input.items.map((i) => i.levelCode),
@@ -323,7 +322,7 @@ export function saveMyExperience(ctx: SignedIn, input: ExperienceInput) {
       item.categoryCode ? [{ code: item.categoryCode, i }] : [],
     );
     if (withCategory.length > 0) {
-      await assertActiveCodes(
+      await assertActiveMasterData(
         tx,
         'JOB_CATEGORY',
         withCategory.map((c) => c.code),
@@ -348,7 +347,7 @@ export function saveMyExperience(ctx: SignedIn, input: ExperienceInput) {
 
 export function saveMySkills(ctx: SignedIn, input: SkillsInput) {
   return saveSection(ctx, 'skills', input, async ({ tx }, row) => {
-    await assertActiveCodes(
+    await assertActiveMasterData(
       tx,
       'SKILL',
       input.items.map((i) => i.skillCode),
@@ -363,7 +362,7 @@ export function saveMySkills(ctx: SignedIn, input: SkillsInput) {
 
 export function saveMyLanguages(ctx: SignedIn, input: LanguagesInput) {
   return saveSection(ctx, 'languages', input, async ({ tx }, row) => {
-    await assertActiveCodes(
+    await assertActiveMasterData(
       tx,
       'LANGUAGE',
       input.items.map((i) => i.languageCode),
@@ -396,7 +395,12 @@ export function saveMyCertifications(ctx: SignedIn, input: CertificationsInput) 
 
 export function saveMyPreferences(ctx: SignedIn, input: PreferencesInput) {
   return saveSection(ctx, 'preferences', input, async ({ tx }, row) => {
-    await assertActiveCodes(tx, 'JOB_CATEGORY', input.categoryCodes, (i) => `categoryCodes.${i}`);
+    await assertActiveMasterData(
+      tx,
+      'JOB_CATEGORY',
+      input.categoryCodes,
+      (i) => `categoryCodes.${i}`,
+    );
     if (input.willingRadiusM !== null) {
       // Never wider than the radius the branch matches within (PRD rule 4).
       const { maxM } = await resolveMatchRadius({ branchId: row.branchId });

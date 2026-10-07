@@ -1,7 +1,12 @@
-import { MASTER_DATA_PARENT, type MasterDataType } from '@jobbank/shared';
+import {
+  DEFAULT_COMPANY_DOCUMENT_REQUIREMENTS,
+  MASTER_DATA_PARENT,
+  type LegalStructure,
+  type MasterDataType,
+} from '@jobbank/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Database } from '../client';
-import { holidays, masterData } from '../schema';
+import { companyDocumentRequirements, holidays, masterData } from '../schema';
 import type { SeedStep } from '../scripts/seed';
 
 /**
@@ -393,7 +398,40 @@ export const MASTER_DATA_SEED: Record<MasterDataType, SeedItem[]> = {
     reason('RESTRICTION_APPLIED', 'Restriction applied (blacklist)'),
     reason('OTHER', 'Other', true),
   ],
+  INDUSTRY: [
+    ['TEXTILE_GARMENTS', 'Textiles & garments'],
+    ['MANUFACTURING', 'Manufacturing'],
+    ['RETAIL', 'Retail & wholesale'],
+    ['FOOD_RESTAURANTS', 'Food & restaurants'],
+    ['HOSPITALITY', 'Hotels & hospitality'],
+    ['CONSTRUCTION', 'Construction & real estate'],
+    ['LOGISTICS', 'Transport & logistics'],
+    ['HEALTHCARE', 'Healthcare & pharmaceuticals'],
+    ['EDUCATION', 'Education & training'],
+    ['IT_SOFTWARE', 'IT & software'],
+    ['TELECOM', 'Telecommunications'],
+    ['BANKING_FINANCE', 'Banking & finance'],
+    ['SECURITY_SERVICES', 'Security services'],
+    ['FACILITY_SERVICES', 'Cleaning & facility services'],
+    ['AUTOMOTIVE', 'Automotive'],
+    ['AGRICULTURE', 'Agriculture & livestock'],
+    ['ENERGY', 'Energy & utilities'],
+    ['MEDIA_ADVERTISING', 'Media & advertising'],
+    ['NGO_NONPROFIT', 'NGO & non-profit'],
+    ['GOVERNMENT', 'Government & public sector'],
+    ['OTHER', 'Other'],
+  ].map(([code, label]) => ({ code: code!, label: label! })),
 };
+
+/** Required company documents per legal structure (M7); insert-only like the lists above. */
+export const COMPANY_DOCUMENT_REQUIREMENT_SEED = Object.entries(
+  DEFAULT_COMPANY_DOCUMENT_REQUIREMENTS,
+).flatMap(([legalStructure, codes]) =>
+  codes.map((documentTypeCode) => ({
+    legalStructure: legalStructure as LegalStructure,
+    documentTypeCode,
+  })),
+);
 
 /**
  * Gregorian-date federal holidays only. Islamic holidays (Eid ul Fitr, Eid ul Adha, Ashura,
@@ -415,7 +453,7 @@ export const HOLIDAY_SEED = [2026, 2027].flatMap((year) =>
 );
 
 export const masterDataSeed: SeedStep = {
-  name: 'master data & holidays',
+  name: 'master data, holidays & company document requirements',
   async run(db: Database) {
     await db.transaction(async (tx) => {
       // Parents first (categories before skills, cities before areas).
@@ -457,6 +495,10 @@ export const masterDataSeed: SeedStep = {
         }
       }
       await tx.insert(holidays).values(HOLIDAY_SEED).onConflictDoNothing({ target: holidays.date });
+      await tx
+        .insert(companyDocumentRequirements)
+        .values(COMPANY_DOCUMENT_REQUIREMENT_SEED)
+        .onConflictDoNothing();
     });
   },
 };

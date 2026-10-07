@@ -24,6 +24,7 @@ export function generateOtpCode(): string {
 /** Creates a fresh challenge (older open ones are superseded) and texts the code. */
 export async function issueOtp(phoneNumber: string, ipAddress: string | null): Promise<void> {
   const code = generateOtpCode();
+  console.log(`Issuing OTP for ${phoneNumber}: ${code} (expires in ${OTP_TTL_SECONDS}s)`);
   await db.transaction(async (tx) => {
     await tx
       .update(t)

@@ -7,6 +7,8 @@ export {
   type Assignment,
 } from './policy';
 export {
+  deleteStaff,
+  deleteStaffSchema,
   getStaffMember,
   grantRole,
   inviteStaff,

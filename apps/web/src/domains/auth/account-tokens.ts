@@ -85,7 +85,11 @@ async function consumeToken(executor: DbExecutor, tokenId: string): Promise<bool
   return used.length === 1;
 }
 
-async function setCredentialPassword(executor: DbExecutor, userId: string, password: string) {
+export async function setCredentialPassword(
+  executor: DbExecutor,
+  userId: string,
+  password: string,
+) {
   const hash = await hashPassword(password);
   await executor
     .insert(schema.accounts)

@@ -16,7 +16,7 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <div className="mx-auto grid w-full max-w-4xl gap-8">
+    <div className="grid w-full gap-8">
       <header className="grid gap-1">
         <h1 className="text-fg text-2xl font-semibold">Settings</h1>
         <p className="text-fg-muted text-sm">

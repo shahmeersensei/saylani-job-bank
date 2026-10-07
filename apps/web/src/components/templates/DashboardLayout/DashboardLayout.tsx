@@ -27,7 +27,7 @@ export function DashboardLayout({
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="border-border sticky top-0 hidden h-dvh border-e lg:block">
+      <aside className="sticky top-0 hidden h-dvh lg:block">
         <AppSidebar sections={navigation} brand={<BrandMark />} footer={sidebarFooter} />
       </aside>
 
@@ -35,7 +35,10 @@ export function DashboardLayout({
       <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="bg-overlay fixed inset-0 z-50 lg:hidden" />
-          <Dialog.Content className="border-border shadow-popover fixed inset-y-0 start-0 z-50 w-[min(18rem,85vw)] border-e lg:hidden">
+          <Dialog.Content
+            className="fixed inset-y-0 start-0 z-50 w-[min(17rem,85vw)] lg:hidden"
+            style={{ boxShadow: 'var(--shadow-popover)' }}
+          >
             <Dialog.Title className="sr-only">Navigation</Dialog.Title>
             <Dialog.Description className="sr-only">Main navigation menu</Dialog.Description>
             <AppSidebar
@@ -44,9 +47,14 @@ export function DashboardLayout({
                 <div className="flex w-full items-center justify-between">
                   <BrandMark />
                   <Dialog.Close asChild>
-                    <Button variant="ghost" size="icon" aria-label="Close navigation">
-                      <X />
-                    </Button>
+                    <button
+                      type="button"
+                      aria-label="Close navigation"
+                      className="rounded-lg p-1 transition-colors hover:[background-color:var(--sidebar-hover-bg)]"
+                      style={{ color: 'var(--sidebar-fg-muted)' }}
+                    >
+                      <X className="size-4" />
+                    </button>
                   </Dialog.Close>
                 </div>
               }
@@ -57,7 +65,7 @@ export function DashboardLayout({
         </Dialog.Portal>
       </Dialog.Root>
 
-      <div className="flex min-w-0 flex-col">
+      <div className="bg-bg flex min-w-0 flex-col">
         <TopBar {...topBar} onMenuClick={() => setDrawerOpen(true)} />
         <main id="main" tabIndex={-1} className="page-gutter flex-1 py-6 outline-none">
           {children}

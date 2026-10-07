@@ -14,16 +14,33 @@ export function AppSidebar({ sections, brand, footer, onNavigate, className }: A
   const pathname = usePathname() ?? '';
 
   return (
-    <div className={cn('bg-surface flex h-full flex-col', className)}>
+    <div
+      className={cn('flex h-full flex-col', className)}
+      style={{
+        backgroundColor: 'var(--sidebar-bg)',
+        borderRight: '1px solid var(--sidebar-border)',
+      }}
+    >
+      {/* Brand row */}
       {brand && (
-        <div className="border-border flex h-16 shrink-0 items-center border-b px-4">{brand}</div>
+        <div
+          className="flex h-16 shrink-0 items-center px-5"
+          style={{ borderBottom: '1px solid var(--sidebar-border)' }}
+        >
+          {brand}
+        </div>
       )}
-      <nav aria-label="Main" className="relative flex-1 scrollbar-thin overflow-y-auto px-3 py-4">
+
+      {/* Nav */}
+      <nav aria-label="Main" className="flex-1 overflow-y-auto px-4 py-5">
         <div className="grid gap-6">
           {sections.map((section, sectionIndex) => (
             <div key={section.title ?? sectionIndex} className="grid gap-1">
               {section.title && (
-                <p className="text-fg-subtle px-3 pb-1 text-xs font-semibold tracking-wide uppercase">
+                <p
+                  className="px-2 pb-2 text-[10px] font-bold tracking-[0.1em] uppercase"
+                  style={{ color: 'var(--sidebar-fg-muted)' }}
+                >
                   {section.title}
                 </p>
               )}
@@ -38,16 +55,35 @@ export function AppSidebar({ sections, brand, footer, onNavigate, className }: A
                         onClick={onNavigate}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                          'focus-visible:focus-ring flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                          'focus-visible:focus-ring relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-100',
                           active
-                            ? 'bg-primary-soft text-primary-soft-fg'
-                            : 'text-fg-muted hover:bg-surface-muted hover:text-fg',
+                            ? 'bg-[var(--sidebar-active-bg)]'
+                            : 'hover:bg-[var(--sidebar-hover-bg)]',
                         )}
+                        style={{ color: active ? 'var(--primary)' : 'var(--sidebar-fg)' }}
                       >
-                        <Icon className="size-4 shrink-0" aria-hidden="true" />
+                        {/* Active left bar */}
+                        {active && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
+                            style={{ background: 'var(--primary)' }}
+                          />
+                        )}
+                        <Icon
+                          className="size-[18px] shrink-0"
+                          aria-hidden="true"
+                          style={{ color: active ? 'var(--primary)' : 'var(--sidebar-fg-muted)' }}
+                        />
                         <span className="flex-1 truncate">{item.label}</span>
                         {item.badge !== undefined && item.badge > 0 && (
-                          <span className="bg-danger text-danger-fg numeric rounded-full px-1.5 py-0.5 text-xs font-semibold">
+                          <span
+                            className="numeric rounded-full px-1.5 py-0.5 text-[11px] font-bold"
+                            style={{
+                              background: 'var(--surface-sunken)',
+                              color: 'var(--fg-muted)',
+                            }}
+                          >
                             {item.badge > 99 ? '99+' : item.badge}
                             <span className="sr-only"> pending</span>
                           </span>
@@ -61,7 +97,13 @@ export function AppSidebar({ sections, brand, footer, onNavigate, className }: A
           ))}
         </div>
       </nav>
-      {footer && <div className="border-border shrink-0 border-t p-3">{footer}</div>}
+
+      {/* Footer */}
+      {footer && (
+        <div className="shrink-0 p-4" style={{ borderTop: '1px solid var(--sidebar-border)' }}>
+          {footer}
+        </div>
+      )}
     </div>
   );
 }

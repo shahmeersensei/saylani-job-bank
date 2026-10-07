@@ -1,7 +1,7 @@
 'use client';
 
 import { BRANCH_SCOPED_ROLES, ROLE_LABELS, type Role } from '@jobbank/shared';
-import { MailPlus, ShieldOff, Trash2, UserCheck, UserX } from 'lucide-react';
+import { MailPlus, ShieldOff, Trash2, UserCheck, UserMinus, UserX } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Badge, Button, Input, Select } from '@/components/atoms';
@@ -26,9 +26,11 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 export function StaffDetailView({
   staff,
   branches,
+  listPath,
 }: {
   staff: StaffDetail;
   branches: BranchOption[];
+  listPath: string;
 }) {
   const router = useRouter();
   const [profile, setProfile] = useState({ name: staff.name, title: staff.title ?? '' });
@@ -191,6 +193,30 @@ export function StaffDetailView({
                 }
               />
             )}
+            <ConfirmDialog
+              title={`Delete ${staff.name}?`}
+              description="This permanently removes the account and all its data. It cannot be undone."
+              tone="danger"
+              confirmLabel="Delete account"
+              requireReason={{
+                label: 'Reason',
+                minLength: 5,
+                placeholder: 'Recorded in the audit log',
+              }}
+              onConfirm={async (reason) => {
+                await apiFetch(`/api/v1/users/${staff.id}`, {
+                  method: 'DELETE',
+                  body: { reason },
+                });
+                toast.success('Account deleted');
+                router.push(listPath);
+              }}
+              trigger={
+                <Button variant="danger" leftIcon={<UserMinus />}>
+                  Delete account
+                </Button>
+              }
+            />
           </div>
         )}
       </Card>

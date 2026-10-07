@@ -11,15 +11,13 @@ import {
   type JobType,
   type LanguageProficiency,
   type MasterDataMeta,
-  type MasterDataType,
   type Shift,
   type SkillLevel,
 } from '@jobbank/shared';
 import { and, asc, count, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { getBranchContact, type BranchContact } from '@/domains/branch';
-import { findMasterDataByCodes } from '@/domains/settings';
 import type { CommandScope, RequestContext } from '@/domains/shared/audit';
-import { NotFoundError, ValidationError } from '@/domains/shared/errors';
+import { NotFoundError } from '@/domains/shared/errors';
 import type { Actor } from '@/domains/shared/scope';
 import { db, type DbExecutor } from '@/lib/db';
 import { applicantMachine } from './machine';
@@ -314,32 +312,6 @@ export async function refreshProfileState(
   }
   if (Object.keys(changes).length > 0) await tx.update(a).set(changes).where(eq(a.id, row.id));
   return { status, completeness };
-}
-
-// ─── Master-data references ────────────────────────────────────────────
-
-/**
- * Checks that every code exists in `type` and is active; returns the items by code.
- * Issues point at `path(index)` so the form can highlight the right row.
- */
-export async function assertActiveCodes(
-  executor: DbExecutor,
-  type: MasterDataType,
-  codes: readonly string[],
-  path: (index: number) => string,
-) {
-  const found = new Map(
-    (await findMasterDataByCodes(type, codes, executor)).map((item) => [item.code, item]),
-  );
-  const issues = codes.flatMap((code, index) => {
-    const item = found.get(code);
-    if (!item) return [{ path: path(index), message: 'Choose an option from the list' }];
-    if (!item.isActive)
-      return [{ path: path(index), message: `"${item.label}" is no longer offered; remove it` }];
-    return [];
-  });
-  if (issues.length > 0) throw new ValidationError(issues);
-  return found;
 }
 
 // ─── Full profile ──────────────────────────────────────────────────────

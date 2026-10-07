@@ -53,12 +53,20 @@ export async function loadActor(userId: string, requestedActiveBranch?: string):
   ]);
 
   const roles = [...new Set(assignments.map((a) => a.role as Role))];
-  const [applicant] = roles.includes('APPLICANT')
-    ? await db
-        .select({ id: schema.applicants.id })
-        .from(schema.applicants)
-        .where(eq(schema.applicants.userId, userId))
-    : [];
+  const [[applicant], [membership]] = await Promise.all([
+    roles.includes('APPLICANT')
+      ? db
+          .select({ id: schema.applicants.id })
+          .from(schema.applicants)
+          .where(eq(schema.applicants.userId, userId))
+      : [],
+    roles.includes('EMPLOYER')
+      ? db
+          .select({ companyId: schema.companyMembers.companyId })
+          .from(schema.companyMembers)
+          .where(eq(schema.companyMembers.userId, userId))
+      : [],
+  ]);
   const branchIds = [
     ...new Set(assignments.map((a) => a.branchId).filter((id): id is string => id !== null)),
   ];
@@ -80,8 +88,7 @@ export async function loadActor(userId: string, requestedActiveBranch?: string):
     permissions: permissionsFor(roles),
     branchIds,
     activeBranchId,
-    // Filled in by M7 (companies).
-    companyId: null,
+    companyId: membership?.companyId ?? null,
     applicantId: applicant?.id ?? null,
     twoFactorPending: requiresTwoFactor(roles) && !user?.twoFactorEnabled,
   };

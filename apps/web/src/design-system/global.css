@@ -52,10 +52,15 @@
   --color-focus: var(--focus);
   --color-overlay: var(--overlay);
 
-  --shadow-card:
-    0 1px 2px hsl(var(--shadow-color) / 0.06), 0 1px 3px hsl(var(--shadow-color) / 0.08);
-  --shadow-popover:
-    0 4px 6px hsl(var(--shadow-color) / 0.08), 0 10px 24px hsl(var(--shadow-color) / 0.14);
+  --shadow-card: var(--shadow-card);
+  --shadow-popover: var(--shadow-popover);
+  --shadow-sidebar: var(--shadow-sidebar);
+
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-fg: var(--sidebar-fg);
+  --color-sidebar-fg-muted: var(--sidebar-fg-muted);
+  --color-sidebar-active-bg: var(--sidebar-active-bg);
+  --color-sidebar-hover-bg: var(--sidebar-hover-bg);
 }
 
 @layer base {

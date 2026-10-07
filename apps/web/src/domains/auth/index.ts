@@ -21,6 +21,11 @@ export {
   type SessionUser,
 } from './actor';
 export { getAuth, isPlaceholderEmail, placeholderEmailFor, SESSION_COOKIE_PREFIX } from './auth';
+export {
+  requestEmployerSignupCode,
+  signUpEmployer,
+  SIGNUP_CODE_TTL_SECONDS,
+} from './employer-signup';
 export { getServerAuthState, requireRole, requireSignedIn } from './server-session';
 export {
   AccountBlockedError,

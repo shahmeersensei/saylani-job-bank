@@ -17,6 +17,7 @@ export const MASTER_DATA_TYPES = [
   'BLACKLIST_REASON',
   'VERIFICATION_REJECTION_REASON',
   'WITHDRAWAL_REASON',
+  'INDUSTRY',
 ] as const;
 
 export type MasterDataType = (typeof MASTER_DATA_TYPES)[number];
@@ -34,6 +35,7 @@ export const MASTER_DATA_TYPE_LABELS: Record<MasterDataType, string> = {
   BLACKLIST_REASON: 'Blacklist reasons',
   VERIFICATION_REJECTION_REASON: 'Company verification rejection reasons',
   WITHDRAWAL_REASON: 'Match withdrawal reasons',
+  INDUSTRY: 'Industries',
 };
 
 /** Which type an item's parent must be, and whether a parent is required. */
@@ -119,6 +121,7 @@ export const MASTER_DATA_META = {
   }),
   VERIFICATION_REJECTION_REASON: reasonMeta,
   WITHDRAWAL_REASON: reasonMeta,
+  INDUSTRY: z.strictObject({}),
 } as const satisfies Record<MasterDataType, z.ZodType>;
 
 export type MasterDataMeta<T extends MasterDataType> = z.infer<(typeof MASTER_DATA_META)[T]>;

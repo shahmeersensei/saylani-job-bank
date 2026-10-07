@@ -78,6 +78,27 @@
       "when": 1790934620434,
       "tag": "0010_applicant_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790939886242,
+      "tag": "0011_companies",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790939894674,
+      "tag": "0012_company_triggers",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791015643649,
+      "tag": "0013_jobs",
+      "breakpoints": true
     }
   ]
 }

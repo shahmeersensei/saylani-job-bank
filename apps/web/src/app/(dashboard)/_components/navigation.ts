@@ -2,8 +2,10 @@ import type { Role } from '@jobbank/shared';
 import { ROLE_HOME } from '@jobbank/shared';
 import {
   Building2,
+  CheckSquare,
   Contact,
   FileText,
+  Briefcase,
   Gauge,
   ListTree,
   SlidersHorizontal,
@@ -39,6 +41,13 @@ export function navigationFor(role: Role): { title?: string; items: NavItemConfi
           items: [{ href: '/super-admin/applicants', label: 'Applicants', icon: Contact }],
         },
         {
+          title: 'Employers',
+          items: [
+            { href: '/super-admin/companies', label: 'Companies', icon: Building2 },
+            { href: '/super-admin/jobs', label: 'Jobs', icon: Briefcase },
+          ],
+        },
+        {
           title: 'Administration',
           items: [
             { href: '/super-admin/branches', label: 'Branches', icon: Building2 },
@@ -54,8 +63,19 @@ export function navigationFor(role: Role): { title?: string; items: NavItemConfi
           items: [
             overview,
             { href: '/branch-admin/applicants', label: 'Applicants', icon: Contact },
+            { href: '/branch-admin/companies', label: 'Companies', icon: Building2 },
+            { href: '/branch-admin/jobs', label: 'Jobs', icon: Briefcase },
             { href: '/branch-admin/staff', label: 'Staff', icon: Users },
             { href: '/branch-admin/settings', label: 'Branch settings', icon: SlidersHorizontal },
+          ],
+        },
+      ];
+    case 'VERIFIER':
+      return [
+        {
+          items: [
+            overview,
+            { href: '/verifier/queue', label: 'Verification queue', icon: CheckSquare },
           ],
         },
       ];
@@ -72,6 +92,16 @@ export function navigationFor(role: Role): { title?: string; items: NavItemConfi
             overview,
             { href: '/applicant/profile', label: 'My profile', icon: UserRound },
             { href: '/applicant/documents', label: 'Documents', icon: FileText },
+          ],
+        },
+      ];
+    case 'EMPLOYER':
+      return [
+        {
+          items: [
+            overview,
+            { href: '/employer/company', label: 'Company', icon: Building2 },
+            { href: '/employer/jobs', label: 'Jobs', icon: Briefcase },
           ],
         },
       ];
