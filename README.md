@@ -40,14 +40,15 @@ pnpm dev                  # http://localhost:3000
 
 ### Local services
 
-| Service             | Address                                                   | Credentials                                  |
+| Service | Address |
+entials |
 | ------------------- | --------------------------------------------------------- | -------------------------------------------- |
-| App                 | http://localhost:3000                                     | —                                            |
-| Health check        | http://localhost:3000/api/v1/health                       | —                                            |
-| PostgreSQL          | `localhost:5433`, db `jobbank` (tests use `jobbank_test`) | owner `jobbank/jobbank`, app `app_rw/app_rw` |
-| S3 (SeaweedFS)      | http://localhost:8333, bucket `jobbank-documents`         | `jobbank` / `jobbank-dev-secret`             |
-| Redis               | `localhost:6380`                                          | —                                            |
-| Mailpit (dev inbox) | http://localhost:8025                                     | —                                            |
+| App | http://localhost:3000 | — |
+| Health check | http://localhost:3000/api/v1/health | — |
+| PostgreSQL | `localhost:5433`, db `jobbank` (tests use `jobbank_test`) | owner `jobbank/jobbank`, app `app_rw/app_rw` |
+| S3 (SeaweedFS) | http://localhost:8333, bucket `jobbank-documents` | `jobbank` / `jobbank-dev-secret` |
+| Redis | `localhost:6380` | — |
+| Mailpit (dev inbox) | http://localhost:8025 | — |
 
 The ports are 5433 and 6380 rather than the defaults, so they don't clash with a local Postgres or Redis.
 

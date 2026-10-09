@@ -122,7 +122,7 @@ function useCountUp(end: number, suffix = '', duration = 2000) {
     if (!el) return;
     const obs = new IntersectionObserver(
       ([e]) => {
-        if (!e.isIntersecting || started.current) return;
+        if (!e?.isIntersecting || started.current) return;
         started.current = true;
         const t0 = performance.now();
         const tick = (now: number) => {
