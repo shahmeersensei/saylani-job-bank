@@ -10,7 +10,9 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test --continue",
+    "test": "turbo run test --continue && pnpm test:jest && pnpm test:e2e",
+    "test:jest": "pnpm --filter @jobbank/web test:jest",
+    "test:e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "infra:up": "docker compose up -d --wait postgres seaweedfs redis mailpit && docker compose run --rm s3-init",
@@ -25,10 +27,14 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
+    "@playwright/test": "^1.63.0",
+    "@types/jest": "^30.0.0",
     "husky": "^9.1.7",
+    "jest": "^30.5.2",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.7.0",
+    "ts-jest": "^29.4.14",
     "turbo": "^2.11.6",
     "typescript": "5.9.3"
   }

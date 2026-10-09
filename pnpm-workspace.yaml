@@ -4,6 +4,8 @@ packages:
 # Dependencies allowed to run install scripts (pnpm blocks all others).
 allowBuilds:
   esbuild: true
+  '@parcel/watcher': true
+  unrs-resolver: true
 # Packages pnpm's release-age policy flagged as too new; pinned on purpose.
 minimumReleaseAgeExclude:
   - '@next/env@15.5.27'

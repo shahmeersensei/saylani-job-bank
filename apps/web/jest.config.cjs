@@ -1,0 +1,87 @@
+/** Jest runs the backend (API) tests: route handlers invoked in-process, like the Vitest integration suite. */
+/** @type {import('jest').Config} */
+module.exports = {
+  testEnvironment: 'node',
+  rootDir: __dirname,
+  roots: ['<rootDir>/../../tests/api'], // tests live at <repo>/tests/api
+  testMatch: ['**/*.test.ts'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^server-only$': '<rootDir>/src/test/server-only-stub.ts',
+    '^@jobbank/shared$': '<rootDir>/../../packages/shared/src/index.ts',
+    '^@jobbank/db$': '<rootDir>/../../packages/db/src/index.ts',
+    '^@jobbank/db/(.*)$': '<rootDir>/../../packages/db/src/$1',
+  },
+  transform: {
+    '^.+\\.[cm]?[jt]sx?$': [
+      'ts-jest',
+      { tsconfig: '<rootDir>/tsconfig.jest.json', diagnostics: false },
+    ],
+  },
+  // Workspace packages live outside node_modules (pnpm symlinks), so they are transformed.
+  // These packages ship ESM only (type:module or .mjs with no "require" export); on
+  // Node < 24.9 Jest cannot require() them natively, so they are compiled to CJS here.
+  transformIgnorePatterns: [
+    '/node_modules/(?!.*(?:' +
+      [
+        'better-auth',
+        '@better-auth',
+        'better-call',
+        'jose',
+        'kysely',
+        '@better-fetch',
+        '@scure',
+        'uncrypto',
+        'defu',
+        'nanoid',
+        'zod-validation-error',
+        '@noble',
+        '@scure',
+        'nanostores',
+        '@t3-oss',
+        'is-plain-obj',
+        'ansi-regex',
+        'ansi-styles',
+        'cliui',
+        'string-width',
+        'strip-ansi',
+        'wrap-ansi',
+        'yargs',
+        'argue-cli',
+        'global-directory',
+        'std-env',
+        'estree-walker',
+        'magic-string',
+        'rou3',
+        'tinyexec',
+        '@asamuzakjp',
+        '@csstools',
+        '@humanfs',
+        '@oxc-project',
+        '@rolldown',
+        '@simple-libs',
+        '@conventional-changelog',
+        'conventional-changelog',
+        'conventional-commits-parser',
+        'node-releases',
+        'get-east-asian-width',
+        '@eslint/core',
+        '@vitejs',
+        '@types/chai',
+        'prettier-plugin-tailwindcss',
+        'rolldown',
+        'why-is-node-running',
+        'husky',
+        'lint-staged',
+        'tsx',
+        'vite',
+        'pnpm',
+      ].join('|') +
+      '))',
+  ],
+  setupFiles: ['<rootDir>/../../tests/api/setup-env.ts'],
+  testTimeout: 30_000,
+  clearMocks: true,
+  // The suite talks to one database and one rate limiter; keep it deterministic.
+  maxWorkers: 1,
+};
