@@ -20,6 +20,10 @@ function loadRootEnv(file = path.resolve(process.cwd(), '.env')): void {
   }
 }
 loadRootEnv();
+// The root `.env` ships `BETTER_AUTH_SECRET=` (empty). Development tolerates it, `next start`
+// refuses every request with "BETTER_AUTH_SECRET must be set in production", so the E2E run
+// supplies one. Filling it in for real belongs to deployment config, not to the app.
+process.env.BETTER_AUTH_SECRET ||= 'e2e-only-secret-e2e-only-secret-e2e';
 
 const PORT = process.env.PORT ?? '3000';
 const baseURL = `http://localhost:${PORT}`;
