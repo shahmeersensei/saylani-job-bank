@@ -12,12 +12,11 @@ import {
   XCircle,
 } from 'lucide-react';
 import NextLink from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { Badge, Button, Input, Select, StatusPill, Textarea } from '@/components/atoms';
+import { useRef, useState } from 'react';
+import { Badge, Button, Select, StatusPill, Textarea } from '@/components/atoms';
 import { FormField, KeyValue } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
-import type { CompanyView } from '@/domains/company/repository';
+import type { CompanyView } from '@/domains/company';
 
 const STATUS_PILL: Record<
   CompanyStatus,
@@ -43,12 +42,12 @@ const REJECTION_REASONS = [
 
 export function VerifierReviewPanel({
   company,
-  actorId,
+  actorId: _actorId,
 }: {
   company: CompanyView;
   actorId: string;
 }) {
-  const router = useRouter();
+  const idempotencyKeys = useRef(new Map<string, string>());
   const [company_, setCompany_] = useState(company);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +61,19 @@ export function VerifierReviewPanel({
   const pill = STATUS_PILL[company_.status];
   const isClaimed = !!ver?.state && ver.state === 'UNDER_VERIFICATION';
 
-  async function callAction(action: string, body?: Record<string, unknown>) {
+  function idempotencyKey(action: string) {
+    const key = idempotencyKeys.current.get(action);
+    if (key) return key;
+    const generated = crypto.randomUUID();
+    idempotencyKeys.current.set(action, generated);
+    return generated;
+  }
+
+  async function callAction(
+    action: string,
+    body?: Record<string, unknown>,
+    key = idempotencyKey(action),
+  ) {
     setPending(action);
     setError(null);
     try {
@@ -71,6 +82,7 @@ export function VerifierReviewPanel({
         {
           method: 'POST',
           body,
+          idempotencyKey: key,
         },
       );
       setCompany_(saved);
@@ -98,10 +110,15 @@ export function VerifierReviewPanel({
   async function reviewDoc(docId: string, status: 'ACCEPTED' | 'REJECTED', note?: string) {
     setPending(`doc-${docId}`);
     setError(null);
+    const action = `review-${docId}-${status}`;
     try {
       const { data: saved } = await apiFetch<CompanyView>(
         `/api/v1/companies/${company_.id}/documents/${docId}/review`,
-        { method: 'PATCH', body: { status, note: note ?? null } },
+        {
+          method: 'PATCH',
+          body: { decision: status, note: note ?? null },
+          idempotencyKey: idempotencyKey(action),
+        },
       );
       setCompany_(saved);
     } catch (err) {
@@ -118,11 +135,15 @@ export function VerifierReviewPanel({
   }
 
   async function verify() {
-    await callAction('verify', {});
+    await callAction('verify', {}, idempotencyKey('verify'));
   }
 
   async function reject() {
-    await callAction('reject', { reasonCode: rejectReason, note: rejectNote || null });
+    await callAction(
+      'reject',
+      { reasonCode: rejectReason, note: rejectNote || null },
+      idempotencyKey('reject'),
+    );
     setShowRejectForm(false);
   }
 

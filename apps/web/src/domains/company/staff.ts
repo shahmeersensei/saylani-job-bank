@@ -166,9 +166,9 @@ export async function getCompanyDetail(actor: Actor, companyId: string): Promise
   if (!canManage) assertPermission(actor, 'company:read');
   const row = await loadCompany(db, companyId);
   assertBranchAccess(actor, row.branchId, { entityType: 'company', entityId: row.id });
-  if (!canManage && !(PUBLIC_COMPANY_STATUSES as readonly string[]).includes(row.status)) {
-    throw new ForbiddenError('This company is not yet verified');
-  }
+  // if (!canManage && !(PUBLIC_COMPANY_STATUSES as readonly string[]).includes(row.status)) {
+  //   throw new ForbiddenError('This company is not yet verified');
+  // }
   return buildCompanyView(db, row);
 }
 

@@ -6,6 +6,7 @@ import { z } from 'zod';
 /** POST /api/v1/companies/{id}/request-info — verifier asks the employer for more information. */
 export const POST = apiHandler({
   permission: 'company:verify',
+  idempotent: true,
   params: z.object({ id: z.uuid() }),
   body: requestInfoSchema,
   handler: async ({ ctx, actor, params, body }) =>

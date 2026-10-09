@@ -10,7 +10,7 @@ import {
 } from '@jobbank/shared';
 import { ArrowLeft, ArrowRight, Building2, CheckCircle2, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Badge, Input, Select, StatusPill, Textarea } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
@@ -71,9 +71,11 @@ interface DetailsForm {
 function DetailsStep({
   company,
   onSaved,
+  idempotencyKey,
 }: {
   company: CompanyView | null;
   onSaved: (c: CompanyView) => void;
+  idempotencyKey: string;
 }) {
   const d = company?.details;
   const [form, setForm] = useState<DetailsForm>({
@@ -121,6 +123,7 @@ function DetailsStep({
         ({ data: saved } = await apiFetch<CompanyView>('/api/v1/companies/register', {
           method: 'POST',
           body,
+          idempotencyKey,
         }));
       } else {
         ({ data: saved } = await apiFetch<CompanyView>('/api/v1/companies/me', {
@@ -602,9 +605,11 @@ function DocumentsStep({
 function SubmitStep({
   company,
   onSubmitted,
+  idempotencyKey,
 }: {
   company: CompanyView;
   onSubmitted: (c: CompanyView) => void;
+  idempotencyKey: string;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -619,6 +624,7 @@ function SubmitStep({
     try {
       const { data: saved } = await apiFetch<CompanyView>('/api/v1/companies/me/submit', {
         method: 'POST',
+        idempotencyKey,
       });
       onSubmitted(saved);
     } catch (err) {
@@ -726,6 +732,7 @@ export function CompanyWizard({
   initialCompany: CompanyView | null;
 }) {
   const router = useRouter();
+  const idempotencyKey = useRef(crypto.randomUUID());
   const [company, setCompany] = useState<CompanyView | null>(initialCompany);
   const [currentStep, setCurrentStep] = useState<WizardStep>(() => {
     const valid = STEPS.map((s) => s.id);
@@ -790,7 +797,9 @@ export function CompanyWizard({
       </nav>
 
       <div className="border-border bg-surface rounded-xl border p-6">
-        {currentStep === 'details' && <DetailsStep company={company} onSaved={saved} />}
+        {currentStep === 'details' && (
+          <DetailsStep company={company} onSaved={saved} idempotencyKey={idempotencyKey.current} />
+        )}
         {currentStep === 'contacts' && company && (
           <ContactsStep company={company} onSaved={saved} />
         )}
@@ -803,6 +812,7 @@ export function CompanyWizard({
         {currentStep === 'submit' && company && (
           <SubmitStep
             company={company}
+            idempotencyKey={idempotencyKey.current}
             onSubmitted={(c) => {
               setCompany(c);
             }}
