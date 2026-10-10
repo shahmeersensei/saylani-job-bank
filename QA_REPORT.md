@@ -362,5 +362,5 @@ pnpm exec playwright install chromium                  # pehli baar
 pnpm test:e2e                                          # prod build + browser
 ```
 
-Artifacts: `playwright-report/index.html`, `playwright-report/results.json`,
-`test-results/` (screenshots + traces), logs: `e2e-run.log`, `vitest-run.log`, `prod-server.log`.
+Artifacts: `tests/reports/e2e-results.json` (Playwright JSON reporter). Consolidated
+report (E2E + load + security): `tests/reports/index.html` (`pnpm test:reports`).

@@ -91,5 +91,5 @@ pnpm test:jest                                      # API only (~40 s warm)
 pnpm test:e2e                                       # builds, then browser suite
 ```
 
-Artifacts: `playwright-report/index.html`, `playwright-report/results.json`,
-`test-results/` (screenshots + traces — `pnpm exec playwright show-trace <trace.zip>`).
+Artifacts: `tests/reports/e2e-results.json` (Playwright JSON reporter) — consolidated
+human-readable report: `tests/reports/index.html` (`pnpm test:reports`).

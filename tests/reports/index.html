@@ -37,16 +37,16 @@
 </style></head><body>
 <header>
   <h1>Saylani Job Bank — Consolidated Test Report</h1>
-  <span class="meta">branch <code>test/api-and-ui-test-suites</code> · 2026-10-10T17:00:39.041Z</span>
+  <span class="meta">branch <code>test/api-and-ui-test-suites</code> · 2026-10-10T17:33:49.083Z</span>
   <nav>
-    <a href="#summary">Summary</a><a href="#qa">QA</a><a href="#load">Load</a><a href="#security">Security</a><a href="#repro">Reproduce</a>
+    <a href="#summary">Summary</a><a href="#e2e">E2E</a><a href="#qa">QA</a><a href="#load">Load</a><a href="#security">Security</a><a href="#repro">Reproduce</a>
   </nav>
 </header>
 <main>
 
 <section id="summary">
   <h2>Summary</h2>
-  <p class="sub">Functional QA + API/Web/DB load + security, ek jagah. Testing only — developers fix.</p>
+  <p class="sub">E2E (Playwright) + functional QA defects + API/Web/DB load + security, ek jagah. Testing only — developers fix.</p>
   <div class="grid">
     <div class="card"><div class="k">QA defects</div><div class="v">13</div><div class="muted">3 critical · 8 major · 2 minor</div></div>
     <div class="card"><div class="k">E2E (Playwright)</div><div class="v">44 / 54</div><div class="muted">10 failed (documented)</div></div>
@@ -56,17 +56,40 @@
   </div>
 </section>
 
+<section id="e2e">
+  <h2>1 · E2E (Playwright)</h2>
+  <p class="sub">JSON: <code>e2e-results.json</code> · Full defect write-up: <a href="../../QA_REPORT.md">QA_REPORT.md</a></p>
+  
+    <div class="summary bad">FAIL — 11/12 passed · 91.7% pass rate · 1 browser project(s)</div>
+    <div style="margin-bottom:10px"><span class="chip bad">chromium 11/12</span></div>
+    <h3>Per-file</h3>
+    <table><thead><tr><th>Spec file</th><th>Status</th><th>Passed</th><th>Duration</th></tr></thead><tbody><tr><td><code>health.spec.ts</code></td><td><span class="chip ok">all passed</span></td><td>2/2</td><td>0.7s</td></tr><tr><td><code>home.spec.ts</code></td><td><span class="chip ok">all passed</span></td><td>3/3</td><td>29.2s</td></tr><tr><td><code>login.spec.ts</code></td><td><span class="chip bad">1 failed</span></td><td>6/7</td><td>68.3s</td></tr></tbody></table>
+    <h3>Failures</h3>
+    <details open><summary>1 failed tests</summary>
+      <table><thead><tr><th>File</th><th>Test</th><th>Project</th><th>Error</th></tr></thead><tbody>
+      <tr><td><code>login.spec.ts</code></td><td>job seeker requests an SMS code and reaches the code step</td><td>chromium</td><td class="bad">Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+Locator: getByText(/Enter the 6-digit code sent to/)
+Expected: visible
+Timeout: 30000ms
+Error: element(s) not found
+
+Call log:
+[2m  - Expect &quot;toBeVi</td></tr>
+      </tbody></table></details>
+</section>
+
 <section id="qa">
-  <h2>1 · QA — Functional defects</h2>
+  <h2>2 · QA — Functional defects</h2>
   <p class="sub">Full detail: <a href="../../QA_REPORT.md">QA_REPORT.md</a></p>
   <table><thead><tr><th>ID</th><th>Severity</th><th>Area</th><th>Defect</th></tr></thead><tbody><tr><td><code>D-01</code></td><td><span class="chip bad">Critical</span></td><td>Backend/Config</td><td>Prod server 500 on every request (BETTER_AUTH_SECRET empty)</td></tr><tr><td><code>D-02</code></td><td><span class="chip bad">Critical</span></td><td>Backend/Auth</td><td>SMS login broken in prod + OTP leaked to logs</td></tr><tr><td><code>D-03</code></td><td><span class="chip bad">Critical</span></td><td>Auth/Seed</td><td>Seeded admin stuck in 2FA gate, dashboard unreachable</td></tr><tr><td><code>D-04</code></td><td><span class="chip warn">Major</span></td><td>Tooling</td><td>Lint 39 errors — CI blocked</td></tr><tr><td><code>D-05</code></td><td><span class="chip warn">Major</span></td><td>API</td><td>Unknown route returns HTML 404, not JSON envelope</td></tr><tr><td><code>D-06</code></td><td><span class="chip warn">Major</span></td><td>Security</td><td>No security headers (CSP/HSTS/X-Frame-Options)</td></tr><tr><td><code>D-07</code></td><td><span class="chip warn">Major</span></td><td>Security</td><td>creds.txt + 2FA backup codes committed to repo</td></tr><tr><td><code>D-08</code></td><td><span class="chip warn">Major</span></td><td>UX/Backend</td><td>Login rate-limit tight, no UI cooldown feedback</td></tr><tr><td><code>D-09</code></td><td><span class="chip warn">Major</span></td><td>A11y/UI</td><td>/forbidden has no &lt;h1&gt;</td></tr><tr><td><code>D-12</code></td><td><span class="chip warn">Major</span></td><td>CI</td><td>CI missing playwright install step + lint blocks pipeline</td></tr><tr><td><code>D-13</code></td><td><span class="chip warn">Major</span></td><td>Security/Dep</td><td>9 vulnerable npm advisories (audit-ci --moderate)</td></tr><tr><td><code>D-10</code></td><td><span class="chip info">Minor</span></td><td>UI</td><td>Select restyle mismatches Input/Textarea</td></tr><tr><td><code>D-11</code></td><td><span class="chip info">Minor</span></td><td>Perf</td><td>next dev login 49s (known)</td></tr></tbody></table>
 </section>
 
 <section id="load">
-  <h2>2 · Load testing</h2>
+  <h2>3 · Load testing</h2>
 
   <h3>API (Artillery) — <code>pnpm test:api-load</code></h3>
-  <p class="sub">Target <code>/api/v1/health</code>, protected 401, unknown-route envelope · HTML: <a href="load-api.html">load-api.html</a></p>
+  <p class="sub">Target <code>/api/v1/health</code>, protected 401, unknown-route envelope · JSON: <code>load-api.json</code></p>
   
     <table>
       <tr><th>Requests</th><td>700 <span class="muted">(failed vusers: 0)</span></td></tr>
@@ -79,7 +102,7 @@
     </table>
 
   <h3>Web (Artillery) — <code>pnpm test:web-load</code></h3>
-  <p class="sub">Landing/login/register/forgot + protected redirect · HTML: <a href="load-web.html">load-web.html</a></p>
+  <p class="sub">Landing/login/register/forgot + protected redirect · JSON: <code>load-web.json</code></p>
   
     <table>
       <tr><th>Requests</th><td>625 <span class="muted">(failed vusers: 0)</span></td></tr>
@@ -97,7 +120,7 @@
 </section>
 
 <section id="security">
-  <h2>3 · Security</h2>
+  <h2>4 · Security</h2>
   <p class="sub">Dependency + config audit via <code>audit-ci --moderate</code> (<code>pnpm test:security</code>)</p>
   
     <div class="summary bad">FAIL — 9 unique advisories (audit-ci --moderate)</div>
@@ -156,12 +179,15 @@ https://github.com/advisories/GHSA-vfj7-8cjw-p6xm[0m
 <section id="repro">
   <h2>Reproduce</h2>
   <pre class="log">pnpm infra:up &amp;&amp; pnpm db:migrate &amp;&amp; pnpm db:seed
-pnpm --filter @jobbank/web build &amp;&amp; pnpm --filter @jobbank/web start   # for load tests
-pnpm test:api-load      # API load
-pnpm test:web-load      # Web load
-pnpm test:db-load       # DB stress
-pnpm test:security      # audit-ci
-pnpm test:reports       # regenerate this report</pre>
+pnpm --filter @jobbank/web build &amp;&amp; pnpm --filter @jobbank/web start   # for load/visual/cross
+pnpm test:e2e              # functional E2E (chromium)  → e2e-results.json
+pnpm test:visual-verify    # visual regression
+pnpm test:cross-browser    # chromium + firefox + webkit
+pnpm test:api-load         # API load
+pnpm test:web-load         # Web load
+pnpm test:db-load          # DB stress
+pnpm test:security         # audit-ci
+pnpm test:reports          # regenerate this index.html</pre>
 </section>
 
 </main></body></html>

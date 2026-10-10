@@ -50,11 +50,9 @@ export default defineConfig({
   // session/OTP rate limits comfortably below their ceilings.
   workers: 2,
   timeout: 120_000,
-  reporter: [
-    ['list'],
-    ['html', { open: 'never', outputFolder: 'playwright-report' }],
-    ['json', { outputFile: 'playwright-report/results.json' }],
-  ],
+  // JSON only — heavy Playwright HTML report (playwright-report/) disabled. Consolidated
+  // human report lives at tests/reports/index.html (pnpm test:reports) which reads this JSON.
+  reporter: [['list'], ['json', { outputFile: 'tests/reports/e2e-results.json' }]],
   use: {
     baseURL,
     trace: 'retain-on-failure',

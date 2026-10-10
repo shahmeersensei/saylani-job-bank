@@ -1,6 +1,7 @@
 /**
  * Generates a self-contained, Playwright-style HTML report at
- * tests/reports/index.html covering: QA defects, load (API/Web/DB), security.
+ * tests/reports/index.html covering: E2E (Playwright JSON), QA defects,
+ * load (API/Web/DB), security.
  *
  * Usage: node tests/generate-report.js   (already wired into pnpm test:reports)
  */
@@ -28,6 +29,92 @@ const esc = (s) =>
     /[&<>"]/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
   );
+
+// ---- Playwright JSON reporter → per-file + per-project rollup ----
+function walkSuites(suites, file, project, out) {
+  for (const s of suites || []) {
+    const f = s.file || file;
+    if (s.specs) {
+      for (const spec of s.specs) {
+        for (const t of spec.tests || []) {
+          const proj = t.projectName || project || 'chromium';
+          const status =
+            t.status === 'expected' ? 'passed' : t.status === 'skipped' ? 'skipped' : 'failed';
+          const first = (t.results || [])[0] || {};
+          out.push({
+            file: f,
+            title: spec.title,
+            project: proj,
+            status,
+            duration: first.duration ?? 0,
+            error: ((first.error || {}).message || '').slice(0, 240),
+          });
+        }
+      }
+    }
+    if (s.suites) walkSuites(s.suites, f, project, out);
+  }
+}
+
+function e2eSection() {
+  const data = readJson('e2e-results.json');
+  if (!data) {
+    return '<p class="muted">Not run (no e2e-results.json). Run <code>pnpm test:e2e</code> then <code>pnpm test:reports</code>.</p>';
+  }
+  const tests = [];
+  walkSuites(data.suites, '', '', tests);
+  const byStatus = (s) => tests.filter((t) => t.status === s).length;
+  const passed = byStatus('passed');
+  const failed = byStatus('failed');
+  const skipped = byStatus('skipped');
+  const total = tests.length;
+  const rate = total ? ((passed / total) * 100).toFixed(1) : 0;
+  const cls = failed ? 'bad' : 'ok';
+
+  // Per-project chips
+  const projects = [...new Set(tests.map((t) => t.project))];
+  const projChips = projects
+    .map((p) => {
+      const pt = tests.filter((t) => t.project === p);
+      const pFail = pt.filter((t) => t.status === 'failed').length;
+      return `<span class="chip ${pFail ? 'bad' : 'ok'}">${esc(p)} ${pt.length - pFail}/${pt.length}</span>`;
+    })
+    .join(' ');
+
+  // Per-file table
+  const files = [...new Set(tests.map((t) => t.file))].sort();
+  const fileRows = files
+    .map((f) => {
+      const ft = tests.filter((t) => t.file === f);
+      const fFail = ft.filter((t) => t.status === 'failed').length;
+      const fPass = ft.filter((t) => t.status === 'passed').length;
+      const dur = (ft.reduce((a, t) => a + (t.duration || 0), 0) / 1000).toFixed(1);
+      return `<tr><td><code>${esc(f)}</code></td><td><span class="chip ${fFail ? 'bad' : 'ok'}">${fFail ? `${fFail} failed` : 'all passed'}</span></td><td>${fPass}/${ft.length}</td><td>${dur}s</td></tr>`;
+    })
+    .join('');
+
+  // Failed test details
+  const failedTests = tests.filter((t) => t.status === 'failed');
+  const failBlock = failedTests.length
+    ? `<details open><summary>${failedTests.length} failed tests</summary>
+      <table><thead><tr><th>File</th><th>Test</th><th>Project</th><th>Error</th></tr></thead><tbody>
+      ${failedTests
+        .map(
+          (t) =>
+            `<tr><td><code>${esc(t.file)}</code></td><td>${esc(t.title)}</td><td>${esc(t.project)}</td><td class="bad">${esc(t.error || '—')}</td></tr>`,
+        )
+        .join('')}
+      </tbody></table></details>`
+    : '<p class="ok">No failed tests in this run.</p>';
+
+  return `
+    <div class="summary ${cls}">${failed ? 'FAIL' : 'PASS'} — ${passed}/${total} passed · ${rate}% pass rate · ${projects.length} browser project(s)</div>
+    <div style="margin-bottom:10px">${projChips}</div>
+    <h3>Per-file</h3>
+    <table><thead><tr><th>Spec file</th><th>Status</th><th>Passed</th><th>Duration</th></tr></thead><tbody>${fileRows}</tbody></table>
+    <h3>Failures</h3>
+    ${failBlock}`;
+}
 
 function artilleryTable(name, data) {
   if (!data) return `<p class="muted">Not run (no JSON).</p>`;
@@ -160,14 +247,14 @@ const html = `<!doctype html>
   <h1>Saylani Job Bank — Consolidated Test Report</h1>
   <span class="meta">branch <code>test/api-and-ui-test-suites</code> · ${now}</span>
   <nav>
-    <a href="#summary">Summary</a><a href="#qa">QA</a><a href="#load">Load</a><a href="#security">Security</a><a href="#repro">Reproduce</a>
+    <a href="#summary">Summary</a><a href="#e2e">E2E</a><a href="#qa">QA</a><a href="#load">Load</a><a href="#security">Security</a><a href="#repro">Reproduce</a>
   </nav>
 </header>
 <main>
 
 <section id="summary">
   <h2>Summary</h2>
-  <p class="sub">Functional QA + API/Web/DB load + security, ek jagah. Testing only — developers fix.</p>
+  <p class="sub">E2E (Playwright) + functional QA defects + API/Web/DB load + security, ek jagah. Testing only — developers fix.</p>
   <div class="grid">
     <div class="card"><div class="k">QA defects</div><div class="v">13</div><div class="muted">3 critical · 8 major · 2 minor</div></div>
     <div class="card"><div class="k">E2E (Playwright)</div><div class="v">44 / 54</div><div class="muted">10 failed (documented)</div></div>
@@ -177,21 +264,27 @@ const html = `<!doctype html>
   </div>
 </section>
 
+<section id="e2e">
+  <h2>1 · E2E (Playwright)</h2>
+  <p class="sub">JSON: <code>e2e-results.json</code> · Full defect write-up: <a href="../../QA_REPORT.md">QA_REPORT.md</a></p>
+  ${e2eSection()}
+</section>
+
 <section id="qa">
-  <h2>1 · QA — Functional defects</h2>
+  <h2>2 · QA — Functional defects</h2>
   <p class="sub">Full detail: <a href="../../QA_REPORT.md">QA_REPORT.md</a></p>
   ${qaSection()}
 </section>
 
 <section id="load">
-  <h2>2 · Load testing</h2>
+  <h2>3 · Load testing</h2>
 
   <h3>API (Artillery) — <code>pnpm test:api-load</code></h3>
-  <p class="sub">Target <code>/api/v1/health</code>, protected 401, unknown-route envelope · HTML: <a href="load-api.html">load-api.html</a></p>
+  <p class="sub">Target <code>/api/v1/health</code>, protected 401, unknown-route envelope · JSON: <code>load-api.json</code></p>
   ${artilleryTable('API', api)}
 
   <h3>Web (Artillery) — <code>pnpm test:web-load</code></h3>
-  <p class="sub">Landing/login/register/forgot + protected redirect · HTML: <a href="load-web.html">load-web.html</a></p>
+  <p class="sub">Landing/login/register/forgot + protected redirect · JSON: <code>load-web.json</code></p>
   ${artilleryTable('Web', web)}
 
   <h3>DB stress (direct Postgres) — <code>pnpm test:db-load</code></h3>
@@ -200,7 +293,7 @@ const html = `<!doctype html>
 </section>
 
 <section id="security">
-  <h2>3 · Security</h2>
+  <h2>4 · Security</h2>
   <p class="sub">Dependency + config audit via <code>audit-ci --moderate</code> (<code>pnpm test:security</code>)</p>
   ${securitySection()}
 </section>
@@ -208,12 +301,15 @@ const html = `<!doctype html>
 <section id="repro">
   <h2>Reproduce</h2>
   <pre class="log">pnpm infra:up &amp;&amp; pnpm db:migrate &amp;&amp; pnpm db:seed
-pnpm --filter @jobbank/web build &amp;&amp; pnpm --filter @jobbank/web start   # for load tests
-pnpm test:api-load      # API load
-pnpm test:web-load      # Web load
-pnpm test:db-load       # DB stress
-pnpm test:security      # audit-ci
-pnpm test:reports       # regenerate this report</pre>
+pnpm --filter @jobbank/web build &amp;&amp; pnpm --filter @jobbank/web start   # for load/visual/cross
+pnpm test:e2e              # functional E2E (chromium)  → e2e-results.json
+pnpm test:visual-verify    # visual regression
+pnpm test:cross-browser    # chromium + firefox + webkit
+pnpm test:api-load         # API load
+pnpm test:web-load         # Web load
+pnpm test:db-load          # DB stress
+pnpm test:security         # audit-ci
+pnpm test:reports          # regenerate this index.html</pre>
 </section>
 
 </main></body></html>`;
