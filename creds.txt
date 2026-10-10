@@ -1,0 +1,6 @@
+Super Admin: superadmin@jobbank.local / JobBank-Dev-2026! (asks you to set up an authenticator app at first sign-in)
+Branch Admin (Karachi): branchadmin.khi@jobbank.local / JobBank-Dev-2026! (asks you to set up an authenticator app at first sign-in)
+Verifier (Karachi): verifier.khi@jobbank.local / JobBank-Dev-2026!
+Staff: staff.khi@jobbank.local or staff.lhr@jobbank.local / JobBank-Dev-2026!
+Employer: employer@jobbank.local / JobBank-Dev-2026! (or use "Email me a sign-in code", which arrives in Mailpit at http://localhost:8025)
+Applicant: "Job seekers" tab, phone 0300 1234567; the SMS code is printed in the pnpm dev terminal.
