@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Saylani Job Bank — Test Report</title>
+<style>
+  :root{--bg:#0b1220;--panel:#131c2e;--panel2:#0f1726;--fg:#e6edf7;--muted:#8b9bb4;--line:#223049;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--info:#58a6ff}
+  *{box-sizing:border-box}body{margin:0;font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+  header{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0}header .meta{color:var(--muted);font-size:12px}
+  nav{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  nav a{color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:8px;font-size:13px}
+  nav a:hover{background:var(--panel2);color:var(--fg)}
+  main{max-width:1080px;margin:0 auto;padding:24px 22px 80px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:20px}
+  h2{font-size:17px;margin:0 0 4px}h3{font-size:14px;margin:18px 0 8px;color:var(--fg)}
+  .sub{color:var(--muted);font-size:12px;margin:0 0 14px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  .chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid transparent}
+  .chip.ok{background:rgba(63,185,80,.15);color:var(--ok);border-color:rgba(63,185,80,.3)}
+  .chip.warn{background:rgba(210,153,34,.15);color:var(--warn);border-color:rgba(210,153,34,.3)}
+  .chip.bad{background:rgba(248,81,73,.15);color:var(--bad);border-color:rgba(248,81,73,.3)}
+  .chip.info{background:rgba(88,166,255,.15);color:var(--info);border-color:rgba(88,166,255,.3)}
+  .ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}.muted{color:var(--muted)}
+  .summary{padding:10px 14px;border-radius:10px;font-weight:600;margin-bottom:12px;border:1px solid}
+  .summary.ok{background:rgba(63,185,80,.1);border-color:rgba(63,185,80,.3)}
+  .summary.bad{background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.3)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .card .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .card .v{font-size:22px;font-weight:700;margin-top:4px}
+  pre.log{background:#0a0f1a;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;font-size:12px;max-height:320px;color:#cdd9e5}
+  ul.adv{margin:8px 0;padding-left:18px;columns:2}ul.adv a{color:var(--info)}
+  details{margin-top:10px}summary{cursor:pointer;color:var(--muted)}
+  code{background:var(--panel2);padding:1px 6px;border-radius:6px;font-size:12px}
+  a{color:var(--info)}
+</style></head><body>
+<header>
+  <h1>Saylani Job Bank — Consolidated Test Report</h1>
+  <span class="meta">branch <code>test/api-and-ui-test-suites</code> · 2026-10-10T15:14:20.367Z</span>
+  <nav>
+    <a href="#summary">Summary</a><a href="#qa">QA</a><a href="#load">Load</a><a href="#security">Security</a><a href="#repro">Reproduce</a>
+  </nav>
+</header>
+<main>
+
+<section id="summary">
+  <h2>Summary</h2>
+  <p class="sub">Functional QA + API/Web/DB load + security, ek jagah. Testing only — developers fix.</p>
+  <div class="grid">
+    <div class="card"><div class="k">QA defects</div><div class="v">12</div><div class="muted">3 critical · 7 major · 2 minor</div></div>
+    <div class="card"><div class="k">E2E (Playwright)</div><div class="v">44 / 54</div><div class="muted">10 failed (documented)</div></div>
+    <div class="card"><div class="k">Unit + API tests</div><div class="v ok">666</div><div class="muted">Vitest 315 + Jest 351 green</div></div>
+    <div class="card"><div class="k">Security advisories</div><div class="v bad">9</div><div class="muted">audit-ci --moderate</div></div>
+  </div>
+</section>
+
+<section id="qa">
+  <h2>1 · QA — Functional defects</h2>
+  <p class="sub">Full detail: <a href="../../QA_REPORT.md">QA_REPORT.md</a></p>
+  <table><thead><tr><th>ID</th><th>Severity</th><th>Area</th><th>Defect</th></tr></thead><tbody><tr><td><code>D-01</code></td><td><span class="chip bad">Critical</span></td><td>Backend/Config</td><td>Prod server 500 on every request (BETTER_AUTH_SECRET empty)</td></tr><tr><td><code>D-02</code></td><td><span class="chip bad">Critical</span></td><td>Backend/Auth</td><td>SMS login broken in prod + OTP leaked to logs</td></tr><tr><td><code>D-03</code></td><td><span class="chip bad">Critical</span></td><td>Auth/Seed</td><td>Seeded admin stuck in 2FA gate, dashboard unreachable</td></tr><tr><td><code>D-04</code></td><td><span class="chip warn">Major</span></td><td>Tooling</td><td>Lint 39 errors — CI blocked</td></tr><tr><td><code>D-05</code></td><td><span class="chip warn">Major</span></td><td>API</td><td>Unknown route returns HTML 404, not JSON envelope</td></tr><tr><td><code>D-06</code></td><td><span class="chip warn">Major</span></td><td>Security</td><td>No security headers (CSP/HSTS/X-Frame-Options)</td></tr><tr><td><code>D-07</code></td><td><span class="chip warn">Major</span></td><td>Security</td><td>creds.txt + 2FA backup codes committed to repo</td></tr><tr><td><code>D-08</code></td><td><span class="chip warn">Major</span></td><td>UX/Backend</td><td>Login rate-limit tight, no UI cooldown feedback</td></tr><tr><td><code>D-09</code></td><td><span class="chip warn">Major</span></td><td>A11y/UI</td><td>/forbidden has no &lt;h1&gt;</td></tr><tr><td><code>D-12</code></td><td><span class="chip warn">Major</span></td><td>CI</td><td>CI missing playwright install step + lint blocks pipeline</td></tr><tr><td><code>D-10</code></td><td><span class="chip info">Minor</span></td><td>UI</td><td>Select restyle mismatches Input/Textarea</td></tr><tr><td><code>D-11</code></td><td><span class="chip info">Minor</span></td><td>Perf</td><td>next dev login 49s (known)</td></tr></tbody></table>
+</section>
+
+<section id="load">
+  <h2>2 · Load testing</h2>
+
+  <h3>API (Artillery) — <code>pnpm test:api-load</code></h3>
+  <p class="sub">Target <code>/api/v1/health</code>, protected 401, unknown-route envelope · HTML: <a href="load-api.html">load-api.html</a></p>
+  
+    <table>
+      <tr><th>Requests</th><td>700 <span class="muted">(failed vusers: 0)</span></td></tr>
+      <tr><th>Status codes</th><td><span class="chip ok">200 × 362</span> <span class="chip warn">401 × 231</span> <span class="chip warn">404 × 107</span></td></tr>
+      <tr><th>Latency mean</th><td>15 ms</td></tr>
+      <tr><th>Latency p50</th><td>13 ms</td></tr>
+      <tr><th>Latency p95</th><td class="ok">33 ms</td></tr>
+      <tr><th>Latency p99</th><td>49 ms</td></tr>
+      <tr><th>Errors</th><td><span class="ok">none</span></td></tr>
+    </table>
+
+  <h3>Web (Artillery) — <code>pnpm test:web-load</code></h3>
+  <p class="sub">Landing/login/register/forgot + protected redirect · HTML: <a href="load-web.html">load-web.html</a></p>
+  
+    <table>
+      <tr><th>Requests</th><td>625 <span class="muted">(failed vusers: 0)</span></td></tr>
+      <tr><th>Status codes</th><td><span class="chip ok">200 × 476</span> <span class="chip warn">404 × 49</span> <span class="chip bad">307 × 100</span></td></tr>
+      <tr><th>Latency mean</th><td>21 ms</td></tr>
+      <tr><th>Latency p50</th><td>19 ms</td></tr>
+      <tr><th>Latency p95</th><td class="ok">41 ms</td></tr>
+      <tr><th>Latency p99</th><td>74 ms</td></tr>
+      <tr><th>Errors</th><td><span class="ok">none</span></td></tr>
+    </table>
+
+  <h3>DB stress (direct Postgres) — <code>pnpm test:db-load</code></h3>
+  <p class="sub">Isolated from HTTP: read + transactional write bursts</p>
+  <pre class="log"></pre>
+</section>
+
+<section id="security">
+  <h2>3 · Security</h2>
+  <p class="sub">Dependency + config audit via <code>audit-ci --moderate</code> (<code>pnpm test:security</code>)</p>
+  
+    <div class="summary bad">FAIL — 9 unique advisories (audit-ci --moderate)</div>
+    <ul class="adv"><li><a href="https://github.com/advisories/GHSA-67mh-4wv8-2f99" target="_blank" rel="noopener">GHSA-67mh-4wv8-2f99</a></li><li><a href="https://github.com/advisories/GHSA-qx2v-qp2m-jg93" target="_blank" rel="noopener">GHSA-qx2v-qp2m-jg93</a></li><li><a href="https://github.com/advisories/GHSA-6g55-p6wh-862q" target="_blank" rel="noopener">GHSA-6g55-p6wh-862q</a></li><li><a href="https://github.com/advisories/GHSA-fxqj-rqcc-2cmp" target="_blank" rel="noopener">GHSA-fxqj-rqcc-2cmp</a></li><li><a href="https://github.com/advisories/GHSA-r28c-9q8g-f849" target="_blank" rel="noopener">GHSA-r28c-9q8g-f849</a></li><li><a href="https://github.com/advisories/GHSA-8cw4-87c7-c6xx" target="_blank" rel="noopener">GHSA-8cw4-87c7-c6xx</a></li><li><a href="https://github.com/advisories/GHSA-vfj7-8cjw-p6xm" target="_blank" rel="noopener">GHSA-vfj7-8cjw-p6xm</a></li><li><a href="https://github.com/advisories/GHSA-hp3w-g68c-fv3c" target="_blank" rel="noopener">GHSA-hp3w-g68c-fv3c</a></li><li><a href="https://github.com/advisories/GHSA-68fv-2mgg-jv7q" target="_blank" rel="noopener">GHSA-68fv-2mgg-jv7q</a></li></ul>
+    <details><summary>Raw audit output</summary><pre class="log">rse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-config&gt;jest-circus&gt;jest-runtime&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-config&gt;jest-circus&gt;jest-runtime&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-config&gt;jest-circus&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-config&gt;jest-runner&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-config&gt;jest-runner&gt;jest-runtime&gt;@jest/globals&gt;@jest/expect&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-config&gt;jest-runner&gt;jest-runtime&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-config&gt;jest-runner&gt;jest-runtime&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-resolve-dependencies&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-runner&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-runner&gt;jest-runtime&gt;@jest/globals&gt;@jest/expect&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-runner&gt;jest-runtime&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-runner&gt;jest-runtime&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-runtime&gt;@jest/globals&gt;@jest/expect&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-runtime&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-runtime&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;@jest/core&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;babel-jest&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;babel-jest&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;jest-circus&gt;@jest/expect&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;jest-circus&gt;jest-runtime&gt;@jest/globals&gt;@jest/expect&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;jest-circus&gt;jest-runtime&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;jest-circus&gt;jest-runtime&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;jest-circus&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;jest-runner&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;jest-runner&gt;jest-runtime&gt;@jest/globals&gt;@jest/expect&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;jest-runner&gt;jest-runtime&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest&gt;jest&gt;jest-cli&gt;jest-config&gt;jest-runner&gt;jest-runtime&gt;jest-snapshot&gt;@jest/transform&gt;babel-plugin-istanbul&gt;@istanbuljs/load-nyc-config&gt;js-yaml&gt;argparse&gt;sprintf-js
+GHSA-qx2v-qp2m-jg93|apps__web&gt;better-auth&gt;next&gt;postcss
+GHSA-qx2v-qp2m-jg93|apps__web&gt;next&gt;postcss
+GHSA-qx2v-qp2m-jg93|packages__db&gt;better-auth&gt;next&gt;postcss
+GHSA-r28c-9q8g-f849|apps__web&gt;better-auth&gt;next&gt;postcss
+GHSA-r28c-9q8g-f849|apps__web&gt;next&gt;postcss
+GHSA-r28c-9q8g-f849|packages__db&gt;better-auth&gt;next&gt;postcss
+GHSA-vfj7-8cjw-p6xm|apps__web&gt;@next/eslint-plugin-next&gt;fast-glob&gt;micromatch&gt;braces
+GHSA-vfj7-8cjw-p6xm|artillery&gt;chokidar&gt;braces
+[31mFailed security audit due to high, moderate vulnerabilities.
+Vulnerable advisories are:
+https://github.com/advisories/GHSA-67mh-4wv8-2f99
+https://github.com/advisories/GHSA-68fv-2mgg-jv7q
+https://github.com/advisories/GHSA-6g55-p6wh-862q
+https://github.com/advisories/GHSA-8cw4-87c7-c6xx
+https://github.com/advisories/GHSA-fxqj-rqcc-2cmp
+https://github.com/advisories/GHSA-hp3w-g68c-fv3c
+https://github.com/advisories/GHSA-qx2v-qp2m-jg93
+https://github.com/advisories/GHSA-r28c-9q8g-f849
+https://github.com/advisories/GHSA-vfj7-8cjw-p6xm[0m
+[31mExiting...[0m
+</pre></details>
+</section>
+
+<section id="repro">
+  <h2>Reproduce</h2>
+  <pre class="log">pnpm infra:up &amp;&amp; pnpm db:migrate &amp;&amp; pnpm db:seed
+pnpm --filter @jobbank/web build &amp;&amp; pnpm --filter @jobbank/web start   # for load tests
+pnpm test:api-load      # API load
+pnpm test:web-load      # Web load
+pnpm test:db-load       # DB stress
+pnpm test:security      # audit-ci
+pnpm test:reports       # regenerate this report</pre>
+</section>
+
+</main></body></html>

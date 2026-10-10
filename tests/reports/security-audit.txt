@@ -1,0 +1,544 @@
+﻿[36mPNPM audit report results:[0m
+{
+  "advisories": {
+    "1102341": {
+      "findings": [
+        {
+          "version": "0.18.20",
+          "paths": [
+            "packages__db>drizzle-kit>@esbuild-kit/esm-loader>@esbuild-kit/core-utils>esbuild",
+            "packages__db>better-auth>drizzle-kit>@esbuild-kit/esm-loader>@esbuild-kit/core-utils>esbuild",
+            "apps__web>better-auth>drizzle-kit>@esbuild-kit/esm-loader>@esbuild-kit/core-utils>esbuild"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1102341,
+      "title": "esbuild enables any website to send any requests to the development server and read the response",
+      "module_name": "esbuild",
+      "vulnerable_versions": "<=0.24.2",
+      "patched_versions": ">=0.25.0",
+      "severity": "moderate",
+      "cwe": "CWE-346",
+      "github_advisory_id": "GHSA-67mh-4wv8-2f99",
+      "url": "https://github.com/advisories/GHSA-67mh-4wv8-2f99"
+    },
+    "1117015": {
+      "findings": [
+        {
+          "version": "8.4.31",
+          "paths": [
+            "packages__db>better-auth>next>postcss",
+            "apps__web>next>postcss",
+            "apps__web>better-auth>next>postcss"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1117015,
+      "title": "PostCSS has XSS via Unescaped </style> in its CSS Stringify Output",
+      "module_name": "postcss",
+      "vulnerable_versions": "<8.5.10",
+      "patched_versions": ">=8.5.10",
+      "severity": "moderate",
+      "cwe": "CWE-79",
+      "github_advisory_id": "GHSA-qx2v-qp2m-jg93",
+      "url": "https://github.com/advisories/GHSA-qx2v-qp2m-jg93"
+    },
+    "1124252": {
+      "findings": [
+        {
+          "version": "8.4.31",
+          "paths": [
+            "packages__db>better-auth>next>postcss",
+            "apps__web>next>postcss",
+            "apps__web>better-auth>next>postcss"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1124252,
+      "title": "PostCSS: Arbitrary file read and information disclosure via attacker-controlled sourceMappingURL in CSS comments",
+      "module_name": "postcss",
+      "vulnerable_versions": "<=8.5.11",
+      "patched_versions": ">=8.5.12",
+      "severity": "high",
+      "cwe": "CWE-22, CWE-200",
+      "github_advisory_id": "GHSA-6g55-p6wh-862q",
+      "url": "https://github.com/advisories/GHSA-6g55-p6wh-862q"
+    },
+    "1130709": {
+      "findings": [
+        {
+          "version": "8.4.31",
+          "paths": [
+            "packages__db>better-auth>next>postcss",
+            "apps__web>next>postcss",
+            "apps__web>better-auth>next>postcss"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1130709,
+      "title": "PostCSS: incomplete fix of GHSA-6g55-p6wh-862q ΓÇö attacker-controlled sourceMappingURL reads arbitrary .map files when `from` is unset",
+      "module_name": "postcss",
+      "vulnerable_versions": "<=8.5.22",
+      "patched_versions": ">=8.5.23",
+      "severity": "moderate",
+      "cwe": "CWE-22, CWE-200",
+      "github_advisory_id": "GHSA-fxqj-rqcc-2cmp",
+      "url": "https://github.com/advisories/GHSA-fxqj-rqcc-2cmp"
+    },
+    "1139510": {
+      "findings": [
+        {
+          "version": "8.4.31",
+          "paths": [
+            "packages__db>better-auth>next>postcss",
+            "apps__web>next>postcss",
+            "apps__web>better-auth>next>postcss"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1139510,
+      "title": "PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure",
+      "module_name": "postcss",
+      "vulnerable_versions": "<=8.5.17",
+      "patched_versions": ">=8.5.18",
+      "severity": "high",
+      "cwe": "CWE-22",
+      "github_advisory_id": "GHSA-r28c-9q8g-f849",
+      "url": "https://github.com/advisories/GHSA-r28c-9q8g-f849"
+    },
+    "1193670": {
+      "findings": [
+        {
+          "version": "4.16.3",
+          "paths": [
+            ".>artillery>csv-parse"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193670,
+      "title": "node-csv: Prototype replacement still reachable via columns path",
+      "module_name": "csv-parse",
+      "vulnerable_versions": "<7.0.2",
+      "patched_versions": ">=7.0.2",
+      "severity": "moderate",
+      "cwe": "CWE-1321",
+      "github_advisory_id": "GHSA-8cw4-87c7-c6xx",
+      "url": "https://github.com/advisories/GHSA-8cw4-87c7-c6xx"
+    },
+    "1240992": {
+      "findings": [
+        {
+          "version": "3.0.3",
+          "paths": [
+            ".>artillery>chokidar>braces",
+            "apps__web>@next/eslint-plugin-next>fast-glob>micromatch>braces"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1240992,
+      "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+      "module_name": "braces",
+      "vulnerable_versions": "<=3.0.3",
+      "patched_versions": null,
+      "patched_versions_unpublished": true,
+      "severity": "high",
+      "cwe": "CWE-674",
+      "github_advisory_id": "GHSA-vfj7-8cjw-p6xm",
+      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+    },
+    "1241202": {
+      "findings": [
+        {
+          "version": "1.0.3",
+          "paths": [
+            ".>ts-jest>jest>@jest/core>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>@jest/reporters>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-resolve-dependencies>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>@jest/core>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>@jest/reporters>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-resolve-dependencies>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>@jest/core>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>jest>jest-cli>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>ts-jest>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>@jest/reporters>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-resolve-dependencies>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>@jest/core>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js",
+            ".>jest>jest-cli>@jest/core>@jest/reporters>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1241202,
+      "title": "sprintf-js vulnerable to denial of service through unbounded precision specifiers",
+      "module_name": "sprintf-js",
+      "vulnerable_versions": "<=1.1.3",
+      "patched_versions": null,
+      "patched_versions_unpublished": true,
+      "severity": "moderate",
+      "cwe": "CWE-1284",
+      "github_advisory_id": "GHSA-hp3w-g68c-fv3c",
+      "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c"
+    },
+    "1241209": {
+      "findings": [
+        {
+          "version": "1.2.1",
+          "paths": [
+            "packages__db>vitest>vite>postcss>source-map-js",
+            "packages__db>vitest>@vitest/mocker>vite>postcss>source-map-js",
+            "packages__db>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js",
+            "packages__db>vitest>jsdom>css-tree>source-map-js",
+            "packages__db>vitest>jsdom>@bramus/specificity>css-tree>source-map-js",
+            "packages__db>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js",
+            "packages__db>better-auth>vitest>vite>postcss>source-map-js",
+            "packages__db>better-auth>vitest>@vitest/mocker>vite>postcss>source-map-js",
+pnpm.exe : [33mFound vulnerable advisory paths:[0m
+At C:\nvm4w\nodejs\pnpm.ps1:14 char:3
++   & "$basedir/node_modules/pnpm/pnpm.exe"   $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([33mFound vuln...sory paths:[0m:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+            "packages__db>better-auth>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js",
+            "packages__db>better-auth>vitest>jsdom>css-tree>source-map-js",
+            "packages__db>better-auth>vitest>jsdom>@bramus/specificity>css-tree>source-map-js",
+            "packages__db>better-auth>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js",
+            "packages__db>better-auth>next>postcss>source-map-js",
+            "apps__web>next>postcss>source-map-js",
+            "apps__web>better-auth>vitest>vite>postcss>source-map-js",
+            "apps__web>better-auth>vitest>@vitest/mocker>vite>postcss>source-map-js",
+            "apps__web>better-auth>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js",
+            "apps__web>better-auth>vitest>jsdom>css-tree>source-map-js",
+            "apps__web>better-auth>vitest>jsdom>@bramus/specificity>css-tree>source-map-js",
+            "apps__web>better-auth>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js",
+            "apps__web>better-auth>next>postcss>source-map-js",
+            "apps__web>@vitejs/plugin-react>vite>postcss>source-map-js",
+            "apps__web>vitest>vite>postcss>source-map-js",
+            "apps__web>vitest>@vitest/mocker>vite>postcss>source-map-js",
+            "apps__web>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js",
+            "apps__web>vitest>jsdom>css-tree>source-map-js",
+            "apps__web>vitest>jsdom>@bramus/specificity>css-tree>source-map-js",
+            "apps__web>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js",
+            "apps__web>@tailwindcss/postcss>@tailwindcss/node>source-map-js",
+            "apps__web>@tailwindcss/postcss>postcss>source-map-js",
+            "apps__web>@testing-library/jest-dom>vitest>vite>postcss>source-map-js",
+            "apps__web>@testing-library/jest-dom>vitest>@vitest/mocker>vite>postcss>source-map-js",
+            "apps__web>@testing-library/jest-dom>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js",
+            "apps__web>@testing-library/jest-dom>vitest>jsdom>css-tree>source-map-js",
+            "apps__web>@testing-library/jest-dom>vitest>jsdom>@bramus/specificity>css-tree>source-map-js",
+            "apps__web>@testing-library/jest-dom>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js",
+            "apps__web>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js",
+            "apps__web>jsdom>css-tree>source-map-js",
+            "apps__web>jsdom>@bramus/specificity>css-tree>source-map-js",
+            "apps__web>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1241209,
+      "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+      "module_name": "source-map-js",
+      "vulnerable_versions": ">=1.0.0 <1.2.2",
+      "patched_versions": ">=1.2.2",
+      "severity": "high",
+      "cwe": "CWE-1284",
+      "github_advisory_id": "GHSA-68fv-2mgg-jv7q",
+      "url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q"
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 5,
+      "high": 4,
+      "critical": 0
+    },
+    "dependencies": 346,
+    "devDependencies": 836,
+    "optionalDependencies": 230,
+    "totalDependencies": 1308
+  }
+}
+GHSA-67mh-4wv8-2f99|apps__web>better-auth>drizzle-kit>@esbuild-kit/esm-loader>@esbuild-kit/core-utils>esbuild
+GHSA-67mh-4wv8-2f99|packages__db>better-auth>drizzle-kit>@esbuild-kit/esm-loader>@esbuild-kit/core-utils>esbuild
+GHSA-67mh-4wv8-2f99|packages__db>drizzle-kit>@esbuild-kit/esm-loader>@esbuild-kit/core-utils>esbuild
+GHSA-68fv-2mgg-jv7q|apps__web>@tailwindcss/postcss>@tailwindcss/node>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>@tailwindcss/postcss>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>@testing-library/jest-dom>vitest>@vitest/mocker>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>@testing-library/jest-dom>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>@testing-library/jest-dom>vitest>jsdom>@bramus/specificity>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>@testing-library/jest-dom>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>@testing-library/jest-dom>vitest>jsdom>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>@testing-library/jest-dom>vitest>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>@vitejs/plugin-react>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>better-auth>next>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>better-auth>vitest>@vitest/mocker>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>better-auth>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>better-auth>vitest>jsdom>@bramus/specificity>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>better-auth>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>better-auth>vitest>jsdom>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>better-auth>vitest>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>jsdom>@bramus/specificity>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>jsdom>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>next>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>vitest>@vitest/mocker>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>vitest>jsdom>@bramus/specificity>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>vitest>jsdom>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|apps__web>vitest>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>better-auth>next>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>better-auth>vitest>@vitest/mocker>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>better-auth>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>better-auth>vitest>jsdom>@bramus/specificity>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>better-auth>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>better-auth>vitest>jsdom>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>better-auth>vitest>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>vitest>@vitest/mocker>vite>postcss>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>vitest>jsdom>@asamuzakjp/dom-selector>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>vitest>jsdom>@bramus/specificity>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>vitest>jsdom>@csstools/css-syntax-patches-for-csstree>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>vitest>jsdom>css-tree>source-map-js
+GHSA-68fv-2mgg-jv7q|packages__db>vitest>vite>postcss>source-map-js
+GHSA-6g55-p6wh-862q|apps__web>better-auth>next>postcss
+GHSA-6g55-p6wh-862q|apps__web>next>postcss
+GHSA-6g55-p6wh-862q|packages__db>better-auth>next>postcss
+GHSA-8cw4-87c7-c6xx|artillery>csv-parse
+GHSA-fxqj-rqcc-2cmp|apps__web>better-auth>next>postcss
+GHSA-fxqj-rqcc-2cmp|apps__web>next>postcss
+GHSA-fxqj-rqcc-2cmp|packages__db>better-auth>next>postcss
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>@jest/reporters>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-resolve-dependencies>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>@jest/core>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>@jest/reporters>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|jest>jest-cli>@jest/core>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>@jest/reporters>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-resolve-dependencies>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>@jest/core>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>@jest/reporters>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-resolve-dependencies>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>@jest/core>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>babel-jest>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>babel-jest>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>jest-circus>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>jest-circus>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>jest-circus>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>jest-circus>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>jest-circus>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>jest-runner>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>jest-runner>jest-runtime>@jest/globals>@jest/expect>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>jest-runner>jest-runtime>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-hp3w-g68c-fv3c|ts-jest>jest>jest-cli>jest-config>jest-runner>jest-runtime>jest-snapshot>@jest/transform>babel-plugin-istanbul>@istanbuljs/load-nyc-config>js-yaml>argparse>sprintf-js
+GHSA-qx2v-qp2m-jg93|apps__web>better-auth>next>postcss
+GHSA-qx2v-qp2m-jg93|apps__web>next>postcss
+GHSA-qx2v-qp2m-jg93|packages__db>better-auth>next>postcss
+GHSA-r28c-9q8g-f849|apps__web>better-auth>next>postcss
+GHSA-r28c-9q8g-f849|apps__web>next>postcss
+GHSA-r28c-9q8g-f849|packages__db>better-auth>next>postcss
+GHSA-vfj7-8cjw-p6xm|apps__web>@next/eslint-plugin-next>fast-glob>micromatch>braces
+GHSA-vfj7-8cjw-p6xm|artillery>chokidar>braces
+[31mFailed security audit due to high, moderate vulnerabilities.
+Vulnerable advisories are:
+https://github.com/advisories/GHSA-67mh-4wv8-2f99
+https://github.com/advisories/GHSA-68fv-2mgg-jv7q
+https://github.com/advisories/GHSA-6g55-p6wh-862q
+https://github.com/advisories/GHSA-8cw4-87c7-c6xx
+https://github.com/advisories/GHSA-fxqj-rqcc-2cmp
+https://github.com/advisories/GHSA-hp3w-g68c-fv3c
+https://github.com/advisories/GHSA-qx2v-qp2m-jg93
+https://github.com/advisories/GHSA-r28c-9q8g-f849
+https://github.com/advisories/GHSA-vfj7-8cjw-p6xm[0m
+[31mExiting...[0m
