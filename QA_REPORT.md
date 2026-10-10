@@ -26,12 +26,29 @@
 
 > Note: Pehla E2E run **52/54 fail** hua kyunke machine par Playwright browsers
 > (`chromium_headless_shell`) install hi nahi the. `pnpm exec playwright install chromium`
-> ke baad ye numbers aaye. **Environment issue, product defect nahi** — lekin QA pipeline
-> ko blocked karta hai, CI me `playwright install --with-deps` zaroori hai.
+> ke baad ye numbers aaye. Ye environment issue hai, product defect nahi — lekin isi wajah se
+> CI me bhi E2E kabhi pass nahi hoga (D-12 dekho).
 
 ---
 
 ## 2. Defects
+
+**Total: 12** — 3 Critical · 7 Major · 2 Minor (D-11 purana/known, baaki 11 naye)
+
+| ID   | Severity | Area           | One-liner                                                            |
+| ---- | -------- | -------------- | -------------------------------------------------------------------- |
+| D-01 | Critical | Backend/Config | Prod server har request 500 (`BETTER_AUTH_SECRET` khaali)            |
+| D-02 | Critical | Backend/Auth   | SMS login prod me broken + OTP logs me leak                          |
+| D-03 | Critical | Auth/Seed      | Seeded admin 2FA gate me phansta, dashboard nahi khulta              |
+| D-04 | Major    | Tooling        | Lint 39 errors, CI block                                             |
+| D-05 | Major    | API            | Unknown route HTML 404, JSON envelope nahi                           |
+| D-06 | Major    | Security       | Koi security header nahi (CSP/HSTS/X-Frame-Options)                  |
+| D-07 | Major    | Security       | Repo me creds.txt + 2FA backup codes commit                          |
+| D-08 | Major    | UX/Backend     | Login rate-limit tight, UI me cooldown feedback nahi                 |
+| D-09 | Major    | A11y/UI        | `/forbidden` par `<h1>` nahi                                         |
+| D-12 | Major    | CI             | E2E kabhi pass nahi hoga (browser install step nahi) + lint CI block |
+| D-10 | Minor    | UI             | Select restyle Input/Textarea se mismatch                            |
+| D-11 | Minor    | Perf           | `next dev` login 49s (known)                                         |
 
 ### CRITICAL
 
@@ -192,6 +209,29 @@ aur screen-reader users ke liye page ka naam hi missing hai. A11y defect.
 
 ---
 
+**D-12 · CI me E2E kabhi pass nahi hoga + lint CI ko pehle hi block karta hai**
+
+`.github/workflows/ci.yml` `push` (main) aur har `pull_request` par `pnpm test` chalata hai,
+jisme Vitest + Jest + **Playwright E2E** shamil hain. Do problems hain:
+
+**a) Playwright browsers CI me install hi nahi hote.** `ci.yml` me koi
+`playwright install` step nahi hai. Isliye `pnpm test` → `pnpm test:e2e` step browser missing
+par crash hoga (wahi "Executable doesn't exist" error jo locally pehla aaya tha). Matlab **CI ka
+E2E suite practically kabhi green nahi ho sakta.**
+
+Fix — `pnpm test` se pehle:
+
+```yaml
+- name: Install Playwright browsers
+  run: pnpm exec playwright install --with-deps chromium
+```
+
+**b) `pnpm lint` step pe hi 39 errors (D-04) hain**, isliye CI **lint par fail hoke ruk jayega**
+aur aage `typecheck` / `test` / `build` kabhi chalenge hi nahi. Matlab CI abhi red hai aur uske
+baad bhi rahega jab tak D-04 fix na ho.
+
+---
+
 ### MINOR / UI
 
 **D-10 · `Select` ka naya restyle `Input`/`Textarea` se mismatch ho gaya** _(uncommitted working-tree change)_
@@ -237,7 +277,7 @@ karte waqt ye slowness false "hang" lagegi.
 
 ---
 
-## 4. Fix ki pehli 5 cheezein
+## 4. Fix ki pehli 6 cheezein
 
 1. **D-01** — `.env` me `BETTER_AUTH_SECRET` bharo (`openssl rand -base64 32`) + boot-time fail-fast.
 2. **D-02** — Production ke liye asli SMS gateway configure karo; console OTP ko prod logs se hatao.
@@ -245,6 +285,8 @@ karte waqt ye slowness false "hang" lagegi.
    baad lagao).
 4. **D-04** — Lint 39 errors saaf karo (unused imports + `no-restricted-imports` + ek `any`).
 5. **D-07** — `creds.txt` + backup-codes files ko git se hatao aur `.gitignore` me add karo.
+6. **D-12** — `ci.yml` me `pnpm exec playwright install --with-deps chromium` step add karo
+   (warna E2E CI me kabhi pass nahi hoga).
 
 ---
 
