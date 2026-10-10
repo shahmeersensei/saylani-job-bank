@@ -297,7 +297,46 @@ karte waqt ye slowness false "hang" lagegi.
 
 ---
 
-## 4. Fix ki pehli 6 cheezein
+## 4. Ye load / security / visual tests kyun add kiye? (need)
+
+Sawal yeh hai: **"unit + E2E toh hain, load/api/db test ki zaroorat kya thi?"** — jawab:
+
+| Suite                                    | Kyun add kiya                                                                                                                                                                                                         | Kya pakdata hai jo baaki tests nahi pakadte                                        |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **API load** (`test:api-load`)           | Unit/E2E me **sirf 1 request** chalti hai. Asli user load par pata chalta hai ke NPM route **p95 latency** kitni hai, **rate-limit** sahi trigger hota hai ya nahi, aur **DB connection pool** exhaust toh nahi hota. | Real concurrency ke neeche slowdown, timeouts, pool exhaustion, rate-limit bypass  |
+| **Web load** (`test:web-load`)           | Landing/login/register **cache/CDN ke bagair** kitne concurrent users handle karte hain — SSR render time load ke saath badhta hai (single-request test me zero dikhta hai).                                          | SSR degrade hona, session-store/redis saturation, p95 burst ke waqt badhna         |
+| **DB load** (`test:db-load`)             | Jest migrations/CRUD ek-ek row par chalte hain. Bulk inserts/reads par **indexes missing** hain ya nahi, lock contention hai ya nahi — sirf stress se dikhta hai.                                                     | Missing indexes, lock contention, query plans jo scale par slow hote hain          |
+| **Security** (`test:security`)           | Code review me dependency vulns pakadna impossible hai (9 advisories is branch par mile). `audit-ci` PR ke waqt vulnerable dependency pehle leta hai.                                                                 | Known CVEs in transitive deps                                                      |
+| **Visual** (`test:visual-verify`)        | UI refactor (Select/CardActionMenu restyle) ke baad bina test ke **unknowingly 5 pages badal** sakte the — screenshot diff instantly pakadta hai.                                                                     | Unintended UI regressions                                                          |
+| **Cross-browser** (`test:cross-browser`) | Sab se bada incident **browser-specific** tha: role selector Chromium me click karta tha par Firefox/WebKit me state mismatch dikha. Chromium-only E2E ye **kabhi nahi pakadta**.                                     | Browser-specific JS/CSS breaks (jabki app users Firefox/Safari bhi use karte hain) |
+
+**Kya yeh "extra" hai?** Nahi — yeh **production risk** cover karta hai. Is app par public
+signup hota hai (job seekers) + branch staff login, matlab load spike real hai. Aur login/2FA/RBAC
+me browser differences real (defect investigation me sabse zyada time isi par laga).
+
+**CI me yeh tests nahi chalte (by design):**
+
+```text
+pnpm test  →  turbo test (Vitest unit) + pnpm test:jest (API) + pnpm test:e2e (chromium)
+```
+
+Load + security + visual + cross-browser sab **alag scripts** hain (`package.json` me
+`test:api-load`, `test:web-load`, `test:db-load`, `test:security`, `test:visual-verify`,
+`test:cross-browser`) jo CI ka `test` step call **hi nahi** karta. Kyun:
+
+1. **Load tests local/integration environment** maante hain (postgres + redis + object storage
+   up + prod build chalu). CI me docker-in-docker + Artillery = flaky aur slow.
+2. **Visual baselines OS-specific** hain (Windows + Chromium) — Linux CI runner par mismatch
+   hoga, isi liye CI me alag baselines chahiye honge (ye abhi tak decide nahi).
+3. **audit-ci `--moderate`** abhi FAIL hai (D-13) — CI me daalte hi pipeline hamesha red ho
+   jaati, developers fix karein toh CI me add karenge.
+
+**Recommended:** abhi manual/local (`pnpm test:api-load` etc.), baad me staging pipeline me
+opt-in. Poori repo me CI ke `test` step me load tests **deliberately nahi** rakhe.
+
+---
+
+## 5. Fix ki pehli 6 cheezein
 
 1. **D-01** — `.env` me `BETTER_AUTH_SECRET` bharo (`openssl rand -base64 32`) + boot-time fail-fast.
 2. **D-02** — Production ke liye asli SMS gateway configure karo; console OTP ko prod logs se hatao.
@@ -312,7 +351,7 @@ karte waqt ye slowness false "hang" lagegi.
 
 ---
 
-## 5. Reproduce karne ke commands
+## 6. Reproduce karne ke commands
 
 ```bash
 pnpm infra:up && pnpm db:migrate && pnpm db:seed      # once
