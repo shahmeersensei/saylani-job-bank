@@ -101,6 +101,7 @@ const QA_DEFECTS = [
   ['D-08', 'Major', 'UX/Backend', 'Login rate-limit tight, no UI cooldown feedback'],
   ['D-09', 'Major', 'A11y/UI', '/forbidden has no <h1>'],
   ['D-12', 'Major', 'CI', 'CI missing playwright install step + lint blocks pipeline'],
+  ['D-13', 'Major', 'Security/Dep', '9 vulnerable npm advisories (audit-ci --moderate)'],
   ['D-10', 'Minor', 'UI', 'Select restyle mismatches Input/Textarea'],
   ['D-11', 'Minor', 'Perf', 'next dev login 49s (known)'],
 ];
@@ -168,8 +169,9 @@ const html = `<!doctype html>
   <h2>Summary</h2>
   <p class="sub">Functional QA + API/Web/DB load + security, ek jagah. Testing only — developers fix.</p>
   <div class="grid">
-    <div class="card"><div class="k">QA defects</div><div class="v">12</div><div class="muted">3 critical · 7 major · 2 minor</div></div>
+    <div class="card"><div class="k">QA defects</div><div class="v">13</div><div class="muted">3 critical · 8 major · 2 minor</div></div>
     <div class="card"><div class="k">E2E (Playwright)</div><div class="v">44 / 54</div><div class="muted">10 failed (documented)</div></div>
+    <div class="card"><div class="k">Visual + Cross-browser</div><div class="v ok">17 / 17</div><div class="muted">5 visual + 12 cross-browser</div></div>
     <div class="card"><div class="k">Unit + API tests</div><div class="v ok">666</div><div class="muted">Vitest 315 + Jest 351 green</div></div>
     <div class="card"><div class="k">Security advisories</div><div class="v bad">${[...new Set((readText('security-audit.txt') || '').match(/GHSA-[\w-]+/g) || [])].length}</div><div class="muted">audit-ci --moderate</div></div>
   </div>

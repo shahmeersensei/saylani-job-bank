@@ -7,13 +7,19 @@
 
 ## 1. Test Runs ka Natija
 
-| Suite                                 | Command                           | Result                                   | Time  |
-| ------------------------------------- | --------------------------------- | ---------------------------------------- | ----- |
-| Typecheck                             | `pnpm typecheck`                  | **PASS** — 3/3 packages                  | 2m    |
-| Lint                                  | `pnpm lint`                       | **FAIL** — 39 errors (38 web + 1 shared) | 1m37s |
-| Unit (Vitest)                         | `pnpm --filter @jobbank/web test` | **PASS** — 315 passed / 53 files         | 267s  |
-| API (Jest)                            | `pnpm test:jest`                  | **PASS** — 351 passed / 13 suites        | 177s  |
-| E2E (Playwright, prod build, `:3001`) | `pnpm test:e2e`                   | **44 passed / 10 failed**                | 7.1m  |
+| Suite                                 | Command                           | Result                                    | Time  |
+| ------------------------------------- | --------------------------------- | ----------------------------------------- | ----- |
+| Typecheck                             | `pnpm typecheck`                  | **PASS** — 3/3 packages                   | 2m    |
+| Lint                                  | `pnpm lint`                       | **FAIL** — 39 errors (38 web + 1 shared)  | 1m37s |
+| Unit (Vitest)                         | `pnpm --filter @jobbank/web test` | **PASS** — 315 passed / 53 files          | 267s  |
+| API (Jest)                            | `pnpm test:jest`                  | **PASS** — 351 passed / 13 suites         | 177s  |
+| E2E (Playwright, prod build, `:3001`) | `pnpm test:e2e`                   | **44 passed / 10 failed**                 | 7.1m  |
+| Visual regression (Playwright)        | `pnpm test:visual-verify`         | **PASS** — 5/5 baselines                  | 17s   |
+| Cross-browser (Chromium/FF/WebKit)    | `pnpm test:cross-browser`         | **PASS** — 12/12                          | 1.8m  |
+| Load — API (Artillery)                | `pnpm test:api-load`              | **PASS** — 700 req, p95 33ms              | ~1m   |
+| Load — Web (Artillery)                | `pnpm test:web-load`              | **PASS** — 480 vusers, p95 82ms           | ~1m   |
+| Load — DB (direct Postgres)           | `pnpm test:db-load`               | **PASS** — reads p95 8ms, writes p95 16ms | ~10s  |
+| Security (audit-ci)                   | `pnpm test:security`              | **FAIL** — 9 advisories                   | ~10s  |
 
 ### E2E ke 10 failures — breakdown
 
@@ -33,7 +39,7 @@
 
 ## 2. Defects
 
-**Total: 12** — 3 Critical · 7 Major · 2 Minor (D-11 purana/known, baaki 11 naye)
+**Total: 13** — 3 Critical · 8 Major · 2 Minor (D-11 purana/known, baaki 12 naye)
 
 | ID   | Severity | Area           | One-liner                                                            |
 | ---- | -------- | -------------- | -------------------------------------------------------------------- |
@@ -47,6 +53,7 @@
 | D-08 | Major    | UX/Backend     | Login rate-limit tight, UI me cooldown feedback nahi                 |
 | D-09 | Major    | A11y/UI        | `/forbidden` par `<h1>` nahi                                         |
 | D-12 | Major    | CI             | E2E kabhi pass nahi hoga (browser install step nahi) + lint CI block |
+| D-13 | Major    | Security/Dep   | 9 vulnerable npm advisories (audit-ci --moderate)                    |
 | D-10 | Minor    | UI             | Select restyle Input/Textarea se mismatch                            |
 | D-11 | Minor    | Perf           | `next dev` login 49s (known)                                         |
 
@@ -232,6 +239,19 @@ baad bhi rahega jab tak D-04 fix na ho.
 
 ---
 
+**D-13 · 9 vulnerable npm dependencies (`audit-ci --moderate`)**
+
+`pnpm test:security` (audit-ci) **9 unique advisories** report karta hai — high + moderate.
+Inme se zyada tar **transitive** hain (next → postcss, jest → js-yaml → sprintf-js,
+better-auth → next, artillery → braces). Full list `tests/reports/security-audit.txt` ke end me
+hai, har advisory ka link `https://github.com/advisories/GHSA-…`.
+
+Fix path: `pnpm update` / `overrides` se vulnerable leaf packages bump karo. Note: kuch
+(next/postcss, jest chain) app ke core me hain — inhe upgrade karne se regression ka risk hai,
+isliye fix karte waqt E2E + unit dobara chalana zaroori.
+
+---
+
 ### MINOR / UI
 
 **D-10 · `Select` ka naya restyle `Input`/`Textarea` se mismatch ho gaya** _(uncommitted working-tree change)_
@@ -287,6 +307,8 @@ karte waqt ye slowness false "hang" lagegi.
 5. **D-07** — `creds.txt` + backup-codes files ko git se hatao aur `.gitignore` me add karo.
 6. **D-12** — `ci.yml` me `pnpm exec playwright install --with-deps chromium` step add karo
    (warna E2E CI me kabhi pass nahi hoga).
+7. **D-13** — `pnpm test:security` (audit-ci) ke 9 advisories fix karo — leaf deps bump /
+   overrides; core upgrades ke baad E2E + unit dobara chalao.
 
 ---
 

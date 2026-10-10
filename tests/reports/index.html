@@ -37,7 +37,7 @@
 </style></head><body>
 <header>
   <h1>Saylani Job Bank — Consolidated Test Report</h1>
-  <span class="meta">branch <code>test/api-and-ui-test-suites</code> · 2026-10-10T15:14:20.367Z</span>
+  <span class="meta">branch <code>test/api-and-ui-test-suites</code> · 2026-10-10T17:00:39.041Z</span>
   <nav>
     <a href="#summary">Summary</a><a href="#qa">QA</a><a href="#load">Load</a><a href="#security">Security</a><a href="#repro">Reproduce</a>
   </nav>
@@ -48,8 +48,9 @@
   <h2>Summary</h2>
   <p class="sub">Functional QA + API/Web/DB load + security, ek jagah. Testing only — developers fix.</p>
   <div class="grid">
-    <div class="card"><div class="k">QA defects</div><div class="v">12</div><div class="muted">3 critical · 7 major · 2 minor</div></div>
+    <div class="card"><div class="k">QA defects</div><div class="v">13</div><div class="muted">3 critical · 8 major · 2 minor</div></div>
     <div class="card"><div class="k">E2E (Playwright)</div><div class="v">44 / 54</div><div class="muted">10 failed (documented)</div></div>
+    <div class="card"><div class="k">Visual + Cross-browser</div><div class="v ok">17 / 17</div><div class="muted">5 visual + 12 cross-browser</div></div>
     <div class="card"><div class="k">Unit + API tests</div><div class="v ok">666</div><div class="muted">Vitest 315 + Jest 351 green</div></div>
     <div class="card"><div class="k">Security advisories</div><div class="v bad">9</div><div class="muted">audit-ci --moderate</div></div>
   </div>
@@ -58,7 +59,7 @@
 <section id="qa">
   <h2>1 · QA — Functional defects</h2>
   <p class="sub">Full detail: <a href="../../QA_REPORT.md">QA_REPORT.md</a></p>
-  <table><thead><tr><th>ID</th><th>Severity</th><th>Area</th><th>Defect</th></tr></thead><tbody><tr><td><code>D-01</code></td><td><span class="chip bad">Critical</span></td><td>Backend/Config</td><td>Prod server 500 on every request (BETTER_AUTH_SECRET empty)</td></tr><tr><td><code>D-02</code></td><td><span class="chip bad">Critical</span></td><td>Backend/Auth</td><td>SMS login broken in prod + OTP leaked to logs</td></tr><tr><td><code>D-03</code></td><td><span class="chip bad">Critical</span></td><td>Auth/Seed</td><td>Seeded admin stuck in 2FA gate, dashboard unreachable</td></tr><tr><td><code>D-04</code></td><td><span class="chip warn">Major</span></td><td>Tooling</td><td>Lint 39 errors — CI blocked</td></tr><tr><td><code>D-05</code></td><td><span class="chip warn">Major</span></td><td>API</td><td>Unknown route returns HTML 404, not JSON envelope</td></tr><tr><td><code>D-06</code></td><td><span class="chip warn">Major</span></td><td>Security</td><td>No security headers (CSP/HSTS/X-Frame-Options)</td></tr><tr><td><code>D-07</code></td><td><span class="chip warn">Major</span></td><td>Security</td><td>creds.txt + 2FA backup codes committed to repo</td></tr><tr><td><code>D-08</code></td><td><span class="chip warn">Major</span></td><td>UX/Backend</td><td>Login rate-limit tight, no UI cooldown feedback</td></tr><tr><td><code>D-09</code></td><td><span class="chip warn">Major</span></td><td>A11y/UI</td><td>/forbidden has no &lt;h1&gt;</td></tr><tr><td><code>D-12</code></td><td><span class="chip warn">Major</span></td><td>CI</td><td>CI missing playwright install step + lint blocks pipeline</td></tr><tr><td><code>D-10</code></td><td><span class="chip info">Minor</span></td><td>UI</td><td>Select restyle mismatches Input/Textarea</td></tr><tr><td><code>D-11</code></td><td><span class="chip info">Minor</span></td><td>Perf</td><td>next dev login 49s (known)</td></tr></tbody></table>
+  <table><thead><tr><th>ID</th><th>Severity</th><th>Area</th><th>Defect</th></tr></thead><tbody><tr><td><code>D-01</code></td><td><span class="chip bad">Critical</span></td><td>Backend/Config</td><td>Prod server 500 on every request (BETTER_AUTH_SECRET empty)</td></tr><tr><td><code>D-02</code></td><td><span class="chip bad">Critical</span></td><td>Backend/Auth</td><td>SMS login broken in prod + OTP leaked to logs</td></tr><tr><td><code>D-03</code></td><td><span class="chip bad">Critical</span></td><td>Auth/Seed</td><td>Seeded admin stuck in 2FA gate, dashboard unreachable</td></tr><tr><td><code>D-04</code></td><td><span class="chip warn">Major</span></td><td>Tooling</td><td>Lint 39 errors — CI blocked</td></tr><tr><td><code>D-05</code></td><td><span class="chip warn">Major</span></td><td>API</td><td>Unknown route returns HTML 404, not JSON envelope</td></tr><tr><td><code>D-06</code></td><td><span class="chip warn">Major</span></td><td>Security</td><td>No security headers (CSP/HSTS/X-Frame-Options)</td></tr><tr><td><code>D-07</code></td><td><span class="chip warn">Major</span></td><td>Security</td><td>creds.txt + 2FA backup codes committed to repo</td></tr><tr><td><code>D-08</code></td><td><span class="chip warn">Major</span></td><td>UX/Backend</td><td>Login rate-limit tight, no UI cooldown feedback</td></tr><tr><td><code>D-09</code></td><td><span class="chip warn">Major</span></td><td>A11y/UI</td><td>/forbidden has no &lt;h1&gt;</td></tr><tr><td><code>D-12</code></td><td><span class="chip warn">Major</span></td><td>CI</td><td>CI missing playwright install step + lint blocks pipeline</td></tr><tr><td><code>D-13</code></td><td><span class="chip warn">Major</span></td><td>Security/Dep</td><td>9 vulnerable npm advisories (audit-ci --moderate)</td></tr><tr><td><code>D-10</code></td><td><span class="chip info">Minor</span></td><td>UI</td><td>Select restyle mismatches Input/Textarea</td></tr><tr><td><code>D-11</code></td><td><span class="chip info">Minor</span></td><td>Perf</td><td>next dev login 49s (known)</td></tr></tbody></table>
 </section>
 
 <section id="load">
