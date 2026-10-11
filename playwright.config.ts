@@ -50,12 +50,9 @@ export default defineConfig({
   // session/OTP rate limits comfortably below their ceilings.
   workers: 2,
   timeout: 120_000,
-  expect: { timeout: 30_000 },
-  reporter: [
-    ['list'],
-    ['html', { open: 'never', outputFolder: 'playwright-report' }],
-    ['json', { outputFile: 'playwright-report/results.json' }],
-  ],
+  // JSON only — heavy Playwright HTML report (playwright-report/) disabled. Consolidated
+  // human report lives at tests/reports/index.html (pnpm test:reports) which reads this JSON.
+  reporter: [['list'], ['json', { outputFile: 'tests/reports/e2e-results.json' }]],
   use: {
     baseURL,
     trace: 'retain-on-failure',
@@ -64,7 +61,21 @@ export default defineConfig({
     navigationTimeout: 60_000,
     actionTimeout: 30_000,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Visual-regression defaults: hide caret, freeze animations so screenshots are stable.
+  expect: {
+    timeout: 30_000,
+    toHaveScreenshot: {
+      animations: 'disabled',
+      caret: 'hide',
+      maxDiffPixelRatio: 0.02,
+      threshold: 0.2,
+    },
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ],
   webServer: {
     command: prod
       ? 'pnpm --filter @jobbank/web build && pnpm --filter @jobbank/web start'

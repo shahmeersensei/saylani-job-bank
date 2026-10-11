@@ -1,0 +1,59 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 15
+      arrivalRate: 3
+      name: Warm up
+    - duration: 40
+      arrivalRate: 12
+      name: Sustained load
+  http:
+    pool: 48
+  defaults:
+    headers:
+      accept: 'text/html'
+  ensure:
+    p95: 3000
+    maxErrorRate: 1
+
+scenarios:
+  - name: 'Landing page'
+    weight: 3
+    flow:
+      - get:
+          url: '/'
+          expect:
+            - statusCode: 200
+
+  - name: 'Login page'
+    weight: 3
+    flow:
+      - get:
+          url: '/login'
+          expect:
+            - statusCode: 200
+
+  - name: 'Register page'
+    weight: 2
+    flow:
+      - get:
+          url: '/register'
+          expect:
+            - statusCode: 200
+
+  - name: 'Forgot password page'
+    weight: 1
+    flow:
+      - get:
+          url: '/forgot-password'
+          expect:
+            - statusCode: 200
+
+  - name: 'Protected page redirects anonymous to login'
+    weight: 2
+    flow:
+      - get:
+          url: '/staff'
+          redirects: 2
+          expect:
+            - statusCode: [200, 307, 308]
