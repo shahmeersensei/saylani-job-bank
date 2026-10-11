@@ -1,0 +1,47 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 20
+      arrivalRate: 5
+      name: Warm up
+    - duration: 40
+      arrivalRate: 15
+      name: Sustained load
+  http:
+    # Keep connections alive so we measure the app, not TCP setup.
+    pool: 64
+  defaults:
+    headers:
+      x-correlation-id: 'load-api-{{ $randomNumber() }}'
+  ensure:
+    p95: 2000
+    maxErrorRate: 1
+
+scenarios:
+  - name: 'Health check (public)'
+    weight: 3
+    flow:
+      - get:
+          url: '/api/v1/health'
+          expect:
+            - statusCode: 200
+            - json: '$.status'
+              equals: 'ok'
+
+  - name: 'Protected route rejects anonymous'
+    weight: 2
+    flow:
+      - get:
+          url: '/api/v1/branches'
+          expect:
+            - statusCode: 401
+            - json: '$.error.code'
+              equals: 'UNAUTHENTICATED'
+
+  - name: 'Unknown API route returns envelope, not 5xx'
+    weight: 1
+    flow:
+      - get:
+          url: '/api/v1/definitely-not-a-route'
+          expect:
+            - statusCode: [404, 401]

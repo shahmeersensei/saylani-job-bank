@@ -2,7 +2,7 @@ import type { Role } from '@jobbank/shared';
 import { hashPassword } from 'better-auth/crypto';
 import { eq } from 'drizzle-orm';
 import type { Database } from '../client';
-import { accounts, branches, userRoles, users } from '../schema';
+import { accounts, branches, twoFactors, userRoles, users } from '../schema';
 import type { SeedStep } from '../scripts/seed';
 
 /**
@@ -105,7 +105,7 @@ export const devData: SeedStep = {
           .values({ ...branch, location: { ...branch.location } })
           .onConflictDoUpdate({
             target: branches.code,
-            set: { name: branch.name, city: branch.city, address: branch.address },
+            set: { name: branch.name, city: branch.city, address: branch.address, isActive: true },
           })
           .returning({ id: branches.id });
         branchIds.set(branch.code, row!.id);
@@ -124,10 +124,13 @@ export const devData: SeedStep = {
           })
           .onConflictDoUpdate({
             target: users.email,
-            set: { name: user.name, status: user.status ?? 'ACTIVE' },
+            set: { name: user.name, status: user.status ?? 'ACTIVE', twoFactorEnabled: false },
           })
           .returning({ id: users.id });
         const userId = row!.id;
+
+        // Clear any enrolled TOTP secret so the account starts without 2FA on every seed.
+        await tx.delete(twoFactors).where(eq(twoFactors.userId, userId));
 
         if (user.password) {
           await tx

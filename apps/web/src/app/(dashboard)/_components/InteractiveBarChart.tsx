@@ -209,7 +209,7 @@ export function CardActionMenu({ items }: { items: { label: string; onClick?: ()
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="rounded-lg p-1 transition-colors hover:bg-[#f4f7f5]"
+        className="hover:bg-surface-muted rounded-lg p-1 transition-colors"
         style={{ color: 'var(--fg-muted)' }}
         aria-label="Actions"
       >
@@ -219,10 +219,7 @@ export function CardActionMenu({ items }: { items: { label: string; onClick?: ()
         <>
           {/* Backdrop */}
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div
-            className="absolute top-8 right-0 z-20 min-w-44 rounded-xl border bg-white p-1"
-            style={{ borderColor: '#e8eeed', boxShadow: '0 4px 16px rgba(0,0,0,0.10)' }}
-          >
+          <div className="bg-surface border-border shadow-popover absolute top-8 right-0 z-20 min-w-44 rounded-xl border p-1">
             {items.map((item) => (
               <button
                 key={item.label}
@@ -231,8 +228,7 @@ export function CardActionMenu({ items }: { items: { label: string; onClick?: ()
                   setOpen(false);
                   item.onClick?.();
                 }}
-                className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-[#f8faf9]"
-                style={{ color: 'var(--fg)' }}
+                className="text-fg hover:bg-surface-muted flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors"
               >
                 {item.label}
               </button>
