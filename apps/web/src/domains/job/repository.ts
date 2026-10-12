@@ -1,7 +1,7 @@
 import 'server-only';
 import { schema } from '@jobbank/db';
 import type { GenderPreference, JobStatus, JobType, ShiftType, SkillLevel } from '@jobbank/shared';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import { NotFoundError } from '@/domains/shared/errors';
 import { db, type DbExecutor } from '@/lib/db';
 

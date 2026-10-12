@@ -28,7 +28,7 @@ function getVisibleRange(period: Period, currentMonth: number) {
 
 export function InteractiveBarChart({
   values,
-  peak,
+  peak: _peak,
   color = '#0d7a3e',
   label,
 }: {

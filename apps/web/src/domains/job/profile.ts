@@ -7,8 +7,8 @@ import {
   type JobStatusInput,
   type UpdateJobInput,
 } from '@jobbank/shared';
-import { and, eq, sql } from 'drizzle-orm';
-import { requireOwnCompany } from '@/domains/company/repository';
+import { eq, sql } from 'drizzle-orm';
+import { requireOwnCompany } from '@/domains/company';
 import { runCommand } from '@/domains/shared/audit';
 import { ForbiddenError, NotFoundError } from '@/domains/shared/errors';
 import { assertPermission, type Actor } from '@/domains/shared/scope';

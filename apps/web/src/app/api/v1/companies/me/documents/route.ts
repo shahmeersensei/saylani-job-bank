@@ -1,6 +1,5 @@
 import { companyPresignSchema } from '@jobbank/shared';
-import { presignMyCompanyDocument } from '@/domains/company';
-import { companyDocumentTypes } from '@/domains/company/repository';
+import { companyDocumentTypes, presignMyCompanyDocument } from '@/domains/company';
 import { apiHandler, created, ok } from '@/domains/shared/http';
 
 /** GET /api/v1/companies/me/documents — document types for companies. */

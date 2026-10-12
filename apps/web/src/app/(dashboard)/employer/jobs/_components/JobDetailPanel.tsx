@@ -7,9 +7,11 @@ import {
   SHIFT_TYPE_LABELS,
   GENDER_PREFERENCE_LABELS,
 } from '@jobbank/shared';
+// eslint-disable-next-line no-restricted-imports -- type-only import is erased at compile time; barrel pulls server-only staff
 import type { JobView } from '@/domains/job/repository';
 import { apiFetch } from '@/lib/api/client';
 import { Badge, Button, Link } from '@/components/atoms';
+// eslint-disable-next-line no-restricted-imports -- pure rules module is client-safe; barrel pulls server-only staff
 import { allowedTransitions } from '@/domains/job/rules';
 import { useRouter } from 'next/navigation';
 import { Pencil, Trash2 } from 'lucide-react';

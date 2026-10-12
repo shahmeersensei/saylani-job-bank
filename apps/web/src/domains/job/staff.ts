@@ -120,7 +120,6 @@ export async function listJobs(
 export async function getJobDetail(actor: Actor, jobId: string): Promise<JobView> {
   assertPermission(actor, 'job:read');
   const row = await loadJob(db, jobId);
-  const scopeCondition = branchScope(actor, j.branchId);
   // For detail, we check manually since branchScope works on queries
   if (!isSuperAdmin(actor)) {
     // assertBranchAccess throws if actor can't see that branch

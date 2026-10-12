@@ -9,6 +9,7 @@ export function EmptyState({
   action,
   compact,
   className,
+  titleAs: Title = 'p',
 }: EmptyStateProps) {
   return (
     <div
@@ -22,7 +23,7 @@ export function EmptyState({
         <Icon className="size-6" aria-hidden="true" />
       </div>
       <div className="grid max-w-sm gap-1">
-        <p className="text-fg text-base font-semibold">{title}</p>
+        <Title className="text-fg text-base font-semibold">{title}</Title>
         {description && <p className="text-fg-muted text-sm">{description}</p>}
       </div>
       {action && <div className="mt-1">{action}</div>}

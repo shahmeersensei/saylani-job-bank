@@ -43,12 +43,16 @@ export default defineConfig({
   testDir: './tests/e2e',
   // Resets the shared login rate-limit counters so repeat runs are not blocked by 429s.
   globalSetup: './apps/web/e2e-global-setup.ts',
-  fullyParallel: true,
+  // Not fully parallel: the suites share a handful of seeded accounts, and concurrent
+  // sign-ins/enrollments for the same user race each other (session cookies, 2FA state,
+  // the 5-per-15min login limiter). Files still run in parallel across workers.
+  fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
-  // Route compilation is no longer a factor in production mode; two workers keep the
-  // session/OTP rate limits comfortably below their ceilings.
-  workers: 2,
+  // One worker: the suites drive the same seeded accounts (login.spec turns superadmin's
+  // 2FA off while super-admin.spec is enrolled), and cross-file runs on two workers raced
+  // that state — flaky `setup=required` bounces. 63 tests still finish in ~5 minutes.
+  workers: 1,
   timeout: 120_000,
   // JSON only — heavy Playwright HTML report (playwright-report/) disabled. Consolidated
   // human report lives at tests/reports/index.html (pnpm test:reports) which reads this JSON.
@@ -85,7 +89,12 @@ export default defineConfig({
     url: `${baseURL}/api/v1/health`,
     reuseExistingServer: true,
     timeout: 420_000,
-    env: { ...process.env, NODE_ENV: 'production' } as Record<string, string>,
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      // Allow the console SMS sender under the production E2E build so the SMS login flow is testable.
+      E2E_SMS: '1',
+    } as Record<string, string>,
     stdout: 'ignore',
     stderr: 'pipe',
   },

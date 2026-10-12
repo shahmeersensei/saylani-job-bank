@@ -25,13 +25,15 @@ export {
   updateMyCompany,
   updateMySite,
 } from './profile';
-export type {
-  CompanyContactView,
-  CompanyDocumentType,
-  CompanyDocumentView,
-  CompanyLocationView,
-  CompanyView,
-  VerificationSummary,
+export {
+  companyDocumentTypes,
+  requireOwnCompany,
+  type CompanyContactView,
+  type CompanyDocumentType,
+  type CompanyDocumentView,
+  type CompanyLocationView,
+  type CompanyView,
+  type VerificationSummary,
 } from './repository';
 export {
   companyEditability,

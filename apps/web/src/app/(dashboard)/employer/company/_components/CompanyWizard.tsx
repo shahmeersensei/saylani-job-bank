@@ -5,16 +5,15 @@ import {
   LEGAL_STRUCTURE_LABELS,
   COMPANY_SIZE_BANDS,
   COMPANY_SIZE_LABELS,
-  COMPANY_STATUS_LABELS,
   type CompanyStatus,
 } from '@jobbank/shared';
-import { ArrowLeft, ArrowRight, Building2, CheckCircle2, Send } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Badge, Input, Select, StatusPill, Textarea } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
-import type { CompanyView } from '@/domains/company/repository';
+import type { CompanyView } from '@/domains/company';
 
 type WizardStep = 'details' | 'contacts' | 'location' | 'documents' | 'submit';
 

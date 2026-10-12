@@ -15,6 +15,7 @@ export default async function ForbiddenPage() {
       <EmptyState
         icon={Lock}
         title="You don't have access to this page"
+        titleAs="h1"
         description="This area belongs to a different role. If you need access, ask your branch admin."
         action={
           <Button asChild>

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { signInStaff } from './helpers';
 
 /**
  * Whole-site sweep: every page in the app must render for the role that owns it, must not
@@ -8,14 +9,22 @@ import { expect, test } from '@playwright/test';
  * It is also the defect catcher: a page that 500s or renders an empty shell shows up here.
  */
 
-const DEV_PASSWORD = 'JobBank-Dev-2026!';
-
-async function signIn(page: import('@playwright/test').Page, email: string) {
-  await page.goto('/login');
-  await page.getByRole('button', { name: /Staff \/ Admin/ }).click();
-  await page.getByLabel(/Email/).fill(email);
-  await page.getByLabel(/Password/).fill(DEV_PASSWORD);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+async function sweep(
+  page: import('@playwright/test').Page,
+  email: string,
+  urls: string[],
+  label: string,
+) {
+  await signInStaff(page, email);
+  for (const url of urls) {
+    const response = await page.goto(url);
+    expect(response?.status(), `${label} ${url} status`).toBeLessThan(500);
+    // The role guard may bounce the user (e.g. SUPER_ADMIN without 2FA); anything that
+    // renders must render a heading.
+    if (!page.url().includes('/forbidden') && !page.url().includes('/login')) {
+      await expect(page.locator('h1').first(), `${label} ${url} heading`).toBeVisible();
+    }
+  }
 }
 
 type Target = { url: string; role: 'anonymous' | 'staff' | 'employer' | 'superadmin' | 'verifier' };
@@ -64,24 +73,6 @@ test.describe('public pages render', () => {
     });
   }
 });
-
-async function sweep(
-  page: import('@playwright/test').Page,
-  email: string,
-  urls: string[],
-  label: string,
-) {
-  await signIn(page, email);
-  for (const url of urls) {
-    const response = await page.goto(url);
-    expect(response?.status(), `${label} ${url} status`).toBeLessThan(500);
-    // The role guard may bounce the user (e.g. SUPER_ADMIN without 2FA); anything that
-    // renders must render a heading.
-    if (!page.url().includes('/forbidden') && !page.url().includes('/login')) {
-      await expect(page.locator('h1').first(), `${label} ${url} heading`).toBeVisible();
-    }
-  }
-}
 
 test.describe('role areas render', () => {
   test('staff area', async ({ page }) => {

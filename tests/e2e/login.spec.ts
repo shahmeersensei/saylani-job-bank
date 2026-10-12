@@ -1,13 +1,20 @@
 import { expect, test } from '@playwright/test';
-
-/** Shared dev credentials — see packages/db/src/seed/dev-data.ts. */
-const DEV_PASSWORD = 'JobBank-Dev-2026!';
+import { clearRateLimits, disableTwoFactor, DEV_PASSWORD } from './helpers';
 
 /** A PK mobile number in national format (never verified, so a random one is safe). */
 const randomPhone = () =>
   `300${Math.floor(Math.random() * 1e7)
     .toString()
     .padStart(7, '0')}`;
+
+test.beforeEach(async () => {
+  await Promise.all([
+    clearRateLimits(),
+    // These specs sign in directly (no helpers.signInStaff), so they need a clean 2FA state.
+    disableTwoFactor('staff.khi@jobbank.local'),
+    disableTwoFactor('superadmin@jobbank.local'),
+  ]);
+});
 
 test.describe('login page', () => {
   test('shows the three role cards first', async ({ page }) => {
@@ -46,7 +53,11 @@ test.describe('login page', () => {
     await page.goto('/login');
     await page.getByRole('button', { name: /Job Seeker/ }).click();
     await expect(page.getByText('Mobile number')).toBeVisible();
-    await page.getByLabel(/Mobile number/).fill(randomPhone());
+    // Type character-by-character so the controlled PhoneInput fires onChange per keystroke.
+    const input = page.getByLabel(/Mobile number/);
+    await input.click();
+    await input.pressSequentially(randomPhone().slice(0, 10), { delay: 20 });
+    await expect(page.getByRole('button', { name: 'Send code' })).toBeEnabled();
     await page.getByRole('button', { name: 'Send code' }).click();
 
     await expect(page.getByText(/Enter the 6-digit code sent to/)).toBeVisible();
@@ -72,17 +83,15 @@ test.describe('login page', () => {
 });
 
 test.describe('super admin first sign-in', () => {
-  test('lands on the super-admin dashboard and can open the 2FA setup page', async ({ page }) => {
+  test('is required to set up 2FA before reaching the super-admin dashboard', async ({ page }) => {
     await page.goto('/login');
     await page.getByRole('button', { name: /Staff \/ Admin/ }).click();
     await page.getByLabel(/Email/).fill('superadmin@jobbank.local');
     await page.getByLabel(/Password/).fill(DEV_PASSWORD);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
-    // The Super Admin is signed in but has no authenticator enrolled yet, so the
-    // security page offers the two-factor setup.
-    await expect(page).toHaveURL(/\/super-admin/);
-    await page.goto('/account/security?setup=required');
+    // SUPER_ADMIN without an enrolled authenticator is forced to /account/security.
+    await expect(page).toHaveURL(/\/account\/security\?setup=required/);
     await expect(page.getByRole('heading', { name: 'Two-factor authentication' })).toBeVisible();
     await expect(page.getByText(/You will need an authenticator app/)).toBeVisible();
   });

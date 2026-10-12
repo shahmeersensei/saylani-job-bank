@@ -1,14 +1,8 @@
 import { expect, test } from '@playwright/test';
-
-/** Shared dev credentials — see packages/db/src/seed/dev-data.ts. */
-const DEV_PASSWORD = 'JobBank-Dev-2026!';
+import { signInStaff } from './helpers';
 
 async function signInAsStaff(page: import('@playwright/test').Page) {
-  await page.goto('/login');
-  await page.getByRole('button', { name: /Staff \/ Admin/ }).click();
-  await page.getByLabel(/Email/).fill('staff.lhr@jobbank.local');
-  await page.getByLabel(/Password/).fill(DEV_PASSWORD);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await signInStaff(page, 'staff.khi@jobbank.local');
   await expect(page).toHaveURL(/\/staff$/);
 }
 

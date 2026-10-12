@@ -33,7 +33,29 @@ export default async function globalSetup(): Promise<void> {
   config({ path: path.resolve(here, '../../.env'), quiet: true });
 
   await clearRateLimits();
+  await resetTwoFactors();
   await warmRoutes();
+}
+
+/**
+ * Clears any 2FA enrolled by a previous run, mirroring the dev seed. The suite signs in
+ * as SUPER_ADMIN / BRANCH_ADMIN on every run and must see the enrollment wizard, not the
+ * TOTP verify step (the secret from a prior run is gone).
+ */
+async function resetTwoFactors(): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) return;
+  const { default: postgres } = await import('postgres');
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`UPDATE users SET two_factor_enabled = false`;
+    await sql`DELETE FROM two_factors`;
+    console.log('[global-setup] reset two-factor state for all users');
+  } catch (error) {
+    console.warn(`[global-setup] could not reset two-factor state: ${String(error)}`);
+  } finally {
+    await sql.end();
+  }
 }
 
 async function clearRateLimits(): Promise<void> {

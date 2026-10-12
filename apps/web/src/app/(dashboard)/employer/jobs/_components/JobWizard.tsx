@@ -9,6 +9,7 @@ import {
   GENDER_PREFERENCES,
   GENDER_PREFERENCE_LABELS,
 } from '@jobbank/shared';
+// eslint-disable-next-line no-restricted-imports -- type-only import is erased at compile time; barrel pulls server-only staff
 import type { JobView } from '@/domains/job/repository';
 import { apiFetch } from '@/lib/api/client';
 import { Button, Input, Select, Textarea } from '@/components/atoms';

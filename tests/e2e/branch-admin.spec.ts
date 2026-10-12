@@ -1,28 +1,14 @@
 import { expect, test } from '@playwright/test';
-
-/** Shared dev credentials — see packages/db/src/seed/dev-data.ts. */
-const DEV_PASSWORD = 'JobBank-Dev-2026!';
+import { signInStaff } from './helpers';
 
 /** Seeded Branch Admin for the Karachi — Gulshan-e-Iqbal branch. */
 const BRANCH_ADMIN_EMAIL = 'branchadmin.khi@jobbank.local';
 /** Seeded Job Bank Staff — the lower-privilege role used for the isolation case. */
 const STAFF_EMAIL = 'staff.khi@jobbank.local';
 
-async function signIn(page: import('@playwright/test').Page, email: string) {
-  await page.goto('/login');
-  await page.getByRole('button', { name: /Staff \/ Admin/ }).click();
-  await page.getByLabel(/Email/).fill(email);
-  await page.getByLabel(/Password/).fill(DEV_PASSWORD);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  // Accepted credentials always leave /login. A BRANCH_ADMIN who has not enrolled an
-  // authenticator yet is routed to /account/security?setup=required instead of /branch-admin
-  // (requireSignedIn → TWO_FACTOR_REQUIRED_ROLES), so the exact landing is asserted per test.
-  await expect(page).not.toHaveURL(/\/login/);
-}
-
 test.describe('branch admin area (/branch-admin)', () => {
   test('the dashboard renders the welcome panel', async ({ page }) => {
-    await signIn(page, BRANCH_ADMIN_EMAIL);
+    await signInStaff(page, BRANCH_ADMIN_EMAIL);
 
     await page.goto('/branch-admin');
     await expect(page).toHaveURL(/\/branch-admin$/);
@@ -30,7 +16,7 @@ test.describe('branch admin area (/branch-admin)', () => {
   });
 
   test('the applicants, companies and add-company pages render', async ({ page }) => {
-    await signIn(page, BRANCH_ADMIN_EMAIL);
+    await signInStaff(page, BRANCH_ADMIN_EMAIL);
 
     await page.goto('/branch-admin/applicants');
     await expect(page).toHaveURL(/\/branch-admin\/applicants$/);
@@ -46,7 +32,7 @@ test.describe('branch admin area (/branch-admin)', () => {
   });
 
   test('the jobs, post-a-job, settings and staff pages render', async ({ page }) => {
-    await signIn(page, BRANCH_ADMIN_EMAIL);
+    await signInStaff(page, BRANCH_ADMIN_EMAIL);
 
     await page.goto('/branch-admin/jobs');
     await expect(page).toHaveURL(/\/branch-admin\/jobs$/);
@@ -66,7 +52,7 @@ test.describe('branch admin area (/branch-admin)', () => {
   });
 
   test('signing out returns the admin to the login page', async ({ page }) => {
-    await signIn(page, BRANCH_ADMIN_EMAIL);
+    await signInStaff(page, BRANCH_ADMIN_EMAIL);
 
     await page.getByRole('button', { name: /Account menu for/ }).click();
     await page.getByRole('menuitem', { name: 'Sign out' }).click();
@@ -76,7 +62,7 @@ test.describe('branch admin area (/branch-admin)', () => {
   });
 
   test('a staff member is refused the branch admin area', async ({ page }) => {
-    await signIn(page, STAFF_EMAIL);
+    await signInStaff(page, STAFF_EMAIL);
     await expect(page).toHaveURL(/\/staff$/);
 
     await page.goto('/branch-admin');

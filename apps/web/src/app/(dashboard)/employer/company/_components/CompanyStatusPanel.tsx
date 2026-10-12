@@ -4,14 +4,13 @@ import {
   COMPANY_STATUS_LABELS,
   LEGAL_STRUCTURE_LABELS,
   COMPANY_SIZE_LABELS,
-  VERIFICATION_EVENT_LABELS,
   type CompanyStatus,
 } from '@jobbank/shared';
 import { Building2, CheckCircle2, XCircle, AlertCircle, Clock } from 'lucide-react';
 import NextLink from 'next/link';
 import { Button, StatusPill } from '@/components/atoms';
 import { KeyValue } from '@/components/molecules';
-import type { CompanyView } from '@/domains/company/repository';
+import type { CompanyView } from '@/domains/company';
 
 const STATUS_PILL: Record<
   CompanyStatus,

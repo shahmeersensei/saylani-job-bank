@@ -22,7 +22,9 @@ const consoleSender: SmsSender = {
 
 export function getSmsSender(): SmsSender {
   if (env.SMS_PROVIDER === 'console') {
-    if (process.env.NODE_ENV === 'production') {
+    // Production blocks the console sender, except when E2E explicitly opts in so the
+    // Playwright suite can exercise the SMS login flow against a production build.
+    if (process.env.NODE_ENV === 'production' && process.env.E2E_SMS !== '1') {
       throw new Error(
         'SMS_PROVIDER=console cannot be used in production; configure a real SMS gateway',
       );

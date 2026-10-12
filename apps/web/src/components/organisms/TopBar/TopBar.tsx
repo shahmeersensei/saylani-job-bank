@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils/cn';
 import type { TopBarProps } from './topBar.types';
 
 export function TopBar({
-  title,
+  title: _title,
   onMenuClick,
   branchSwitcher,
   user,

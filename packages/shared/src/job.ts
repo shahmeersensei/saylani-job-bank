@@ -43,8 +43,6 @@ export const GENDER_PREFERENCE_LABELS: Record<GenderPreference, string> = {
 
 // ─── Schemas ────────────────────────────────────────────────────────────
 
-const optText = (max = 2000) => z.string().trim().max(max).optional();
-
 export const createJobSchema = z.object({
   title: z.string().trim().min(3).max(200),
   categoryCode: z.string().trim().min(1).max(50),

@@ -30,23 +30,6 @@ import { listApplicants, getMyProfile } from '@/domains/applicant';
 import { listCompanies, listQueue } from '@/domains/company';
 import { listStaff } from '@/domains/user';
 import { listMyJobs } from '@/domains/job';
-import { formatPkMobileDisplay } from '@/lib/format/phone';
-
-/* ─── Monthly chart labels ──────────────────────────────────────── */
-const MONTHS_SHORT = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
 
 /* ─── Chart shape (illustrative — real time-series coming later) ── */
 const ROLE_CHART: Record<Role, { values: number[]; peak: number; label: string }> = {
@@ -728,7 +711,6 @@ export async function WelcomePanel({ role }: { role: Role }) {
       /* no company yet */
     }
     const activeJobs = jobs.filter((j) => j.status === 'OPEN');
-    const filled = jobs.map((j) => j.vacancies ?? 1);
     const jobItems: DashMain['subItems'] = activeJobs.slice(0, 4).map((j) => ({
       icon: Briefcase as LucideIcon,
       label: j.title,
