@@ -210,8 +210,6 @@ export const applicantLocationSchema = z.object({
     .max(300),
   cityCode: masterDataCodeSchema,
   areaCode: masterDataCodeSchema.nullish().transform((v) => v ?? null),
-  /** The branch the applicant chose (the nearest one is suggested). Locked once ACTIVE. */
-  branchId: z.uuid('Choose a branch'),
 });
 export type ApplicantLocationInput = z.infer<typeof applicantLocationSchema>;
 
@@ -282,7 +280,7 @@ export const skillsSchema = z.object({
       z.object({
         skillCode: masterDataCodeSchema,
         level: z.enum(SKILL_LEVELS),
-        years: z.number().int().min(0).max(50),
+        years: z.number().int().min(0).max(50).default(0),
       }),
     )
     .max(30)

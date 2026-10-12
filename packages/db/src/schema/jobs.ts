@@ -1,7 +1,9 @@
 import {
+  BONUS_TIERS,
   GENDER_PREFERENCES,
   JOB_STATUSES,
   JOB_TYPES,
+  MEDICAL_COVERAGE_TYPES,
   SHIFT_TYPES,
   SKILL_LEVELS,
 } from '@jobbank/shared';
@@ -44,6 +46,20 @@ export const jobs = pgTable(
     closesAt: timestamp('closes_at', { withTimezone: true }),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),
+    reopenedAt: timestamp('reopened_at', { withTimezone: true }),
+    // Benefits & Perks
+    fuelAllowance: boolean('fuel_allowance').notNull().default(false),
+    flexibleHours: boolean('flexible_hours').notNull().default(false),
+    annualLeaveDays: smallint('annual_leave_days'),
+    medicalCoverage: text('medical_coverage', { enum: MEDICAL_COVERAGE_TYPES })
+      .notNull()
+      .default('NONE'),
+    bonusTier: text('bonus_tier', { enum: BONUS_TIERS }).notNull().default('NONE'),
+    workFromHome: boolean('work_from_home').notNull().default(false),
+    providentFund: boolean('provident_fund').notNull().default(false),
+    transportAllowance: boolean('transport_allowance').notNull().default(false),
+    eobi: boolean('eobi').notNull().default(false),
+    lifeInsurance: boolean('life_insurance').notNull().default(false),
     createdBy: uuid('created_by').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

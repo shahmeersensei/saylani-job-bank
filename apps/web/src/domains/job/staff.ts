@@ -6,9 +6,9 @@ import { runCommand } from '@/domains/shared/audit';
 import { ForbiddenError, NotFoundError } from '@/domains/shared/errors';
 import { paginationMeta, type ListQuery } from '@/domains/shared/pagination';
 import {
-  assertBranchAccess,
+  assertCityAccess,
   assertPermission,
-  branchScope,
+  cityScope,
   hasPermission,
   isSuperAdmin,
   type Actor,
@@ -57,16 +57,13 @@ export async function listJobs(
 
   const conditions: SQL[] = [];
 
-  // Branch scope — branchScope returns undefined (all) or a SQL condition
-  const scopeCondition = branchScope(actor, j.branchId);
+  // City scope — all staff in any branch of the same city see all jobs for that city
+  const scopeCondition = cityScope(actor, j.branchId);
   if (scopeCondition) conditions.push(scopeCondition);
 
   if (f.status) conditions.push(eq(j.status, f.status));
   if (f.companyId) conditions.push(eq(j.companyId, f.companyId));
-  if (f.branchId) {
-    if (!isSuperAdmin(actor)) assertBranchAccess(actor, f.branchId);
-    conditions.push(eq(j.branchId, f.branchId));
-  }
+  if (f.branchId) conditions.push(eq(j.branchId, f.branchId));
   if (query.q) {
     const like = `%${query.q}%`;
     conditions.push(or(ilike(j.title, like), ilike(j.categoryCode, like))!);
@@ -120,16 +117,7 @@ export async function listJobs(
 export async function getJobDetail(actor: Actor, jobId: string): Promise<JobView> {
   assertPermission(actor, 'job:read');
   const row = await loadJob(db, jobId);
-  const scopeCondition = branchScope(actor, j.branchId);
-  // For detail, we check manually since branchScope works on queries
-  if (!isSuperAdmin(actor)) {
-    // assertBranchAccess throws if actor can't see that branch
-    try {
-      assertBranchAccess(actor, row.branchId);
-    } catch {
-      throw new ForbiddenError('Job is not in your branch');
-    }
-  }
+  await assertCityAccess(actor, row.branchId, { entityType: 'job', entityId: row.id });
   return buildJobView(db, row);
 }
 
@@ -154,7 +142,10 @@ export async function staffCreateJob(
   if (company.status !== 'VERIFIED')
     throw new ForbiddenError('Jobs can only be posted for verified companies');
   if (!company.branchId) throw new ForbiddenError('Company has no branch assigned');
-  if (!isSuperAdmin(ctx.actor)) assertBranchAccess(ctx.actor, company.branchId);
+  await assertCityAccess(ctx.actor, company.branchId, {
+    entityType: 'company',
+    entityId: company.id,
+  });
 
   return runCommand(ctx, async ({ tx, audit }) => {
     const [row] = await tx

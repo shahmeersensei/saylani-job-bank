@@ -1,6 +1,14 @@
 import 'server-only';
 import { schema } from '@jobbank/db';
-import type { GenderPreference, JobStatus, JobType, ShiftType, SkillLevel } from '@jobbank/shared';
+import type {
+  BonusTier,
+  GenderPreference,
+  JobStatus,
+  JobType,
+  MedicalCoverageType,
+  ShiftType,
+  SkillLevel,
+} from '@jobbank/shared';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { NotFoundError } from '@/domains/shared/errors';
 import { db, type DbExecutor } from '@/lib/db';
@@ -55,6 +63,18 @@ export interface JobView {
   closesAt: string | null;
   publishedAt: string | null;
   closedAt: string | null;
+  reopenedAt: string | null;
+  // Benefits & Perks
+  fuelAllowance: boolean;
+  flexibleHours: boolean;
+  annualLeaveDays: number | null;
+  medicalCoverage: MedicalCoverageType;
+  bonusTier: BonusTier;
+  workFromHome: boolean;
+  providentFund: boolean;
+  transportAllowance: boolean;
+  eobi: boolean;
+  lifeInsurance: boolean;
   locations: JobLocationView[];
   requirements: JobRequirementsView | null;
   skills: JobSkillView[];
@@ -101,6 +121,17 @@ export async function buildJobView(executor: DbExecutor, row: JobRow): Promise<J
     closesAt: row.closesAt?.toISOString() ?? null,
     publishedAt: row.publishedAt?.toISOString() ?? null,
     closedAt: row.closedAt?.toISOString() ?? null,
+    reopenedAt: row.reopenedAt?.toISOString() ?? null,
+    fuelAllowance: row.fuelAllowance,
+    flexibleHours: row.flexibleHours,
+    annualLeaveDays: row.annualLeaveDays,
+    medicalCoverage: row.medicalCoverage as MedicalCoverageType,
+    bonusTier: row.bonusTier as BonusTier,
+    workFromHome: row.workFromHome,
+    providentFund: row.providentFund,
+    transportAllowance: row.transportAllowance,
+    eobi: row.eobi,
+    lifeInsurance: row.lifeInsurance,
     locations: locations.map((l) => ({
       id: l.id,
       companyLocationId: l.companyLocationId,

@@ -39,9 +39,40 @@ function FollowValue({ value }: { value: LatLng | null }) {
   return null;
 }
 
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'SaylaniJobBank/1.0' } },
+    );
+    if (!res.ok) return '';
+    const json = (await res.json()) as {
+      address?: {
+        house_number?: string;
+        road?: string;
+        neighbourhood?: string;
+        suburb?: string;
+        town?: string;
+        city?: string;
+        village?: string;
+        state?: string;
+        country?: string;
+      };
+      display_name?: string;
+    };
+    const a = json.address ?? {};
+    // Build a readable address line from the most useful parts
+    const parts = [a.house_number, a.road, a.neighbourhood ?? a.suburb].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : (json.display_name ?? '');
+  } catch {
+    return '';
+  }
+}
+
 export default function MapPinPickerClient({
   value,
   onChange,
+  onLocate,
   defaultCenter = KARACHI,
   zoom = 13,
   rings = [],
@@ -76,9 +107,17 @@ export default function MapPinPickerClient({
     setLocating(true);
     setGeoError(null);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
+        const coords: LatLng = {
+          lat: roundCoord(position.coords.latitude),
+          lng: roundCoord(position.coords.longitude),
+        };
+        pick(coords);
+        if (onLocate) {
+          const addressLine = await reverseGeocode(coords.lat, coords.lng);
+          onLocate(coords, addressLine);
+        }
         setLocating(false);
-        pick({ lat: position.coords.latitude, lng: position.coords.longitude });
       },
       (error) => {
         setLocating(false);

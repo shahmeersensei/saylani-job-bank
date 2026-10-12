@@ -17,6 +17,8 @@ import { Button, StatusPill } from '@/components/atoms';
 import { StatCard } from '@/components/molecules/StatCard';
 import { getMyProfile } from '@/domains/applicant';
 import { requireRole } from '@/domains/auth';
+import { listMatchedJobs } from '@/domains/matching';
+import { listMyApplications } from '@/domains/placement';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
 import { APPLICANT_STATUS_PILL, IDENTITY_PILL } from '../_components/applicants/labels';
 import { StatusToggle } from './_components/StatusToggle';
@@ -115,6 +117,15 @@ export default async function ApplicantHomePage() {
 
   /* ── Dashboard ───────────────────────────────────────────── */
   const { completeness } = profile;
+  const [matchedJobs, myApplications] = await Promise.all([
+    profile.address ? listMatchedJobs(profile) : Promise.resolve([]),
+    listMyApplications(actor),
+  ]);
+
+  const upcomingInterviews = myApplications.filter(
+    (a) =>
+      a.status === 'INTERVIEW_SCHEDULED' && a.interviewAt && new Date(a.interviewAt) > new Date(),
+  );
   const missingForActivation = completeness.sections.filter((s) =>
     completeness.activationMissing.includes(s.id),
   );
@@ -165,20 +176,86 @@ export default async function ApplicantHomePage() {
         />
         <StatCard
           label="Applications"
-          value="—"
+          value={myApplications.length > 0 ? String(myApplications.length) : '—'}
           icon={Briefcase}
           tone="blue"
-          sub="In pipeline (M10)"
+          sub={
+            myApplications.length > 0
+              ? `${myApplications.filter((a) => a.status === 'SHORTLISTED').length} shortlisted`
+              : 'None yet'
+          }
         />
-        <StatCard label="Interviews" value="—" icon={Calendar} tone="amber" sub="Upcoming (M11)" />
+        <StatCard
+          label="Interviews"
+          value={upcomingInterviews.length > 0 ? String(upcomingInterviews.length) : '—'}
+          icon={Calendar}
+          tone="amber"
+          sub={upcomingInterviews.length > 0 ? 'Upcoming scheduled' : 'None scheduled'}
+        />
         <StatCard
           label="Job Matches"
-          value="—"
+          value={matchedJobs.length > 0 ? String(matchedJobs.length) : '—'}
           icon={MapPin}
           tone="teal"
-          sub="Near your area (M9)"
+          sub={
+            matchedJobs.length > 0
+              ? `${matchedJobs.filter((j) => j.strength === 'GREAT').length} great matches`
+              : profile.address
+                ? 'None yet in your city'
+                : 'Add location to see jobs'
+          }
         />
       </div>
+
+      {/* ── Application notifications ────────────────────────── */}
+      {upcomingInterviews.map((app) => (
+        <div
+          key={app.id}
+          className="flex items-start gap-3 rounded-2xl px-5 py-4 text-sm"
+          style={{
+            background: 'var(--warning-soft)',
+            color: 'var(--warning-soft-fg)',
+            border: '1px solid rgba(180,83,9,0.15)',
+          }}
+        >
+          <Calendar className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Interview scheduled: {app.jobTitle}</p>
+            {app.interviewAt && (
+              <p className="mt-0.5">
+                {new Date(app.interviewAt).toLocaleString('en-PK', {
+                  dateStyle: 'full',
+                  timeStyle: 'short',
+                })}
+                {app.interviewLocation ? ` · ${app.interviewLocation}` : ''}
+              </p>
+            )}
+            {app.interviewNote && <p className="mt-0.5 opacity-80">{app.interviewNote}</p>}
+          </div>
+        </div>
+      ))}
+
+      {myApplications
+        .filter((a) => a.status === 'SHORTLISTED')
+        .map((app) => (
+          <div
+            key={app.id}
+            className="flex items-start gap-3 rounded-2xl px-5 py-4 text-sm"
+            style={{
+              background: 'var(--primary-soft)',
+              color: 'var(--primary-soft-fg)',
+              border: '1px solid rgba(26,95,172,0.15)',
+            }}
+          >
+            <Briefcase className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="font-semibold">You have been shortlisted: {app.jobTitle}</p>
+              <p className="mt-0.5 opacity-80">
+                at {app.companyName} — your branch will be in touch to confirm next steps.
+              </p>
+            </div>
+          </div>
+        ))}
 
       {/* ── Status alerts ────────────────────────────────────── */}
       {profile.status === 'DRAFT' && missingForActivation.length > 0 && (

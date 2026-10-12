@@ -321,8 +321,13 @@ const addressFields = {
     .trim()
     .min(5, 'Enter the address (building, street, area)')
     .max(300),
-  cityCode: masterDataCodeSchema,
-  areaCode: masterDataCodeSchema.nullish().transform((v) => v ?? null),
+  cityCode: z.string('Enter the city').trim().min(2, 'Enter the city name').max(100),
+  areaCode: z
+    .string()
+    .trim()
+    .max(100)
+    .nullish()
+    .transform((v) => v || null),
 };
 
 /** Head office pin + the branch the company registers with (nearest suggested). */

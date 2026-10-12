@@ -9,10 +9,14 @@ import {
 } from '@/domains/applicant';
 import { requireRole } from '@/domains/auth';
 import { listBranches, listBranchOptions } from '@/domains/branch';
+import { listApplicationsForApplicant } from '@/domains/placement';
 import { listMasterData } from '@/domains/settings';
 import { ValidationError } from '@/domains/shared/errors';
 import { parseListQuery } from '@/domains/shared/pagination';
 import { isSuperAdmin } from '@/domains/shared/scope';
+import { db } from '@/lib/db';
+import { schema } from '@jobbank/db';
+import { and, eq, sql } from 'drizzle-orm';
 import { loadForPage } from '../../_lib/page-context';
 import { ApplicantDetailView } from './ApplicantDetailView';
 import { ApplicantsTable } from './ApplicantsTable';
@@ -87,13 +91,39 @@ export async function ApplicantDetailPage({
   const { actor } = await requireRole(role);
   const { id } = await params;
   const applicant = await loadForPage(actor, () => getApplicantForStaff(actor, id));
-  const [labels, branches] = await Promise.all([
+
+  // Fetch open jobs in the applicant's city for the shortlist picker
+  const openJobsPromise =
+    applicant.can.shortlist && applicant.address?.cityCode
+      ? db
+          .select({
+            id: schema.jobs.id,
+            title: schema.jobs.title,
+            companyId: schema.jobs.companyId,
+          })
+          .from(schema.jobs)
+          .innerJoin(schema.jobLocations, eq(schema.jobs.id, schema.jobLocations.jobId))
+          .where(
+            and(
+              eq(schema.jobs.status, 'OPEN'),
+              sql`upper(${schema.jobLocations.cityCode}) = upper(${applicant.address.cityCode})`,
+            ),
+          )
+          .limit(100)
+          .then((rows) => rows.map((r) => ({ value: r.id, label: r.title })))
+      : Promise.resolve([]);
+
+  const [labels, branches, openJobs, existingApplications] = await Promise.all([
     profileLabels(),
-    // Transfers can go to any active branch, not only the ones the admin manages.
     applicant.can.transfer
       ? listBranchOptions(applicant.address?.location ?? { lat: 30.3753, lng: 69.3451 })
       : Promise.resolve([]),
+    openJobsPromise,
+    applicant.can.shortlist
+      ? listApplicationsForApplicant(actor, applicant.id)
+      : Promise.resolve([]),
   ]);
+
   return (
     <DetailPageLayout
       breadcrumbs={[
@@ -112,6 +142,8 @@ export async function ApplicantDetailPage({
         applicant={applicant}
         labels={labels}
         branches={branches.map((b) => ({ value: b.id, label: b.name }))}
+        openJobs={openJobs}
+        existingApplications={existingApplications}
         listPath={basePath}
       />
     </DetailPageLayout>

@@ -486,21 +486,25 @@ export async function updateStaffProfile(
   userId: string,
   input: z.infer<typeof staffProfileSchema>,
 ): Promise<StaffDetail> {
-  await runCommand(ctx, async ({ tx, audit }) => {
-    const { row, assignments } = await loadTarget(tx, ctx.actor, userId);
-    assertAllowed(canManageUser(ctx.actor, userId, assignments));
-    const changes = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
-    if (Object.keys(changes).length === 0) return;
-    await tx.update(u).set(changes).where(eq(u.id, userId));
-    audit({
-      action: 'user.update',
-      entityType: 'user',
-      entityId: userId,
-      branchId: assignments[0]?.branchId ?? null,
-      before: { name: row.name, title: row.title },
-      after: changes,
-    });
-  });
+  await runCommand(
+    ctx,
+    async ({ tx, audit }) => {
+      const { row, assignments } = await loadTarget(tx, ctx.actor, userId);
+      assertAllowed(canManageUser(ctx.actor, userId, assignments));
+      const changes = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
+      if (Object.keys(changes).length === 0) return;
+      await tx.update(u).set(changes).where(eq(u.id, userId));
+      audit({
+        action: 'user.update',
+        entityType: 'user',
+        entityId: userId,
+        branchId: assignments[0]?.branchId ?? null,
+        before: { name: row.name, title: row.title },
+        after: changes,
+      });
+    },
+    { audited: false },
+  );
   return getStaffMember(ctx.actor, userId);
 }
 

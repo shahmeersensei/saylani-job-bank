@@ -10,3 +10,4 @@ export {
   visibleBranches,
   type Actor,
 } from './scope';
+export { assertCityAccess, cityScope } from './city-scope';
