@@ -13,6 +13,7 @@ import {
 import { useState } from 'react';
 import { Input, Select } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
+import { Plus, X } from 'lucide-react';
 import type { ApplicantProfile } from '@/domains/applicant';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import {
@@ -25,9 +26,9 @@ import { RepeatableList } from './RepeatableList';
 import { useStepSave, type StepProps } from './step';
 
 interface SkillRow {
-  skillCode: string;
+  skillCode: string; // UPPER_SNAKE derived from user input
+  label: string; // display text
   level: SkillLevel | '';
-  years: string;
 }
 interface LanguageRow {
   languageCode: string;
@@ -39,8 +40,14 @@ const prefixed = (errors: FieldErrors, prefix: string): FieldErrors =>
 
 export function SkillsStep({ profile, lists, bindSave }: StepProps) {
   const [skills, setSkills] = useState<SkillRow[]>(
-    profile?.skills.map((s) => ({ ...s, years: String(s.years) })) ?? [],
+    profile?.skills.map((s) => ({
+      skillCode: s.skillCode,
+      label: s.skillCode.replace(/_/g, ' '),
+      level: s.level,
+    })) ?? [],
   );
+  const [skillInput, setSkillInput] = useState('');
+  const [pickLevel, setPickLevel] = useState<SkillLevel>('BEGINNER');
   const [languages, setLanguages] = useState<LanguageRow[]>(
     profile?.languages.length ? profile.languages : [{ languageCode: 'URDU', proficiency: '' }],
   );
@@ -53,7 +60,6 @@ export function SkillsStep({ profile, lists, bindSave }: StepProps) {
       items: skills.map((r) => ({
         skillCode: r.skillCode || undefined,
         level: r.level || undefined,
-        years: r.years === '' ? 0 : Number(r.years),
       })),
     });
     const l = languagesSchema.safeParse({
@@ -85,8 +91,25 @@ export function SkillsStep({ profile, lists, bindSave }: StepProps) {
     }
   });
 
-  const chosenSkills = new Set(skills.map((s) => s.skillCode));
+  const chosenCodes = new Set(skills.map((s) => s.skillCode));
   const chosenLanguages = new Set(languages.map((l) => l.languageCode));
+
+  const labelToCode = (text: string) =>
+    text
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_|_$/g, '');
+
+  const addSkill = () => {
+    const trimmed = skillInput.trim();
+    if (!trimmed) return;
+    const code = labelToCode(trimmed);
+    if (!code || chosenCodes.has(code)) return;
+    setSkills((prev) => [...prev, { skillCode: code, label: trimmed, level: pickLevel }]);
+    setSkillInput('');
+    setPickLevel('BEGINNER');
+  };
 
   return (
     <div className="grid gap-6">
@@ -107,46 +130,78 @@ export function SkillsStep({ profile, lists, bindSave }: StepProps) {
             {errors['skills.items']}
           </p>
         )}
-        <RepeatableList
-          items={skills}
-          onChange={setSkills}
-          max={30}
-          itemLabel={(i) => `Skill ${i + 1}`}
-          addLabel={skills.length ? 'Add another skill' : 'Add a skill'}
-          createItem={(): SkillRow => ({ skillCode: '', level: '', years: '' })}
-          renderItem={(row, update, i) => (
-            <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
-              <FormField label="Skill" required error={errors[`skills.items.${i}.skillCode`]}>
-                <Select
-                  placeholder="Choose a skill"
-                  value={row.skillCode}
-                  onChange={(e) => update({ skillCode: e.target.value })}
-                  options={lists.skills.filter(
-                    (o) => o.value === row.skillCode || !chosenSkills.has(o.value),
-                  )}
-                />
-              </FormField>
-              <FormField label="Level" required error={errors[`skills.items.${i}.level`]}>
-                <Select
-                  placeholder="Choose"
-                  value={row.level}
-                  onChange={(e) => update({ level: e.target.value as SkillLevel })}
-                  options={SKILL_LEVELS.map((l) => ({ value: l, label: SKILL_LEVEL_LABELS[l] }))}
-                />
-              </FormField>
-              <FormField label="Years" error={errors[`skills.items.${i}.years`]}>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={50}
-                  value={row.years}
-                  onChange={(e) => update({ years: e.target.value })}
-                />
-              </FormField>
-            </div>
-          )}
-        />
+
+        {/* Add row */}
+        <div className="flex flex-wrap items-end gap-3">
+          <FormField label="Skill name" className="min-w-[180px] flex-1">
+            <Input
+              value={skillInput}
+              onChange={(e) => setSkillInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addSkill();
+                }
+              }}
+              placeholder="e.g. MS Excel, AutoCAD, Driving…"
+            />
+          </FormField>
+          <FormField label="Level" className="min-w-[150px]">
+            <Select
+              value={pickLevel}
+              onChange={(e) => setPickLevel(e.target.value as SkillLevel)}
+              options={SKILL_LEVELS.map((l) => ({ value: l, label: SKILL_LEVEL_LABELS[l] }))}
+            />
+          </FormField>
+          <button
+            type="button"
+            onClick={addSkill}
+            disabled={!skillInput.trim()}
+            className="bg-surface border-border text-fg mb-0.5 flex h-10 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium disabled:opacity-40"
+          >
+            <Plus className="size-4" /> Add
+          </button>
+        </div>
+
+        {/* Skill chips */}
+        {skills.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {skills.map((s, i) => (
+              <div
+                key={s.skillCode}
+                className="bg-surface border-border flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm"
+              >
+                <span className="text-fg font-medium">{s.label}</span>
+                <span className="text-fg-muted">·</span>
+                <select
+                  value={s.level}
+                  onChange={(e) =>
+                    setSkills((prev) =>
+                      prev.map((r, j) =>
+                        j === i ? { ...r, level: e.target.value as SkillLevel } : r,
+                      ),
+                    )
+                  }
+                  className="text-fg-muted bg-transparent text-xs focus:outline-none"
+                >
+                  {SKILL_LEVELS.map((l) => (
+                    <option key={l} value={l}>
+                      {SKILL_LEVEL_LABELS[l]}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setSkills((prev) => prev.filter((_, j) => j !== i))}
+                  className="text-fg-subtle hover:text-danger ml-1 transition-colors"
+                  aria-label={`Remove ${s.label}`}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="border-border grid gap-3 border-t pt-5">

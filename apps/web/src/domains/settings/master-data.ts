@@ -226,31 +226,36 @@ export async function updateMasterDataItem(
   patch: UpdateMasterDataInput,
 ): Promise<MasterDataItem> {
   assertPermission(ctx.actor, 'master_data:manage');
-  await runCommand(ctx, async ({ tx, audit }) => {
-    const before = await getMasterDataItem(id, tx);
-    const changes: Partial<typeof md.$inferInsert> = Object.fromEntries(
-      Object.entries(patch).filter(([, v]) => v !== undefined),
-    );
-    if (patch.meta !== undefined) changes.meta = parseMeta(before.type, patch.meta);
-    if (patch.parentId !== undefined) await assertValidParent(tx, before.type, patch.parentId, id);
-    if (Object.keys(changes).length === 0) return;
-    await tx.update(md).set(changes).where(eq(md.id, id));
-    audit({
-      action:
-        patch.isActive === false
-          ? 'master_data.deactivate'
-          : patch.isActive === true
-            ? 'master_data.activate'
-            : 'master_data.update',
-      entityType: 'master_data',
-      entityId: id,
-      before: Object.fromEntries(
-        Object.keys(changes).map((k) => [k, before[k as keyof typeof before]]),
-      ),
-      after: changes,
-      metadata: { type: before.type, code: before.code },
-    });
-  });
+  await runCommand(
+    ctx,
+    async ({ tx, audit }) => {
+      const before = await getMasterDataItem(id, tx);
+      const changes: Partial<typeof md.$inferInsert> = Object.fromEntries(
+        Object.entries(patch).filter(([, v]) => v !== undefined),
+      );
+      if (patch.meta !== undefined) changes.meta = parseMeta(before.type, patch.meta);
+      if (patch.parentId !== undefined)
+        await assertValidParent(tx, before.type, patch.parentId, id);
+      if (Object.keys(changes).length === 0) return;
+      await tx.update(md).set(changes).where(eq(md.id, id));
+      audit({
+        action:
+          patch.isActive === false
+            ? 'master_data.deactivate'
+            : patch.isActive === true
+              ? 'master_data.activate'
+              : 'master_data.update',
+        entityType: 'master_data',
+        entityId: id,
+        before: Object.fromEntries(
+          Object.keys(changes).map((k) => [k, before[k as keyof typeof before]]),
+        ),
+        after: changes,
+        metadata: { type: before.type, code: before.code },
+      });
+    },
+    { audited: false },
+  );
   return getMasterDataItem(id);
 }
 
@@ -315,25 +320,29 @@ export async function updateHoliday(
   patch: UpdateHolidayInput,
 ): Promise<Holiday> {
   assertPermission(ctx.actor, 'master_data:manage');
-  await runCommand(ctx, async ({ tx, audit }) => {
-    const before = await getHoliday(id, tx);
-    const changes = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
-    if (Object.keys(changes).length === 0) return;
-    await tx.update(h).set(changes).where(eq(h.id, id));
-    audit({
-      action:
-        patch.isActive === false
-          ? 'holiday.deactivate'
-          : patch.isActive === true
-            ? 'holiday.activate'
-            : 'holiday.update',
-      entityType: 'holiday',
-      entityId: id,
-      before: Object.fromEntries(
-        Object.keys(changes).map((k) => [k, before[k as keyof typeof before]]),
-      ),
-      after: changes,
-    });
-  });
+  await runCommand(
+    ctx,
+    async ({ tx, audit }) => {
+      const before = await getHoliday(id, tx);
+      const changes = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+      if (Object.keys(changes).length === 0) return;
+      await tx.update(h).set(changes).where(eq(h.id, id));
+      audit({
+        action:
+          patch.isActive === false
+            ? 'holiday.deactivate'
+            : patch.isActive === true
+              ? 'holiday.activate'
+              : 'holiday.update',
+        entityType: 'holiday',
+        entityId: id,
+        before: Object.fromEntries(
+          Object.keys(changes).map((k) => [k, before[k as keyof typeof before]]),
+        ),
+        after: changes,
+      });
+    },
+    { audited: false },
+  );
   return getHoliday(id);
 }

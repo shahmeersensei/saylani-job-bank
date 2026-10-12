@@ -13,7 +13,16 @@ import {
   type IdentityMethod,
   type IdentityOutcome,
 } from '@jobbank/shared';
-import { ArrowRightLeft, BadgeCheck, Pencil, Phone, UserCheck, UserX } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  BadgeCheck,
+  Briefcase,
+  Calendar,
+  Pencil,
+  Phone,
+  UserCheck,
+  UserX,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Badge, Button, Input, RadioGroup, Select, Textarea } from '@/components/atoms';
@@ -29,6 +38,7 @@ import {
 } from '@/components/molecules';
 import { DocumentList, MapPinPicker, Timeline } from '@/components/organisms';
 import type { ApplicantStaffView } from '@/domains/applicant';
+import type { ApplicationView } from '@/domains/placement';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import { formatCnic } from '@/lib/format/cnic';
 import { formatDate } from '@/lib/format/date';
@@ -430,17 +440,246 @@ function TransferDialog({
   );
 }
 
+// ─── Shortlist dialog ──────────────────────────────────────────────────
+
+function ShortlistDialog({
+  applicant,
+  openJobs,
+}: {
+  applicant: ApplicantStaffView;
+  openJobs: SelectOption[];
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [jobId, setJobId] = useState('');
+  const [note, setNote] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await apiFetch('/api/v1/applications', {
+        method: 'POST',
+        body: { applicantId: applicant.id, jobId, note: note || undefined },
+      });
+      toast.success('Applicant shortlisted for the job');
+      setOpen(false);
+      setJobId('');
+      setNote('');
+      router.refresh();
+    } catch (err) {
+      if (err instanceof ApiClientError && err.issues.length) setErrors(toFieldErrors(err.issues));
+      else toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Shortlist for a job"
+      description={`Select an open job to shortlist ${applicant.personal.fullName} for.`}
+      open={open}
+      onOpenChange={setOpen}
+      trigger={<Button leftIcon={<Briefcase />}>Shortlist for job</Button>}
+    >
+      <form className="grid gap-4" onSubmit={submit} noValidate>
+        <FormField label="Job" required error={errors.jobId}>
+          {openJobs.length === 0 ? (
+            <p className="text-fg-muted text-sm">No open jobs found in this city.</p>
+          ) : (
+            <Select
+              placeholder="Choose a job"
+              value={jobId}
+              onChange={(e) => setJobId(e.target.value)}
+              options={openJobs}
+            />
+          )}
+        </FormField>
+        <FormField label="Note" hint="Optional note for staff reference.">
+          <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+        </FormField>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={saving} disabled={!jobId}>
+            Shortlist
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Schedule interview dialog ─────────────────────────────────────────
+
+function ScheduleInterviewDialog({ applicationId }: { applicationId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [interviewAt, setInterviewAt] = useState('');
+  const [location, setLocation] = useState('');
+  const [interviewNote, setInterviewNote] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await apiFetch(`/api/v1/applications/${applicationId}/interview`, {
+        method: 'POST',
+        body: {
+          interviewAt: new Date(interviewAt).toISOString(),
+          interviewLocation: location || undefined,
+          interviewNote: interviewNote || undefined,
+        },
+      });
+      toast.success('Interview scheduled');
+      setOpen(false);
+      router.refresh();
+    } catch (err) {
+      if (err instanceof ApiClientError && err.issues.length) setErrors(toFieldErrors(err.issues));
+      else toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Schedule interview"
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <Button size="sm" variant="secondary" leftIcon={<Calendar />}>
+          Schedule interview
+        </Button>
+      }
+    >
+      <form className="grid gap-4" onSubmit={submit} noValidate>
+        <FormField label="Date & time" required error={errors.interviewAt}>
+          <Input
+            type="datetime-local"
+            value={interviewAt}
+            onChange={(e) => setInterviewAt(e.target.value)}
+          />
+        </FormField>
+        <FormField label="Location" error={errors.interviewLocation}>
+          <Input
+            placeholder="Branch office, room number, etc."
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+        </FormField>
+        <FormField label="Note for applicant" error={errors.interviewNote}>
+          <Textarea
+            rows={2}
+            value={interviewNote}
+            onChange={(e) => setInterviewNote(e.target.value)}
+          />
+        </FormField>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={saving} disabled={!interviewAt}>
+            Confirm interview
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Applications list ─────────────────────────────────────────────────
+
+const APPLICATION_STATUS_LABELS: Record<
+  string,
+  { label: string; tone: 'neutral' | 'info' | 'warning' | 'success' | 'danger' }
+> = {
+  SHORTLISTED: { label: 'Shortlisted', tone: 'info' },
+  INTERVIEW_SCHEDULED: { label: 'Interview scheduled', tone: 'warning' },
+  FORWARDED: { label: 'Referred', tone: 'success' },
+  HIRED: { label: 'Hired', tone: 'success' },
+  REJECTED: { label: 'Not progressed', tone: 'neutral' },
+};
+
+function ApplicationsCard({
+  applicant,
+  applications,
+  canScheduleInterview,
+}: {
+  applicant: ApplicantStaffView;
+  applications: ApplicationView[];
+  canScheduleInterview: boolean;
+}) {
+  if (applications.length === 0) {
+    return (
+      <Card title="Applications">
+        <p className="text-fg-muted text-sm">No applications yet.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="Applications">
+      <ul className="grid gap-3">
+        {applications.map((app) => {
+          const pill = APPLICATION_STATUS_LABELS[app.status] ?? {
+            label: app.status,
+            tone: 'neutral' as const,
+          };
+          return (
+            <li key={app.id} className="border-border grid gap-2 rounded-lg border p-3 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-fg font-medium">{app.jobTitle}</p>
+                  <p className="text-fg-muted text-xs">{app.companyName}</p>
+                </div>
+                <Badge tone={pill.tone}>{pill.label}</Badge>
+              </div>
+              {app.interviewAt && (
+                <p className="text-fg-muted text-xs">
+                  Interview:{' '}
+                  {new Date(app.interviewAt).toLocaleString('en-PK', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                  {app.interviewLocation ? ` · ${app.interviewLocation}` : ''}
+                </p>
+              )}
+              {app.note && <p className="text-fg-muted text-xs">Note: {app.note}</p>}
+              {canScheduleInterview && app.status === 'SHORTLISTED' && (
+                <div className="flex justify-end">
+                  <ScheduleInterviewDialog applicationId={app.id} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
 // ─── Page body ─────────────────────────────────────────────────────────
 
 export function ApplicantDetailView({
   applicant,
   labels,
   branches,
+  openJobs,
+  existingApplications,
   listPath,
 }: {
   applicant: ApplicantStaffView;
   labels: ProfileLabels;
   branches: SelectOption[];
+  openJobs?: SelectOption[];
+  existingApplications?: ApplicationView[];
   listPath: string;
 }) {
   const router = useRouter();
@@ -467,6 +706,12 @@ export function ApplicantDetailView({
             .join(', ')}
           .
         </p>
+      )}
+
+      {applicant.can.shortlist && (
+        <div className="flex flex-wrap gap-2">
+          <ShortlistDialog applicant={applicant} openJobs={openJobs ?? []} />
+        </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -699,6 +944,14 @@ export function ApplicantDetailView({
           )}
         </Card>
       </div>
+
+      {existingApplications && existingApplications.length > 0 && (
+        <ApplicationsCard
+          applicant={applicant}
+          applications={existingApplications}
+          canScheduleInterview={!!applicant.can.scheduleInterview}
+        />
+      )}
 
       {(applicant.can.manage || applicant.can.transfer) && (
         <Card title="Account">

@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from 'react';
 import {
+  BONUS_TIER_LABELS,
+  GENDER_PREFERENCE_LABELS,
   JOB_STATUS_LABELS,
   JOB_TYPE_LABELS,
+  MEDICAL_COVERAGE_LABELS,
   SHIFT_TYPE_LABELS,
-  GENDER_PREFERENCE_LABELS,
 } from '@jobbank/shared';
 import type { JobView } from '@/domains/job/repository';
 import { apiFetch } from '@/lib/api/client';
@@ -35,6 +37,7 @@ const TRANSITION_LABELS: Record<string, string> = {
   pause: 'Pause',
   resume: 'Resume',
   close: 'Close',
+  reopen: 'Reopen',
 };
 
 const TRANSITION_STATUS: Record<string, string> = {
@@ -42,6 +45,7 @@ const TRANSITION_STATUS: Record<string, string> = {
   pause: 'PAUSED',
   resume: 'OPEN',
   close: 'CLOSED',
+  reopen: 'OPEN',
 };
 
 function KV({ label, value }: { label: string; value: string | number | null | undefined }) {
@@ -97,19 +101,19 @@ export function JobDetailPanel({ job }: Props) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Badge tone={pill.tone}>{JOB_STATUS_LABELS[job.status]}</Badge>
-          {job.status === 'DRAFT' && (
-            <>
-              <Link href={`/employer/jobs/${job.id}/edit`}>
-                <Button size="sm" variant="secondary">
-                  <Pencil className="mr-1.5 size-4" />
-                  Edit
-                </Button>
-              </Link>
-              <Button size="sm" variant="secondary" onClick={handleDelete} disabled={pending}>
-                <Trash2 className="text-danger mr-1.5 size-4" />
-                Delete
+          {(job.status === 'DRAFT' || job.status === 'OPEN' || job.status === 'PAUSED') && (
+            <Link href={`/employer/jobs/${job.id}/edit`}>
+              <Button size="sm" variant="secondary">
+                <Pencil className="mr-1.5 size-4" />
+                Edit
               </Button>
-            </>
+            </Link>
+          )}
+          {job.status === 'DRAFT' && (
+            <Button size="sm" variant="secondary" onClick={handleDelete} disabled={pending}>
+              <Trash2 className="text-danger mr-1.5 size-4" />
+              Delete
+            </Button>
           )}
         </div>
       </header>
@@ -133,6 +137,40 @@ export function JobDetailPanel({ job }: Props) {
       <div className="border-border bg-surface rounded-xl border p-5">
         <h2 className="text-fg mb-3 font-medium">Description</h2>
         <p className="text-fg-muted text-sm whitespace-pre-wrap">{job.description}</p>
+      </div>
+
+      <div className="border-border bg-surface grid gap-4 rounded-xl border p-5">
+        <h2 className="text-fg font-medium">Benefits &amp; Perks</h2>
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
+          <KV label="Medical coverage" value={MEDICAL_COVERAGE_LABELS[job.medicalCoverage]} />
+          <KV label="Bonus" value={BONUS_TIER_LABELS[job.bonusTier]} />
+          {job.annualLeaveDays != null && (
+            <KV label="Annual leave" value={`${job.annualLeaveDays} days / year`} />
+          )}
+        </dl>
+        {(() => {
+          const active = [
+            job.fuelAllowance && 'Fuel allowance',
+            job.flexibleHours && 'Flexible hours',
+            job.workFromHome && 'Work from home',
+            job.providentFund && 'Provident fund',
+            job.transportAllowance && 'Transport allowance',
+            job.eobi && 'EOBI',
+            job.lifeInsurance && 'Life insurance',
+          ].filter(Boolean) as string[];
+          return active.length > 0 ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {active.map((perk) => (
+                <span
+                  key={perk}
+                  className="bg-surface-muted border-border text-fg-subtle rounded-full border px-3 py-1 text-xs"
+                >
+                  {perk}
+                </span>
+              ))}
+            </div>
+          ) : null;
+        })()}
       </div>
 
       {transitions.length > 0 && (

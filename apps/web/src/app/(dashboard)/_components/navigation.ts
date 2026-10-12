@@ -90,6 +90,7 @@ export function navigationFor(role: Role): { title?: string; items: NavItemConfi
         {
           items: [
             overview,
+            { href: '/applicant/jobs', label: 'Job Matches', icon: Briefcase },
             { href: '/applicant/profile', label: 'My profile', icon: UserRound },
             { href: '/applicant/documents', label: 'Documents', icon: FileText },
           ],

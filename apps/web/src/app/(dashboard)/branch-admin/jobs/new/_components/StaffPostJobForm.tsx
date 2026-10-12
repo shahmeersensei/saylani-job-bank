@@ -1,12 +1,16 @@
 'use client';
 
 import {
-  JOB_TYPES,
-  JOB_TYPE_LABELS,
-  SHIFT_TYPES,
-  SHIFT_TYPE_LABELS,
+  BONUS_TIERS,
+  BONUS_TIER_LABELS,
   GENDER_PREFERENCES,
   GENDER_PREFERENCE_LABELS,
+  JOB_TYPES,
+  JOB_TYPE_LABELS,
+  MEDICAL_COVERAGE_TYPES,
+  MEDICAL_COVERAGE_LABELS,
+  SHIFT_TYPES,
+  SHIFT_TYPE_LABELS,
 } from '@jobbank/shared';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -26,6 +30,11 @@ const GENDER_OPTIONS = GENDER_PREFERENCES.map((v) => ({
   value: v,
   label: GENDER_PREFERENCE_LABELS[v],
 }));
+const MEDICAL_OPTIONS = MEDICAL_COVERAGE_TYPES.map((v) => ({
+  value: v,
+  label: MEDICAL_COVERAGE_LABELS[v],
+}));
+const BONUS_OPTIONS = BONUS_TIERS.map((v) => ({ value: v, label: BONUS_TIER_LABELS[v] }));
 
 export function StaffPostJobForm({ companies, categories }: Props) {
   const router = useRouter();
@@ -42,6 +51,18 @@ export function StaffPostJobForm({ companies, categories }: Props) {
   const [salaryMin, setSalaryMin] = useState('');
   const [salaryMax, setSalaryMax] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Benefits & Perks
+  const [fuelAllowance, setFuelAllowance] = useState(false);
+  const [flexibleHours, setFlexibleHours] = useState(false);
+  const [annualLeaveDays, setAnnualLeaveDays] = useState('');
+  const [medicalCoverage, setMedicalCoverage] = useState('NONE');
+  const [bonusTier, setBonusTier] = useState('NONE');
+  const [workFromHome, setWorkFromHome] = useState(false);
+  const [providentFund, setProvidentFund] = useState(false);
+  const [transportAllowance, setTransportAllowance] = useState(false);
+  const [eobi, setEobi] = useState(false);
+  const [lifeInsurance, setLifeInsurance] = useState(false);
 
   const categoryOptions = categories.map((c) => ({ value: c.code, label: c.label }));
   const companyOptions = companies.map((c) => ({ value: c.id, label: c.name }));
@@ -63,6 +84,16 @@ export function StaffPostJobForm({ companies, categories }: Props) {
             vacancies: parseInt(vacancies, 10),
             salaryMin: salaryMin ? parseInt(salaryMin, 10) : undefined,
             salaryMax: salaryMax ? parseInt(salaryMax, 10) : undefined,
+            fuelAllowance,
+            flexibleHours,
+            annualLeaveDays: annualLeaveDays ? parseInt(annualLeaveDays, 10) : undefined,
+            medicalCoverage,
+            bonusTier,
+            workFromHome,
+            providentFund,
+            transportAllowance,
+            eobi,
+            lifeInsurance,
           },
         });
         toast.success('Job created as draft');
@@ -154,6 +185,60 @@ export function StaffPostJobForm({ companies, categories }: Props) {
                 placeholder="Optional"
               />
             </FormField>
+            <div className="border-border rounded-xl border p-4 sm:col-span-2">
+              <h3 className="text-fg mb-3 text-sm font-medium">Benefits &amp; Perks</h3>
+              <div className="grid gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Medical coverage">
+                    <Select
+                      options={MEDICAL_OPTIONS}
+                      value={medicalCoverage}
+                      onChange={(e) => setMedicalCoverage(e.target.value)}
+                    />
+                  </FormField>
+                  <FormField label="Bonus">
+                    <Select
+                      options={BONUS_OPTIONS}
+                      value={bonusTier}
+                      onChange={(e) => setBonusTier(e.target.value)}
+                    />
+                  </FormField>
+                </div>
+                <FormField label="Annual leave (days/year)">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={annualLeaveDays}
+                    onChange={(e) => setAnnualLeaveDays(e.target.value)}
+                    placeholder="e.g. 15"
+                  />
+                </FormField>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+                  {(
+                    [
+                      [fuelAllowance, setFuelAllowance, 'Fuel allowance'],
+                      [flexibleHours, setFlexibleHours, 'Flexible hours'],
+                      [workFromHome, setWorkFromHome, 'Work from home'],
+                      [providentFund, setProvidentFund, 'Provident fund'],
+                      [transportAllowance, setTransportAllowance, 'Transport allowance'],
+                      [eobi, setEobi, 'EOBI'],
+                      [lifeInsurance, setLifeInsurance, 'Life insurance'],
+                    ] as [boolean, (v: boolean) => void, string][]
+                  ).map(([val, setter, label]) => (
+                    <label key={label} className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="accent-primary size-4"
+                        checked={val}
+                        onChange={(e) => setter(e.target.checked)}
+                      />
+                      <span className="text-fg text-sm">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
             <FormField label="Description" required className="sm:col-span-2">
               <Textarea
                 value={description}

@@ -11,7 +11,7 @@ import type {
   SkillsInput,
   UpdatePersonalInput,
 } from '@jobbank/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq, ilike } from 'drizzle-orm';
 import { getBranchContact, listBranchOptions, type BranchOption } from '@/domains/branch';
 import { assertActiveMasterData, resolveMatchRadius } from '@/domains/settings';
 import { recordAudit, runCommand, type CommandScope } from '@/domains/shared/audit';
@@ -235,37 +235,49 @@ export async function setMyLocation(
         ]);
       }
     }
-    const branch = await getBranchContact(input.branchId, tx);
-    if (!branch?.isActive) {
-      throw new ValidationError([{ path: 'branchId', message: 'Choose an active branch' }]);
+    // Auto-assign: find any active branch whose city matches the chosen cityCode.
+    // The applicant never picks a branch; the system assigns one so the DB constraint holds.
+    const cityLabel = city.label; // e.g. "Karachi"
+    const cityBranches = await tx
+      .select({ id: schema.branches.id })
+      .from(schema.branches)
+      .where(and(ilike(schema.branches.city, cityLabel), eq(schema.branches.isActive, true)))
+      .limit(1);
+    if (cityBranches.length === 0) {
+      throw new ValidationError([
+        {
+          path: 'cityCode',
+          message: `No active branch found for ${cityLabel}. Please contact support.`,
+        },
+      ]);
     }
-    const branchChanged = row.branchId !== input.branchId;
+    const assignedBranchId = cityBranches[0]!.id;
+    const branchChanged = row.branchId !== assignedBranchId;
     if (branchChanged && branchLocked(row)) {
-      throw new ForbiddenError(
-        'Your profile is active, so only Job Bank staff can move it to another branch. ' +
-          'Ask your branch to transfer you.',
-      );
+      // Profile is active — keep current branch silently (city change requires staff transfer).
+      // We still update the address fields below.
     }
 
     const values = {
       addressLine: input.addressLine,
       cityCode: input.cityCode,
-      areaCode: input.areaCode,
+      areaCode: input.areaCode ?? null,
       location: input.location,
     };
     await tx
       .insert(addr)
       .values({ applicantId: row.id, ...values })
       .onConflictDoUpdate({ target: addr.applicantId, set: values });
-    if (branchChanged) await tx.update(a).set({ branchId: input.branchId }).where(eq(a.id, row.id));
+    if (branchChanged && !branchLocked(row)) {
+      await tx.update(a).set({ branchId: assignedBranchId }).where(eq(a.id, row.id));
+    }
 
     audit({
       action: 'applicant.update_location',
       entityType: 'applicant',
       entityId: row.id,
-      branchId: input.branchId,
-      // The pin and street address are redacted from the audit log; the codes are kept.
-      after: { ...values, branchId: input.branchId },
+      branchId: assignedBranchId,
+      after: { ...values, branchId: assignedBranchId },
       metadata: { branchChanged },
     });
     await refreshProfileState(cmd, row.id);
@@ -347,12 +359,21 @@ export function saveMyExperience(ctx: SignedIn, input: ExperienceInput) {
 
 export function saveMySkills(ctx: SignedIn, input: SkillsInput) {
   return saveSection(ctx, 'skills', input, async ({ tx }, row) => {
-    await assertActiveMasterData(
-      tx,
-      'SKILL',
-      input.items.map((i) => i.skillCode),
-      (i) => `items.${i}.skillCode`,
-    );
+    // Auto-upsert any skill codes that don't yet exist in master data so applicants
+    // can enter custom skills without needing admin pre-approval.
+    if (input.items.length > 0) {
+      await tx
+        .insert(schema.masterData)
+        .values(
+          input.items.map((item) => ({
+            type: 'SKILL' as const,
+            code: item.skillCode,
+            label: item.skillCode.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+            isActive: true,
+          })),
+        )
+        .onConflictDoNothing();
+    }
     await tx.delete(skl).where(eq(skl.applicantId, row.id));
     if (input.items.length > 0) {
       await tx.insert(skl).values(input.items.map((item) => ({ ...item, applicantId: row.id })));

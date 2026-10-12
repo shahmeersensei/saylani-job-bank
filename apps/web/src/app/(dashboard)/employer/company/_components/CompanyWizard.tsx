@@ -18,6 +18,17 @@ import type { CompanyView } from '@/domains/company/repository';
 
 type WizardStep = 'details' | 'contacts' | 'location' | 'documents' | 'submit';
 
+function friendlyError(err: unknown): string {
+  if (err instanceof ApiClientError) {
+    if (err.code === 'IDEMPOTENCY_CONFLICT' || err.code === 'IDEMPOTENCY_IN_PROGRESS')
+      return 'This request was already submitted. Please refresh the page and try again.';
+    if (err.code === 'IDEMPOTENCY_KEY_REQUIRED')
+      return 'A required request token is missing. Please refresh the page.';
+    return err.message;
+  }
+  return 'Something went wrong. Please try again.';
+}
+
 const STEPS: { id: WizardStep; label: string }[] = [
   { id: 'details', label: 'Details' },
   { id: 'contacts', label: 'Contacts' },
@@ -133,7 +144,7 @@ function DetailsStep({
       }
       onSaved(saved);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Something went wrong.');
+      setError(friendlyError(err));
     } finally {
       setPending(false);
     }
@@ -149,10 +160,18 @@ function DetailsStep({
   return (
     <form className="grid gap-4" onSubmit={(e) => void save(e)}>
       <FormField label="Registered company name" required>
-        <Input value={form.legalName} onChange={(e) => set('legalName')(e.target.value)} />
+        <Input
+          placeholder="e.g. Saylani Welfare International Trust"
+          value={form.legalName}
+          onChange={(e) => set('legalName')(e.target.value)}
+        />
       </FormField>
       <FormField label="Trading name" hint="Leave empty if trading under the registered name">
-        <Input value={form.tradeName} onChange={(e) => set('tradeName')(e.target.value)} />
+        <Input
+          placeholder="e.g. Saylani Welfare"
+          value={form.tradeName}
+          onChange={(e) => set('tradeName')(e.target.value)}
+        />
       </FormField>
       <FormField label="Business type" required>
         <Select
@@ -162,14 +181,19 @@ function DetailsStep({
           placeholder="Choose a type"
         />
       </FormField>
-      <FormField label="NTN (National Tax Number)" required hint="e.g. 1234567-8">
-        <Input value={form.ntn} onChange={(e) => set('ntn')(e.target.value)} />
+      <FormField label="NTN (National Tax Number)" required>
+        <Input
+          placeholder="e.g. 1234567-8"
+          value={form.ntn}
+          onChange={(e) => set('ntn')(e.target.value)}
+        />
       </FormField>
       <FormField
         label="Registration / SECP number"
         hint="Required for private/public limited companies"
       >
         <Input
+          placeholder="e.g. 0012345"
           value={form.registrationNo}
           onChange={(e) => set('registrationNo')(e.target.value)}
         />
@@ -201,6 +225,7 @@ function DetailsStep({
       <FormField label="About the company">
         <Textarea
           rows={3}
+          placeholder="Briefly describe what your company does, its mission, and the kind of staff you are looking for."
           value={form.description}
           onChange={(e) => set('description')(e.target.value)}
         />
@@ -286,7 +311,7 @@ function ContactsStep({
       });
       onSaved(saved);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Something went wrong.');
+      setError(friendlyError(err));
     } finally {
       setPending(false);
     }
@@ -330,10 +355,15 @@ function ContactsStep({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <FormField label="Full name" required>
-              <Input value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} />
+              <Input
+                placeholder="e.g. Ahmed Khan"
+                value={item.name}
+                onChange={(e) => updateItem(idx, 'name', e.target.value)}
+              />
             </FormField>
             <FormField label="Designation">
               <Input
+                placeholder="e.g. HR Manager"
                 value={item.designation}
                 onChange={(e) => updateItem(idx, 'designation', e.target.value)}
               />
@@ -349,6 +379,7 @@ function ContactsStep({
             <FormField label="Email">
               <Input
                 type="email"
+                placeholder="contact@company.com"
                 value={item.email}
                 onChange={(e) => updateItem(idx, 'email', e.target.value)}
               />
@@ -381,6 +412,42 @@ function ContactsStep({
 
 // ─── Location step ──────────────────────────────────────────────────────
 
+interface GeoResult {
+  formatted: string;
+  lat: number;
+  lng: number;
+  city: string;
+  area: string;
+}
+
+async function searchAddress(query: string): Promise<GeoResult[]> {
+  const key = process.env.NEXT_PUBLIC_OPENCAGE_API_KEY;
+  if (!key) return [];
+  const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(query)}&key=${key}&limit=5&countrycode=pk&language=en&no_annotations=1`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const json = (await res.json()) as {
+    results: {
+      formatted: string;
+      geometry: { lat: number; lng: number };
+      components: {
+        city?: string;
+        town?: string;
+        suburb?: string;
+        neighbourhood?: string;
+        county?: string;
+      };
+    }[];
+  };
+  return json.results.map((r) => ({
+    formatted: r.formatted,
+    lat: r.geometry.lat,
+    lng: r.geometry.lng,
+    city: r.components.city ?? r.components.town ?? r.components.county ?? '',
+    area: r.components.suburb ?? r.components.neighbourhood ?? '',
+  }));
+}
+
 function LocationStep({
   company,
   onSaved,
@@ -389,15 +456,20 @@ function LocationStep({
   onSaved: (c: CompanyView) => void;
 }) {
   const hq = company.headOffice;
-  const [lat, setLat] = useState(hq?.location.lat.toString() ?? '');
-  const [lng, setLng] = useState(hq?.location.lng.toString() ?? '');
+  const [lat, setLat] = useState(hq?.location.lat ?? 0);
+  const [lng, setLng] = useState(hq?.location.lng ?? 0);
   const [addressLine, setAddressLine] = useState(hq?.addressLine ?? '');
-  const [cityCode, setCityCode] = useState(hq?.cityCode ?? '');
-  const [areaCode, setAreaCode] = useState(hq?.areaCode ?? '');
+  const [city, setCity] = useState(hq?.cityCode ?? '');
+  const [area, setArea] = useState(hq?.areaCode ?? '');
   const [branchId, setBranchId] = useState(company.branch?.id ?? '');
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(hq?.addressLine ?? '');
+  const [suggestions, setSuggestions] = useState<GeoResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!lat || !lng) return;
@@ -411,6 +483,34 @@ function LocationStep({
       .catch(() => undefined);
   }, [lat, lng]);
 
+  function onSearchChange(value: string) {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.trim().length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      const results = await searchAddress(value);
+      setSuggestions(results);
+      setShowSuggestions(results.length > 0);
+      setSearching(false);
+    }, 500);
+  }
+
+  function pickSuggestion(r: GeoResult) {
+    setLat(r.lat);
+    setLng(r.lng);
+    setAddressLine(r.formatted);
+    setSearchQuery(r.formatted);
+    if (r.city) setCity(r.city);
+    if (r.area) setArea(r.area);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
@@ -419,65 +519,93 @@ function LocationStep({
       const { data: saved } = await apiFetch<CompanyView>('/api/v1/companies/me/head-office', {
         method: 'PUT',
         body: {
-          location: { lat: parseFloat(lat), lng: parseFloat(lng) },
+          location: { lat, lng },
           addressLine,
-          cityCode,
-          areaCode: areaCode || undefined,
+          cityCode: city,
+          areaCode: area || undefined,
           branchId,
         },
       });
       onSaved(saved);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Something went wrong.');
+      setError(friendlyError(err));
     } finally {
       setPending(false);
     }
   }
 
-  const isReady = lat && lng && addressLine.trim().length >= 5 && cityCode && branchId;
+  const hasCoords = lat !== 0 && lng !== 0;
+  const isReady =
+    hasCoords && addressLine.trim().length >= 5 && city.trim().length >= 2 && branchId;
 
   return (
     <form className="grid gap-4" onSubmit={(e) => void save(e)}>
       <p className="text-fg-muted text-sm">
-        Enter your head office location. Job Bank will suggest the nearest branch.
+        Search for your head office address. Job Bank will suggest the nearest branch automatically.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label="Latitude" required hint="e.g. 24.8607">
+
+      {/* Address search */}
+      <div className="relative">
+        <FormField label="Search address" required>
           <Input
-            type="number"
-            step="any"
-            value={lat}
-            onChange={(e) => setLat(e.target.value)}
-            placeholder="24.8607"
+            placeholder="Type your office address, e.g. DHA Phase 5, Karachi"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
           />
         </FormField>
-        <FormField label="Longitude" required hint="e.g. 67.0011">
-          <Input
-            type="number"
-            step="any"
-            value={lng}
-            onChange={(e) => setLng(e.target.value)}
-            placeholder="67.0011"
-          />
-        </FormField>
+        {searching && <p className="text-fg-muted mt-1 text-xs">Searching…</p>}
+        {showSuggestions && (
+          <ul className="border-border bg-surface absolute top-full z-10 mt-1 w-full overflow-hidden rounded-xl border shadow-lg">
+            {suggestions.map((r, i) => (
+              <li key={i}>
+                <button
+                  type="button"
+                  className="hover:bg-surface-muted w-full px-4 py-2.5 text-left text-sm"
+                  onMouseDown={() => pickSuggestion(r)}
+                >
+                  {r.formatted}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      <FormField label="Address" required>
+
+      {hasCoords && (
+        <p className="text-fg-muted text-xs">
+          Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}
+        </p>
+      )}
+
+      <FormField label="Full address" required>
         <Input
-          placeholder="Building, street, area"
+          placeholder="Building name, street, area"
           value={addressLine}
           onChange={(e) => setAddressLine(e.target.value)}
         />
       </FormField>
+
       <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label="City code" required hint="Master data city code">
-          <Input value={cityCode} onChange={(e) => setCityCode(e.target.value)} />
+        <FormField label="City" required>
+          <Input
+            placeholder="e.g. Karachi"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
         </FormField>
-        <FormField label="Area code">
-          <Input value={areaCode} onChange={(e) => setAreaCode(e.target.value)} />
+        <FormField label="Area">
+          <Input
+            placeholder="e.g. DHA Phase 5"
+            value={area}
+            onChange={(e) => setArea(e.target.value)}
+          />
         </FormField>
       </div>
+
       {branches.length > 0 && (
-        <FormField label="Branch" required>
+        <FormField label="Nearest Job Bank branch" required>
           <Select
             value={branchId}
             onChange={(e) => setBranchId(e.target.value)}
@@ -511,6 +639,30 @@ function DocumentsStep({
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [company_, setCompany_] = useState(company);
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  const [scanWarning, setScanWarning] = useState<Record<string, string>>({});
+
+  function previewFile(typeCode: string, file: File) {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (ev.target?.result)
+        setPreviews((p) => ({ ...p, [typeCode]: ev.target!.result as string }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function validateDocument(typeCode: string, file: File): string | null {
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) return 'File is too large. Maximum size is 5 MB.';
+    const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowed.includes(file.type)) return 'Only JPG, PNG, or PDF files are accepted.';
+    const nameLower = file.name.toLowerCase();
+    if (typeCode.includes('CNIC') && !nameLower.match(/cnic|id|nic|identity/)) {
+      return 'Please make sure this is a clear image of your CNIC (front or back).';
+    }
+    return null;
+  }
 
   async function upload(typeCode: string, file: File) {
     setUploading(typeCode);
@@ -533,7 +685,7 @@ function DocumentsStep({
       );
       setCompany_(saved);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Upload failed. Try again.');
+      setError(friendlyError(err));
     } finally {
       setUploading(null);
     }
@@ -569,6 +721,14 @@ function DocumentsStep({
                 {uploaded.reviewStatus === 'ACCEPTED' && ' · Accepted by verifier'}
               </p>
             )}
+            {previews[code] && (
+              <img
+                src={previews[code]}
+                alt={`Preview of ${code.replace(/_/g, ' ')}`}
+                className="mt-1 h-20 w-auto rounded-lg object-cover"
+              />
+            )}
+            {scanWarning[code] && <p className="text-warning text-xs">{scanWarning[code]}</p>}
             <label className="cursor-pointer">
               <input
                 type="file"
@@ -577,7 +737,19 @@ function DocumentsStep({
                 disabled={uploading === code}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) void upload(code, file);
+                  if (!file) return;
+                  const warning = validateDocument(code, file);
+                  if (warning) {
+                    setScanWarning((w) => ({ ...w, [code]: warning }));
+                    return;
+                  }
+                  setScanWarning((w) => {
+                    const n = { ...w };
+                    delete n[code];
+                    return n;
+                  });
+                  previewFile(code, file);
+                  void upload(code, file);
                 }}
               />
               <span className="text-accent text-sm underline underline-offset-4">
@@ -628,7 +800,7 @@ function SubmitStep({
       });
       onSubmitted(saved);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Something went wrong.');
+      setError(friendlyError(err));
     } finally {
       setPending(false);
     }
@@ -644,7 +816,7 @@ function SubmitStep({
       });
       onSubmitted(saved);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Something went wrong.');
+      setError(friendlyError(err));
     } finally {
       setPending(false);
     }
@@ -732,7 +904,8 @@ export function CompanyWizard({
   initialCompany: CompanyView | null;
 }) {
   const router = useRouter();
-  const idempotencyKey = useRef(crypto.randomUUID());
+  const registerKey = useRef(crypto.randomUUID());
+  const submitKey = useRef(crypto.randomUUID());
   const [company, setCompany] = useState<CompanyView | null>(initialCompany);
   const [currentStep, setCurrentStep] = useState<WizardStep>(() => {
     const valid = STEPS.map((s) => s.id);
@@ -798,7 +971,7 @@ export function CompanyWizard({
 
       <div className="border-border bg-surface rounded-xl border p-6">
         {currentStep === 'details' && (
-          <DetailsStep company={company} onSaved={saved} idempotencyKey={idempotencyKey.current} />
+          <DetailsStep company={company} onSaved={saved} idempotencyKey={registerKey.current} />
         )}
         {currentStep === 'contacts' && company && (
           <ContactsStep company={company} onSaved={saved} />
@@ -812,7 +985,7 @@ export function CompanyWizard({
         {currentStep === 'submit' && company && (
           <SubmitStep
             company={company}
-            idempotencyKey={idempotencyKey.current}
+            idempotencyKey={submitKey.current}
             onSubmitted={(c) => {
               setCompany(c);
             }}

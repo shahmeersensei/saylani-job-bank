@@ -4,6 +4,8 @@ import { certificationsSchema, educationSchema } from '@jobbank/shared';
 import { useState } from 'react';
 import { Checkbox, Input, Select } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
+import { MonthYearPicker } from './MonthYearPicker';
+
 import type { ApplicantProfile } from '@/domains/applicant';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import {
@@ -199,20 +201,19 @@ export function EducationStep({ profile, lists, bindSave }: StepProps) {
                 <Input value={row.issuer} onChange={(e) => update({ issuer: e.target.value })} />
               </FormField>
               <FormField label="Issued (month)">
-                <Input
-                  type="month"
+                <MonthYearPicker
                   value={row.issuedMonth}
-                  onChange={(e) => update({ issuedMonth: e.target.value })}
+                  onChange={(v) => update({ issuedMonth: v })}
                 />
               </FormField>
               <FormField
                 label="Expires (month)"
                 error={errors[`certifications.items.${i}.expiresMonth`]}
               >
-                <Input
-                  type="month"
+                <MonthYearPicker
                   value={row.expiresMonth}
-                  onChange={(e) => update({ expiresMonth: e.target.value })}
+                  onChange={(v) => update({ expiresMonth: v })}
+                  placeholder="Month (optional)"
                 />
               </FormField>
             </div>
