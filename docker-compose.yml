@@ -5,6 +5,8 @@ name: jobbank
 
 services:
   postgres:
+    # PostGIS. pgvector is installed in-container (dev) or via docker/Dockerfile.postgres
+    # (fresh setup) so the matching engine can store embeddings beside geo data.
     image: postgis/postgis:16-3.4
     restart: unless-stopped
     environment:

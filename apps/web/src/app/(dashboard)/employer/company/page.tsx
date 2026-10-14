@@ -17,6 +17,11 @@ export default async function EmployerCompanyPage({
     return <CompanyWizard initialStep="details" initialCompany={null} />;
   }
 
+  // VERIFIED/SUSPENDED with ?step= → show wizard (editable sections only)
+  if ((company.status === 'VERIFIED' || company.status === 'SUSPENDED') && step) {
+    return <CompanyWizard initialStep={step} initialCompany={company} />;
+  }
+
   if (company.status === 'VERIFIED' || company.status === 'SUSPENDED') {
     return <CompanyStatusPanel company={company} />;
   }

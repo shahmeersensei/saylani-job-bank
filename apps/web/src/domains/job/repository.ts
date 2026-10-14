@@ -1,15 +1,7 @@
 import 'server-only';
 import { schema } from '@jobbank/db';
-import type {
-  BonusTier,
-  GenderPreference,
-  JobStatus,
-  JobType,
-  MedicalCoverageType,
-  ShiftType,
-  SkillLevel,
-} from '@jobbank/shared';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import type { GenderPreference, JobStatus, JobType, ShiftType, SkillLevel } from '@jobbank/shared';
+import { asc, desc, eq } from 'drizzle-orm';
 import { NotFoundError } from '@/domains/shared/errors';
 import { db, type DbExecutor } from '@/lib/db';
 
@@ -30,6 +22,8 @@ export interface JobLocationView {
   companyLocationId: string | null;
   addressLine: string;
   cityCode: string;
+  /** Work pin on the map (public job-site coordinates, not private data). */
+  location: { lat: number; lng: number } | null;
 }
 
 export interface JobRequirementsView {
@@ -137,6 +131,7 @@ export async function buildJobView(executor: DbExecutor, row: JobRow): Promise<J
       companyLocationId: l.companyLocationId,
       addressLine: l.addressLine,
       cityCode: l.cityCode,
+      location: l.location,
     })),
     requirements: reqs
       ? {

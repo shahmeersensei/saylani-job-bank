@@ -1,7 +1,6 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   BONUS_TIERS,
   BONUS_TIER_LABELS,
@@ -22,16 +21,28 @@ import {
   type ShiftType,
   type SkillLevel,
 } from '@jobbank/shared';
-import type { JobView } from '@/domains/job/repository';
-import { ApiClientError, apiFetch } from '@/lib/api/client';
-import { Button, Input, Select, Textarea } from '@/components/atoms';
+import type { JobView } from '@/domains/job';
+import { apiFetch } from '@/lib/api/client';
+import { Button, Input, Select, Spinner, Textarea } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
+import { MapPinPicker, type LatLng } from '@/components/organisms';
 import { useRouter } from 'next/navigation';
 import { MapPin, Plus, X } from 'lucide-react';
 
 const JobLocationMap = dynamic(() => import('./JobLocationMap'), { ssr: false });
 
 // ─── Option arrays ──────────────────────────────────────────────────────
+
+interface CityOption {
+  value: string;
+  label: string;
+}
+
+interface ReverseResult {
+  addressLine: string;
+  cityCode: string | null;
+  cityLabel: string | null;
+}
 
 const JOB_TYPE_OPTIONS = JOB_TYPES.map((v) => ({ value: v, label: JOB_TYPE_LABELS[v] }));
 const SHIFT_OPTIONS = SHIFT_TYPES.map((v) => ({ value: v, label: SHIFT_TYPE_LABELS[v] }));
@@ -94,101 +105,57 @@ export function JobWizard({ initialJob = null }: Props) {
     initialJob?.salaryMax != null ? String(initialJob.salaryMax) : '',
   );
 
-  // ── Master data ──────────────────────────────────────────────────────
-  const [categories, setCategories] = useState<MasterDataItem[]>([]);
-  const [availableSkills, setAvailableSkills] = useState<MasterDataItem[]>([]);
+  // ── Location: pin on the map, address/city autofilled by reverse geocode ──
+  const saved = initialJob?.locations[0] ?? null;
+  const [pin, setPin] = useState<LatLng | null>(saved?.location ?? null);
+  const [addressLine, setAddressLine] = useState(saved?.addressLine ?? '');
+  const [cityCode, setCityCode] = useState(saved?.cityCode ?? '');
+  const [cities, setCities] = useState<CityOption[]>([]);
+  const [geocoding, setGeocoding] = useState(false);
+  /** True while the address text is machine-filled (so a new pin may replace it). */
+  const autoFilled = useRef(!saved?.addressLine);
+
+  const isNew = !initialJob;
 
   useEffect(() => {
-    apiFetch<MasterDataItem[]>('/api/v1/master-data?type=JOB_CATEGORY')
-      .then((r) => setCategories(r.data))
-      .catch(() => undefined);
-    apiFetch<MasterDataItem[]>('/api/v1/master-data?type=SKILL')
-      .then((r) => setAvailableSkills(r.data))
-      .catch(() => undefined);
+    let cancelled = false;
+    apiFetch<{ code: string; label: string }[]>('/api/v1/master-data?type=CITY')
+      .then(({ data }) => {
+        if (!cancelled) setCities(data.map((c) => ({ value: c.code, label: c.label })));
+      })
+      .catch(() => {
+        // City list is a nicety; the form still works with manual entry.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // ── Requirements ─────────────────────────────────────────────────────
-  const [minExperience, setMinExperience] = useState(
-    initialJob?.requirements?.minExperienceYears != null
-      ? String(initialJob.requirements.minExperienceYears)
-      : '',
-  );
-  const [otherRequirements, setOtherRequirements] = useState(
-    initialJob?.requirements?.otherRequirements ?? '',
-  );
-
-  // ── Skills ───────────────────────────────────────────────────────────
-  const [skills, setSkills] = useState<SkillEntry[]>(
-    (initialJob?.skills ?? []).map((s) => ({
-      skillCode: s.skillCode,
-      label: s.skillCode,
-      minLevel: s.minLevel,
-      required: s.required,
-    })),
-  );
-  const [pickLabel, setPickLabel] = useState('');
-  const [pickLevel, setPickLevel] = useState<SkillLevel>('BEGINNER');
-
-  function addSkill() {
-    const trimmed = pickLabel.trim();
-    if (!trimmed) return;
-    const code = trimmed.toUpperCase().replace(/\s+/g, '_');
-    if (skills.some((s) => s.skillCode === code)) return;
-    setSkills((prev) => [
-      ...prev,
-      { skillCode: code, label: trimmed, minLevel: pickLevel, required: true },
-    ]);
-    setPickLabel('');
-    setPickLevel('BEGINNER');
-  }
-
-  function handleSkillKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addSkill();
-    }
-  }
-
-  function removeSkill(code: string) {
-    setSkills((prev) => prev.filter((s) => s.skillCode !== code));
-  }
-
-  function updateSkillLevel(code: string, level: SkillLevel) {
-    setSkills((prev) => prev.map((s) => (s.skillCode === code ? { ...s, minLevel: level } : s)));
-  }
-
-  // ── Location ─────────────────────────────────────────────────────────
-  const existingLoc = initialJob?.locations[0];
-  const [addressLine, setAddressLine] = useState(existingLoc?.addressLine ?? '');
-  const [locationCity, setLocationCity] = useState(existingLoc?.cityCode ?? '');
-  const [lat, setLat] = useState(0);
-  const [lng, setLng] = useState(0);
-  const [showMap, setShowMap] = useState(false);
-
-  function handleMapPick(pickedLat: number, pickedLng: number) {
-    setLat(pickedLat);
-    setLng(pickedLng);
-  }
-
-  // ── Benefits & Perks ─────────────────────────────────────────────────
-  const [fuelAllowance, setFuelAllowance] = useState(initialJob?.fuelAllowance ?? false);
-  const [flexibleHours, setFlexibleHours] = useState(initialJob?.flexibleHours ?? false);
-  const [annualLeaveDays, setAnnualLeaveDays] = useState(
-    initialJob?.annualLeaveDays != null ? String(initialJob.annualLeaveDays) : '',
-  );
-  const [medicalCoverage, setMedicalCoverage] = useState<MedicalCoverageType>(
-    initialJob?.medicalCoverage ?? 'NONE',
-  );
-  const [bonusTier, setBonusTier] = useState<BonusTier>(initialJob?.bonusTier ?? 'NONE');
-  const [workFromHome, setWorkFromHome] = useState(initialJob?.workFromHome ?? false);
-  const [providentFund, setProvidentFund] = useState(initialJob?.providentFund ?? false);
-  const [transportAllowance, setTransportAllowance] = useState(
-    initialJob?.transportAllowance ?? false,
-  );
-  const [eobi, setEobi] = useState(initialJob?.eobi ?? false);
-  const [lifeInsurance, setLifeInsurance] = useState(initialJob?.lifeInsurance ?? false);
-
-  // ── Submit ────────────────────────────────────────────────────────────
+  // Pin change → reverse geocode → autofill address + city (debounced).
+  useEffect(() => {
+    if (!pin || cities.length === 0) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setGeocoding(true);
+      try {
+        const { data } = await apiFetch<ReverseResult>(
+          `/api/v1/geocode/reverse?lat=${pin.lat}&lng=${pin.lng}`,
+          { signal: controller.signal },
+        );
+        if (autoFilled.current || !addressLine) setAddressLine(data.addressLine || addressLine);
+        if (data.cityCode) setCityCode(data.cityCode);
+      } catch {
+        // Offline or Nominatim down: keep whatever the employer typed.
+      } finally {
+        setGeocoding(false);
+      }
+    }, 450);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run on pin/cities only; addressLine read at fire time
+  }, [pin, cities]);
 
   function handleSubmit() {
     startTransition(async () => {
@@ -224,62 +191,33 @@ export function JobWizard({ initialJob = null }: Props) {
           });
           jobId = created.id;
         } else {
-          await apiFetch<JobView>(`/api/v1/jobs/me/${initialJob.id}`, {
+          const { data: updated } = await apiFetch<JobView>(`/api/v1/jobs/me/${initialJob.id}`, {
             method: 'PATCH',
             body: basicBody,
           });
-          jobId = initialJob.id;
+          jobId = updated.id;
         }
 
-        // Save sub-resources in parallel
-        await Promise.all([
-          // Requirements: save if any value is filled
-          minExperience || otherRequirements
-            ? apiFetch(`/api/v1/jobs/me/${jobId}/requirements`, {
-                method: 'PUT',
-                body: {
-                  minExperienceYears: minExperience ? parseInt(minExperience, 10) : undefined,
-                  otherRequirements: otherRequirements || undefined,
-                },
-              })
-            : undefined,
-          // Skills
-          apiFetch(`/api/v1/jobs/me/${jobId}/skills`, {
+        if (pin && addressLine.trim().length >= 3 && cityCode) {
+          await apiFetch<JobView>(`/api/v1/jobs/me/${jobId}/location`, {
             method: 'PUT',
             body: {
-              skills: skills.map((s) => ({
-                skillCode: s.skillCode,
-                minLevel: s.minLevel,
-                required: s.required,
-              })),
+              location: pin,
+              addressLine: addressLine.trim(),
+              cityCode,
             },
-          }),
-          // Location: save only if address and city are filled
-          addressLine.trim() && locationCity.trim()
-            ? apiFetch(`/api/v1/jobs/me/${jobId}/location`, {
-                method: 'PUT',
-                body: {
-                  addressLine: addressLine.trim(),
-                  cityCode: locationCity.trim(),
-                  ...(lat !== 0 || lng !== 0 ? { location: { lat, lng } } : {}),
-                },
-              })
-            : undefined,
-        ]);
-
-        if (isNew) {
-          router.push(`/employer/jobs/${jobId}`);
-        } else {
-          router.refresh();
+          });
         }
+
+        if (isNew) router.push(`/employer/jobs/${jobId}`);
+        else router.refresh();
       } catch (e) {
         setError(friendlyError(e));
       }
     });
   }
 
-  const isReady =
-    title.trim().length >= 3 && categoryCode.trim() && description.trim().length >= 10;
+  const locationReady = pin && addressLine.trim().length >= 3 && cityCode;
 
   return (
     <div className="grid w-full gap-8">
@@ -592,6 +530,64 @@ export function JobWizard({ initialJob = null }: Props) {
             ))}
           </div>
         </Section>
+
+        <div className="grid gap-4 border-t pt-6">
+          <div>
+            <h2 className="text-fg text-lg font-semibold">Work location</h2>
+            <p className="text-fg-muted text-sm">
+              Tap the job site on the map — we will fill in the address for you. Matching uses this
+              pin to rank nearby applicants.
+            </p>
+          </div>
+
+          <MapPinPicker value={pin} onChange={setPin} label="Job site location" height="18rem" />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              label="Address"
+              hint={
+                geocoding ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Spinner className="size-3" /> Looking up the address…
+                  </span>
+                ) : pin ? (
+                  'Autofilled from the map — edit if needed.'
+                ) : (
+                  'Place the pin on the map first.'
+                )
+              }
+              className="sm:col-span-2"
+            >
+              <Input
+                value={addressLine}
+                onChange={(e) => {
+                  setAddressLine(e.target.value);
+                  autoFilled.current = false;
+                }}
+                placeholder="House, street and block"
+              />
+            </FormField>
+
+            <FormField
+              label="City"
+              hint={pin && !cityCode ? 'Could not match a city — pick it manually.' : undefined}
+            >
+              <Select
+                placeholder={cities.length ? 'Choose the city' : 'Loading cities…'}
+                value={cityCode}
+                onChange={(e) => setCityCode(e.target.value)}
+                options={cities}
+              />
+            </FormField>
+          </div>
+
+          {!locationReady && (
+            <p className="text-fg-muted text-sm">
+              The location is saved once you place a pin, fill the address (3+ characters) and pick
+              a city — required before publishing.
+            </p>
+          )}
+        </div>
 
         {error && <p className="text-danger text-sm">{error}</p>}
 

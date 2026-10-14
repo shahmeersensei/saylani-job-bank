@@ -2,7 +2,17 @@ import type { Role } from '@jobbank/shared';
 import { hashPassword } from 'better-auth/crypto';
 import { eq } from 'drizzle-orm';
 import type { Database } from '../client';
-import { accounts, branches, twoFactors, userRoles, users } from '../schema';
+import {
+  accounts,
+  branches,
+  companyContacts,
+  companyLocations,
+  companyMembers,
+  companies,
+  twoFactors,
+  userRoles,
+  users,
+} from '../schema';
 import type { SeedStep } from '../scripts/seed';
 
 /**
@@ -151,6 +161,61 @@ export const devData: SeedStep = {
             branchId: branch ? branchIds.get(branch)! : null,
           })),
         );
+      }
+
+      // A pre-VERIFIED company for the seeded employer, so local testing can go
+      // straight to posting jobs (PRD rule 2: only verified companies post).
+      const [employer] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, 'employer@jobbank.local'));
+      if (employer) {
+        const companyId = '00000000-0000-4000-8000-00000000c001';
+        await tx
+          .insert(companies)
+          .values({
+            id: companyId,
+            branchId: branchIds.get('KHI-GULSHAN')!,
+            legalName: 'Hamza Traders (Pvt) Ltd',
+            tradeName: 'Hamza Traders',
+            legalStructure: 'PRIVATE_LIMITED',
+            ntn: '1234567-8',
+            industryCode: 'RETAIL',
+            sizeBand: '1_10',
+            website: 'https://hamzatraders.example',
+            description: 'Dev-seeded verified company for local testing.',
+            status: 'VERIFIED',
+            verifiedAt: new Date(),
+            createdBy: employer.id,
+          })
+          .onConflictDoNothing({ target: companies.id });
+        await tx
+          .insert(companyMembers)
+          .values({ companyId, userId: employer.id, role: 'OWNER' })
+          .onConflictDoNothing();
+        await tx
+          .insert(companyContacts)
+          .values({
+            companyId,
+            name: 'Hamza Employer',
+            designation: 'Owner',
+            phone: '+923001112223',
+            email: 'employer@jobbank.local',
+            isPrimary: true,
+          })
+          .onConflictDoNothing();
+        await tx
+          .insert(companyLocations)
+          .values({
+            companyId,
+            kind: 'HQ',
+            label: 'Head office',
+            addressLine: 'Block 13-D, Gulshan-e-Iqbal, Karachi',
+            cityCode: 'KARACHI',
+            areaCode: 'GULSHAN_E_IQBAL',
+            location: { lat: 24.9204, lng: 67.0932 },
+          })
+          .onConflictDoNothing();
       }
     });
   },

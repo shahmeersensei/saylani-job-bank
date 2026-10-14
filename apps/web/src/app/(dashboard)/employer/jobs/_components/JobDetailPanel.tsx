@@ -14,7 +14,7 @@ import { apiFetch } from '@/lib/api/client';
 import { Badge, Button, Link } from '@/components/atoms';
 import { allowedTransitions } from '@/domains/job/rules';
 import { useRouter } from 'next/navigation';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Users } from 'lucide-react';
 
 interface Props {
   job: JobView;
@@ -101,13 +101,25 @@ export function JobDetailPanel({ job }: Props) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Badge tone={pill.tone}>{JOB_STATUS_LABELS[job.status]}</Badge>
-          {(job.status === 'DRAFT' || job.status === 'OPEN' || job.status === 'PAUSED') && (
-            <Link href={`/employer/jobs/${job.id}/edit`}>
-              <Button size="sm" variant="secondary">
-                <Pencil className="mr-1.5 size-4" />
-                Edit
+          <Link href={`/employer/jobs/${job.id}/matches`}>
+            <Button size="sm" variant="secondary">
+              <Users className="mr-1.5 size-4" />
+              Shortlist
+            </Button>
+          </Link>
+          {job.status === 'DRAFT' && (
+            <>
+              <Link href={`/employer/jobs/${job.id}/edit`}>
+                <Button size="sm" variant="secondary">
+                  <Pencil className="mr-1.5 size-4" />
+                  Edit
+                </Button>
+              </Link>
+              <Button size="sm" variant="secondary" onClick={handleDelete} disabled={pending}>
+                <Trash2 className="text-danger mr-1.5 size-4" />
+                Delete
               </Button>
-            </Link>
+            </>
           )}
           {job.status === 'DRAFT' && (
             <Button size="sm" variant="secondary" onClick={handleDelete} disabled={pending}>

@@ -1,11 +1,12 @@
 'use client';
 
-import { Bell, ChevronDown, Menu, Search, Command } from 'lucide-react';
+import { ChevronDown, Menu, Search, Command } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
 import { Avatar } from '@/components/atoms/Avatar';
 import { Button } from '@/components/atoms/Button';
 import { Select } from '@/components/atoms/Select';
 import { cn } from '@/lib/utils/cn';
+import { NotificationBell } from './NotificationBell';
 import type { TopBarProps } from './topBar.types';
 
 export function TopBar({
@@ -15,6 +16,7 @@ export function TopBar({
   user,
   userMenuItems = [],
   actions,
+  notificationsHref,
   className,
 }: TopBarProps) {
   return (
@@ -91,18 +93,7 @@ export function TopBar({
         {actions}
 
         {/* Notification bell */}
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="hover:bg-surface-muted focus-visible:focus-ring relative grid size-10 place-items-center rounded-lg transition-colors"
-        >
-          <Bell className="text-fg-muted size-[18px]" aria-hidden="true" />
-          <span
-            aria-hidden="true"
-            className="absolute top-2 right-2 size-2 rounded-full"
-            style={{ backgroundColor: 'var(--primary)' }}
-          />
-        </button>
+        <NotificationBell viewAllHref={notificationsHref} />
       </div>
 
       {user && (
