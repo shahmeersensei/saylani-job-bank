@@ -1,10 +1,8 @@
 -- Auto matching engine (services/matching, Python): runs, shortlist rows,
--- factor breakdowns, an outbox the worker polls, and a pgvector slot for
--- Phase 3 semantic retrieval. Requires the `vector` extension (see
--- docker/Dockerfile.postgres: PostGIS + pgvector in one image).
+-- factor breakdowns, and an outbox the worker polls.
+-- pgvector / embeddings table lives in 0019_embeddings.sql (requires the
+-- `vector` extension; skip that migration on plain Postgres installs).
 
-CREATE EXTENSION IF NOT EXISTS vector;
---> statement-breakpoint
 CREATE TABLE "match_runs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"job_id" uuid NOT NULL,
@@ -59,16 +57,6 @@ CREATE TABLE "match_outbox" (
 	"processed_at" timestamp with time zone
 );
 --> statement-breakpoint
-CREATE TABLE "embeddings" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"entity_type" text NOT NULL,
-	"entity_id" uuid NOT NULL,
-	"model" text NOT NULL,
-	"content" text NOT NULL,
-	"embedding" vector(384),
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
 ALTER TABLE "match_runs" ADD CONSTRAINT "match_runs_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE CASCADE ON UPDATE NO ACTION;--> statement-breakpoint
 ALTER TABLE "job_matches" ADD CONSTRAINT "job_matches_run_id_fkey" FOREIGN KEY ("run_id") REFERENCES "public"."match_runs"("id") ON DELETE CASCADE ON UPDATE NO ACTION;--> statement-breakpoint
 ALTER TABLE "job_matches" ADD CONSTRAINT "job_matches_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE CASCADE ON UPDATE NO ACTION;--> statement-breakpoint
@@ -81,5 +69,3 @@ CREATE INDEX "job_matches_job_score_idx" ON "job_matches" USING btree ("job_id",
 CREATE UNIQUE INDEX "job_match_factors_match_factor_uq" ON "job_match_factors" USING btree ("job_match_id", "factor");--> statement-breakpoint
 CREATE UNIQUE INDEX "match_outbox_pending_dedupe_uq" ON "match_outbox" USING btree ("event_type", "dedupe_key") WHERE "status" = 'PENDING';--> statement-breakpoint
 CREATE INDEX "match_outbox_claim_idx" ON "match_outbox" USING btree ("status", "next_attempt_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "embeddings_entity_model_uq" ON "embeddings" USING btree ("entity_type", "entity_id", "model");--> statement-breakpoint
-CREATE INDEX "embeddings_hnsw_idx" ON "embeddings" USING hnsw ("embedding" vector_cosine_ops);

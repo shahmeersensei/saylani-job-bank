@@ -12,6 +12,7 @@ export {
 export {
   getJobMatches,
   getMyPendingOffers,
+  listMatchedJobs,
   listRejectionReasons,
   listRefusalReasons,
   requestJobMatchesRefresh,
@@ -20,7 +21,9 @@ export {
   MATCH_REVIEW_STATUSES,
   OFFER_RESPONSES,
   type MatchDecisionInput,
+  type MatchedJob,
   type MatchReviewStatus,
+  type MatchStrength,
   type OfferResponse,
   type OfferResponseInput,
   type PendingOffer,

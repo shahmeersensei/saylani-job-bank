@@ -233,6 +233,7 @@ export interface ApplicantStaffView extends ApplicantProfile {
     transfer: boolean;
     shortlist: boolean;
     scheduleInterview: boolean;
+    referToEmployer: boolean;
   };
 }
 
@@ -286,6 +287,7 @@ export async function getApplicantForStaff(
       shortlist: hasPermission(actor, 'match_case:manage') && row.status === 'ACTIVE',
       scheduleInterview:
         hasPermission(actor, 'interview:schedule_jobbank') && row.status === 'ACTIVE',
+      referToEmployer: hasPermission(actor, 'match_case:refer') && row.status === 'ACTIVE',
     },
   };
 }
