@@ -71,6 +71,7 @@ export function RoleShell({
       }
       topBar={{
         user: { name: user.name, role: ROLE_LABELS[role] },
+        notificationsHref: role === 'APPLICANT' ? '/applicant/notifications' : '/notifications',
         userMenuItems: [
           ...(showSecurity
             ? [

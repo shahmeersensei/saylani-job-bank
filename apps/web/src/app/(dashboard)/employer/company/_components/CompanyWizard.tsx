@@ -5,25 +5,49 @@ import {
   LEGAL_STRUCTURE_LABELS,
   COMPANY_SIZE_BANDS,
   COMPANY_SIZE_LABELS,
-  COMPANY_STATUS_LABELS,
   type CompanyStatus,
 } from '@jobbank/shared';
-import { ArrowLeft, ArrowRight, Building2, CheckCircle2, Send } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Badge, Input, Select, StatusPill, Textarea } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
-import type { CompanyView } from '@/domains/company/repository';
+import type { CompanyView } from '@/domains/company';
 
 type WizardStep = 'details' | 'contacts' | 'location' | 'documents' | 'submit';
 
-const STEPS: { id: WizardStep; label: string }[] = [
-  { id: 'details', label: 'Details' },
-  { id: 'contacts', label: 'Contacts' },
-  { id: 'location', label: 'Location' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'submit', label: 'Submit' },
+const STEPS: { id: WizardStep; label: string; title: string; description: string }[] = [
+  {
+    id: 'details',
+    label: 'Details',
+    title: 'Company details',
+    description: 'Start with your registered business information.',
+  },
+  {
+    id: 'contacts',
+    label: 'Contacts',
+    title: 'Key contacts',
+    description: 'Tell us who Job Bank should contact about your company.',
+  },
+  {
+    id: 'location',
+    label: 'Location',
+    title: 'Head office location',
+    description: 'Add your office address so we can connect you to a nearby branch.',
+  },
+  {
+    id: 'documents',
+    label: 'Documents',
+    title: 'Company documents',
+    description: 'Upload the documents needed to verify your business.',
+  },
+  {
+    id: 'submit',
+    label: 'Review',
+    title: 'Review and submit',
+    description: 'Check your information before sending it for verification.',
+  },
 ];
 
 const STATUS_PILL: Record<
@@ -147,7 +171,7 @@ function DetailsStep({
     form.sizeBand;
 
   return (
-    <form className="grid gap-4" onSubmit={(e) => void save(e)}>
+    <form className="grid gap-5 sm:grid-cols-2" onSubmit={(e) => void save(e)}>
       <FormField label="Registered company name" required>
         <Input value={form.legalName} onChange={(e) => set('legalName')(e.target.value)} />
       </FormField>
@@ -198,23 +222,19 @@ function DetailsStep({
           onChange={(e) => set('website')(e.target.value)}
         />
       </FormField>
-      <FormField label="About the company">
+      <FormField label="About the company" className="sm:col-span-2">
         <Textarea
           rows={3}
           value={form.description}
           onChange={(e) => set('description')(e.target.value)}
         />
       </FormField>
-      {error && <p className="text-danger text-sm">{error}</p>}
-      <Button
-        type="submit"
-        fullWidth
-        loading={pending}
-        disabled={!isReady}
-        rightIcon={<ArrowRight />}
-      >
-        Save and continue
-      </Button>
+      {error && <p className="text-danger text-sm sm:col-span-2">{error}</p>}
+      <div className="border-border flex justify-end border-t pt-4 sm:col-span-2">
+        <Button type="submit" loading={pending} disabled={!isReady} rightIcon={<ArrowRight />}>
+          Save and continue
+        </Button>
+      </div>
     </form>
   );
 }
@@ -751,52 +771,89 @@ export function CompanyWizard({
   }
 
   const currentIdx = stepIndex(currentStep);
+  const activeStep = STEPS[currentIdx]!;
+  const progress = Math.round(((currentIdx + 1) / STEPS.length) * 100);
 
   return (
-    <div className="grid w-full gap-6">
-      <header className="grid gap-1">
-        <h1 className="text-fg text-2xl font-semibold">Register your company</h1>
-        {company && (
+    <div className="grid w-full gap-4 pb-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-1">
+          <h1 className="text-fg text-2xl font-semibold">Register your company</h1>
           <p className="text-fg-muted text-sm">
-            {company.details.legalName} ·{' '}
+            Complete your company profile to start hiring through Job Bank.
+          </p>
+        </div>
+        {company && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-fg-muted max-w-56 truncate text-sm">
+              {company.details.legalName}
+            </span>
             <StatusPill
               label={STATUS_PILL[company.status].label}
               tone={STATUS_PILL[company.status].variant}
             />
-          </p>
+          </div>
         )}
       </header>
 
-      <nav aria-label="Registration steps" className="flex gap-1 overflow-x-auto pb-1">
-        {STEPS.map((s, idx) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => company && goTo(s.id)}
-            disabled={!company && idx > 0}
-            className={[
-              'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors',
-              s.id === currentStep
-                ? 'bg-primary text-primary-fg'
-                : 'text-fg-muted hover:bg-surface-muted',
-            ].join(' ')}
-          >
-            {idx < currentIdx && company ? (
-              <CheckCircle2 className="text-success size-3.5" aria-hidden="true" />
-            ) : (
-              <span
-                aria-hidden="true"
-                className="flex size-3.5 shrink-0 items-center justify-center rounded-full border border-current text-center text-[10px] leading-3"
+      <section aria-label="Company registration progress" className="grid gap-3">
+        <div
+          aria-label={`${progress}% complete`}
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={progress}
+          className="bg-surface-muted h-1 overflow-hidden rounded-full"
+          role="progressbar"
+        >
+          <div
+            className="bg-primary h-full rounded-full transition-[width] duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <nav aria-label="Registration steps" className="flex gap-1 overflow-x-auto pb-1">
+          {STEPS.map((s, idx) => {
+            const isCurrent = s.id === currentStep;
+            const isComplete = idx < currentIdx && company;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => company && goTo(s.id)}
+                disabled={!company && idx > 0}
+                aria-current={isCurrent ? 'step' : undefined}
+                className={[
+                  'flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                  'focus-visible:focus-ring disabled:cursor-not-allowed disabled:opacity-50',
+                  isCurrent ? 'bg-primary text-primary-fg' : 'text-fg-muted hover:bg-surface-muted',
+                ].join(' ')}
               >
-                {idx + 1}
-              </span>
-            )}
-            {s.label}
-          </button>
-        ))}
-      </nav>
+                {isComplete ? (
+                  <CheckCircle2 className="text-success size-5 shrink-0" aria-hidden="true" />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="flex size-5 shrink-0 items-center justify-center rounded-full border border-current text-[11px] font-semibold"
+                  >
+                    {idx + 1}
+                  </span>
+                )}
+                <span className="font-medium">{s.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </section>
 
-      <div className="border-border bg-surface rounded-xl border p-6">
+      <section className="border-border bg-surface grid gap-5 rounded-xl border p-4 sm:p-6">
+        <div className="grid gap-1">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-fg text-lg font-semibold">{activeStep.title}</h2>
+            <span className="text-fg-muted text-xs">
+              Step {currentIdx + 1} of {STEPS.length}
+            </span>
+          </div>
+          <p className="text-fg-muted text-sm">{activeStep.description}</p>
+        </div>
         {currentStep === 'details' && (
           <DetailsStep company={company} onSaved={saved} idempotencyKey={idempotencyKey.current} />
         )}
@@ -821,13 +878,13 @@ export function CompanyWizard({
         {!company && currentStep !== 'details' && (
           <p className="text-fg-muted text-center text-sm">Complete company details first.</p>
         )}
-      </div>
+      </section>
 
       {prevStep(currentStep) && company && (
         <button
           type="button"
           onClick={() => goTo(prevStep(currentStep)!)}
-          className="text-fg-muted flex w-fit items-center gap-1 text-sm hover:underline"
+          className="text-fg-muted hover:text-fg focus-visible:focus-ring flex w-fit items-center gap-2 text-sm font-medium"
         >
           <ArrowLeft className="size-4" />
           Back

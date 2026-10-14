@@ -75,21 +75,26 @@ export default function MapPinPickerClient({
     }
     setLocating(true);
     setGeoError(null);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocating(false);
-        pick({ lat: position.coords.latitude, lng: position.coords.longitude });
-      },
-      (error) => {
-        setLocating(false);
-        setGeoError(
-          error.code === error.PERMISSION_DENIED
-            ? 'Location permission was denied. Tap the map to place the pin instead.'
-            : 'Could not get your location. Tap the map to place the pin instead.',
-        );
-      },
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
-    );
+
+    const onSuccess = (position: GeolocationPosition) => {
+      setLocating(false);
+      pick({ lat: position.coords.latitude, lng: position.coords.longitude });
+    };
+    const onFail = (error: GeolocationPositionError) => {
+      setLocating(false);
+      setGeoError(
+        error.code === error.PERMISSION_DENIED
+          ? 'Location permission was denied. Tap the map to place the pin instead.'
+          : 'Could not get your location. Tap the map to place the pin instead.',
+      );
+    };
+
+    // Low accuracy first (WiFi/IP — fast, works on desktops), then high accuracy fallback.
+    navigator.geolocation.getCurrentPosition(onSuccess, onFail, {
+      enableHighAccuracy: false,
+      timeout: 8_000,
+      maximumAge: 300_000,
+    });
   };
 
   const setCoordinate = (axis: keyof LatLng, raw: string) => {
