@@ -30,6 +30,9 @@
     "db:migrate": "pnpm --filter @jobbank/db db:migrate",
     "db:seed": "pnpm --filter @jobbank/db db:seed",
     "db:studio": "pnpm --filter @jobbank/db db:studio",
+    "matching:dev": "cd services/matching && .\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --reload --port 8000",
+    "matching:test": "cd services/matching && .\\.venv\\Scripts\\python.exe -m pytest -q",
+    "matching:install": "cd services/matching && python -m venv .venv && .\\.venv\\Scripts\\python.exe -m pip install -e \".[dev]\"",
     "prepare": "husky"
   },
   "devDependencies": {
