@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, Check, MailCheck, X } from 'lucide-react';
 import type { PendingOffer } from '@/domains/matching';
@@ -25,6 +25,29 @@ interface Props {
 
 export function NotificationsClient({ items, unread, offers, refusalReasons }: Props) {
   const router = useRouter();
+  const lastCreatedAt = items[0]?.createdAt?.toISOString?.() ?? new Date().toISOString();
+  const sinceRef = useRef(lastCreatedAt);
+
+  // ── SSE: real-time notification push ───────────────────────────────────
+  useEffect(() => {
+    const url = `/api/v1/notifications/stream?since=${encodeURIComponent(sinceRef.current)}`;
+    const es = new EventSource(url);
+
+    es.addEventListener('notifications', () => {
+      // New notifications arrived — refresh the server-rendered page data.
+      router.refresh();
+    });
+
+    es.onerror = () => {
+      // EventSource reconnects automatically; nothing to do here.
+    };
+
+    return () => {
+      es.close();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [busyId, setBusyId] = useState<string | null>(null);
   const [declining, setDeclining] = useState<PendingOffer | null>(null);
   const [accepting, setAccepting] = useState<PendingOffer | null>(null);
@@ -217,6 +240,10 @@ export function NotificationsClient({ items, unread, offers, refusalReasons }: P
                             MATCH_SHORTLISTED: { label: 'Shortlisted', tone: 'info' as const },
                             OFFER_ACCEPTED: { label: 'Accepted', tone: 'success' as const },
                             OFFER_DECLINED: { label: 'Declined', tone: 'warning' as const },
+                            INTERVIEW_POSTPONED: { label: 'Postponed', tone: 'warning' as const },
+                            INTERVIEW_CANCELLED: { label: 'Cancelled', tone: 'neutral' as const },
+                            INTERVIEW_RESCHEDULED: { label: 'Rescheduled', tone: 'info' as const },
+                            APPLICANT_REFERRED: { label: 'Referred', tone: 'success' as const },
                           }[item.type] ?? { label: item.type, tone: 'neutral' as const })}
                         />
                       </span>

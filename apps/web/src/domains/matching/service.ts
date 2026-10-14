@@ -400,6 +400,82 @@ export async function respondToJobOffer(
   return { applicantResponse: input.applicantResponse };
 }
 
+// ─── Applicant job-matches view ───────────────────────────────────────────
+
+export type MatchStrength = 'GREAT' | 'GOOD' | 'POSSIBLE';
+
+export interface MatchedJob {
+  jobId: string;
+  title: string;
+  strength: MatchStrength;
+  score: number;
+  matchReasons: string[];
+  jobType: string;
+  shift: string;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  publishedAt: string | null;
+}
+
+function scoreToStrength(score: number): MatchStrength {
+  if (score >= 75) return 'GREAT';
+  if (score >= 50) return 'GOOD';
+  return 'POSSIBLE';
+}
+
+/**
+ * Returns all jobs from the latest completed match run for this applicant,
+ * ordered best-score first. Intended for the applicant's job-matches page.
+ */
+export async function listMatchedJobs(profile: { id: string }): Promise<MatchedJob[]> {
+  const rows = await db
+    .select({
+      jobId: jm.jobId,
+      title: j.title,
+      score: jm.score,
+      summary: jm.summary,
+      jobType: j.jobType,
+      shift: j.shift,
+      salaryMin: j.salaryMin,
+      salaryMax: j.salaryMax,
+      publishedAt: j.publishedAt,
+    })
+    .from(jm)
+    .innerJoin(mr, eq(mr.id, jm.runId))
+    .innerJoin(j, and(eq(j.id, jm.jobId), eq(j.status, 'OPEN')))
+    .where(and(eq(jm.applicantId, profile.id), eq(mr.status, 'COMPLETED')))
+    .orderBy(desc(jm.score), desc(mr.createdAt));
+
+  // One entry per job: keep the row from the most recent run (rows are already
+  // DESC by createdAt so the first occurrence for each jobId is the latest).
+  const seen = new Set<string>();
+  const out: MatchedJob[] = [];
+  for (const row of rows) {
+    if (seen.has(row.jobId)) continue;
+    seen.add(row.jobId);
+    const score = row.score ?? 0;
+    out.push({
+      jobId: row.jobId,
+      title: row.title,
+      strength: scoreToStrength(score),
+      score,
+      matchReasons: row.summary
+        ? row.summary
+            .split(/\.\s+/)
+            .map((s) => s.replace(/\.$/, '').trim())
+            .filter(Boolean)
+            .slice(0, 5)
+        : [],
+      jobType: row.jobType,
+      shift: row.shift,
+      salaryMin: row.salaryMin ?? null,
+      salaryMax: row.salaryMax ?? null,
+      publishedAt: row.publishedAt?.toISOString() ?? null,
+    });
+  }
+  return out;
+}
+
 /** Reason dropdown options for the applicant's offer-response UI. */
 export async function listRefusalReasons(): Promise<
   { code: string; label: string; requiresNote: boolean }[]
