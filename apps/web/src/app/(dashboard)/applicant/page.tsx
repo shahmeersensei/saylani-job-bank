@@ -1,6 +1,7 @@
 import type { ProfileSectionId } from '@jobbank/shared';
 import {
   ArrowRight,
+  Bell,
   Briefcase,
   Building2,
   Calendar,
@@ -17,8 +18,7 @@ import { Button, StatusPill } from '@/components/atoms';
 import { StatCard } from '@/components/molecules/StatCard';
 import { getMyProfile } from '@/domains/applicant';
 import { requireRole } from '@/domains/auth';
-import { listMatchedJobs } from '@/domains/matching';
-import { listMyApplications } from '@/domains/placement';
+import { listMyNotifications } from '@/domains/notifications';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
 import { APPLICANT_STATUS_PILL, IDENTITY_PILL } from '../_components/applicants/labels';
 import { StatusToggle } from './_components/StatusToggle';
@@ -38,7 +38,10 @@ const STEP_FOR: Record<ProfileSectionId, string> = {
 
 export default async function ApplicantHomePage() {
   const { actor, user } = await requireRole('APPLICANT');
-  const profile = await getMyProfile(actor);
+  const [profile, { unread }] = await Promise.all([
+    getMyProfile(actor),
+    listMyNotifications(actor, { page: 1, pageSize: 1 }),
+  ]);
 
   /* ── Empty state ─────────────────────────────────────────── */
   if (!profile) {
@@ -155,6 +158,12 @@ export default async function ApplicantHomePage() {
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill {...APPLICANT_STATUS_PILL[profile.status]} />
           <StatusPill {...IDENTITY_PILL[profile.identityStatus]} />
+          <Button asChild variant="secondary" leftIcon={<Bell />} size="sm">
+            <NextLink href="/applicant/notifications">
+              Updates
+              {unread > 0 ? ` (${unread})` : ''}
+            </NextLink>
+          </Button>
           <Button asChild variant="secondary" leftIcon={<UserRound />} size="sm">
             <NextLink href="/applicant/profile">Edit profile</NextLink>
           </Button>

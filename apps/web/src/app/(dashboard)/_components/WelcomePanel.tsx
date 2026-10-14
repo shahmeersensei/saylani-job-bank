@@ -880,8 +880,8 @@ export async function WelcomePanel({ role }: { role: Role }) {
         : `All ${visible.length} branches`
       : me.branches.map((b) => b.name).join(', ') || 'Platform-wide';
 
-  const CARD = 'rounded-2xl border bg-white p-6';
-  const BORDER = '1px solid #e8eeed';
+  const CARD = 'rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6';
+  const BORDER = '1px solid var(--border)';
 
   return (
     <div className="grid w-full gap-6">
@@ -896,7 +896,11 @@ export async function WelcomePanel({ role }: { role: Role }) {
         <div className="flex items-center gap-2">
           <span
             className="flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm"
-            style={{ borderColor: '#e8eeed', color: 'var(--fg-muted)', background: '#fff' }}
+            style={{
+              borderColor: 'var(--border)',
+              color: 'var(--fg-muted)',
+              background: 'var(--surface)',
+            }}
           >
             <Calendar className="size-4" aria-hidden="true" />
             {dateStr}
@@ -986,7 +990,10 @@ export async function WelcomePanel({ role }: { role: Role }) {
                   <div
                     key={si}
                     className="flex items-center justify-between rounded-xl p-3"
-                    style={{ background: '#f8faf9', border: '1px solid #e8eeed' }}
+                    style={{
+                      background: 'var(--surface-muted)',
+                      border: '1px solid var(--border)',
+                    }}
                   >
                     <div className="flex min-w-0 items-center gap-2">
                       <span
@@ -1148,7 +1155,7 @@ export async function WelcomePanel({ role }: { role: Role }) {
           />
 
           {/* Recent Activity */}
-          <div className="rounded-2xl border bg-white" style={{ border: BORDER }}>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
             <div
               className="flex items-center justify-between px-6 py-4"
               style={{ borderBottom: BORDER }}
@@ -1169,7 +1176,7 @@ export async function WelcomePanel({ role }: { role: Role }) {
               style={{
                 gridTemplateColumns: '1fr auto auto auto',
                 color: 'var(--fg-muted)',
-                background: '#f8faf9',
+                background: 'var(--surface-muted)',
                 borderBottom: BORDER,
               }}
             >
