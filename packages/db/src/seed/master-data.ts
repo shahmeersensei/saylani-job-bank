@@ -277,7 +277,23 @@ const doc = (
   mimeTypes = IMAGES_PDF,
   maxSizeMb = 5,
   multiple = false,
-): SeedItem => ({ code, label, meta: { appliesTo, required, mimeTypes, maxSizeMb, multiple } });
+  requirements: {
+    requiredForCategories?: string[];
+    requiredAlternativeForCategories?: string[];
+  } = {},
+): SeedItem => ({
+  code,
+  label,
+  meta: {
+    appliesTo,
+    required,
+    requiredForCategories: requirements.requiredForCategories ?? [],
+    requiredAlternativeForCategories: requirements.requiredAlternativeForCategories ?? [],
+    mimeTypes,
+    maxSizeMb,
+    multiple,
+  },
+});
 
 export const MASTER_DATA_SEED: Record<MasterDataType, SeedItem[]> = {
   JOB_CATEGORY: Object.entries(CATEGORY_SKILLS).map(([code, { label }]) => ({ code, label })),
@@ -361,9 +377,30 @@ export const MASTER_DATA_SEED: Record<MasterDataType, SeedItem[]> = {
     doc('CNIC_BACK', 'CNIC (back)', 'APPLICANT', true, ['image/jpeg', 'image/png']),
     doc('CV', 'CV / résumé', 'APPLICANT', false, ['application/pdf']),
     doc('PHOTO', 'Passport-size photo', 'APPLICANT', false, ['image/jpeg', 'image/png'], 2),
-    doc('EDUCATION_CERTIFICATE', 'Education certificate', 'APPLICANT', false, IMAGES_PDF, 5, true),
+    doc(
+      'EDUCATION_CERTIFICATE',
+      'Education certificate / degree',
+      'APPLICANT',
+      false,
+      IMAGES_PDF,
+      5,
+      true,
+      { requiredAlternativeForCategories: ['HEALTHCARE'] },
+    ),
     doc('EXPERIENCE_LETTER', 'Experience letter', 'APPLICANT', false, IMAGES_PDF, 5, true),
-    doc('DRIVING_LICENSE', 'Driving licence', 'APPLICANT', false),
+    doc('DRIVING_LICENSE', 'Driving licence', 'APPLICANT', false, IMAGES_PDF, 5, false, {
+      requiredForCategories: ['DRIVING_DELIVERY'],
+    }),
+    doc(
+      'HEALTHCARE_LICENSE',
+      'Professional licence / registration',
+      'APPLICANT',
+      false,
+      IMAGES_PDF,
+      5,
+      true,
+      { requiredAlternativeForCategories: ['HEALTHCARE'] },
+    ),
     doc('CHARACTER_CERTIFICATE', 'Police character certificate', 'APPLICANT', false),
     doc('AUTHORISED_PERSON_CNIC', 'CNIC of authorised person', 'COMPANY', true),
     doc('NTN_CERTIFICATE', 'NTN certificate', 'COMPANY', false),

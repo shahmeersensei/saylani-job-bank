@@ -1,5 +1,6 @@
 'use client';
 
+import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/atoms';
@@ -23,12 +24,16 @@ export function ProfileWizard({
   lists,
   documentTypes,
   maxRadiusM,
+  onReturnToOverview,
+  onProfileUpdate,
 }: {
   initialProfile: ApplicantProfile | null;
   initialStep: number;
   lists: ProfileLists;
   documentTypes: ApplicantDocumentType[];
   maxRadiusM: number;
+  onReturnToOverview?: () => void;
+  onProfileUpdate?: (profile: ApplicantProfile) => void;
 }) {
   const router = useRouter();
   const [profile, setProfile] = useState(initialProfile);
@@ -54,6 +59,7 @@ export function ProfileWizard({
       const saved = await saveRef.current?.();
       if (!saved) return false;
       setProfile(saved);
+      onProfileUpdate?.(saved);
       return true;
     } finally {
       setSaving(false);
@@ -64,58 +70,97 @@ export function ProfileWizard({
     if (!(await save())) return;
     if (isLast) {
       toast.success('Your profile is saved');
-      router.push('/applicant');
-      router.refresh();
+      if (onReturnToOverview) {
+        onReturnToOverview();
+      } else {
+        router.push('/applicant');
+        router.refresh();
+      }
     } else go(current + 1);
   };
 
   const stepProps = { profile, lists, bindSave };
 
   return (
-    <WizardLayout
-      title={profile ? 'Your profile' : 'Create your profile'}
-      description={
-        profile
-          ? `${profile.completeness.percent}% complete. Changes are saved when you press Continue.`
-          : 'Takes about 10 minutes. You can save and finish later.'
-      }
-      steps={WIZARD_STEPS.map((s) => ({
-        id: s.id,
-        label: s.label,
-        description: 'description' in s ? s.description : undefined,
-      }))}
-      current={current}
-      onStepClick={profile ? go : undefined}
-      onBack={() => go(current - 1)}
-      onNext={next}
-      saving={saving}
-      nextLabel={isLast ? 'Finish' : profile ? 'Save and continue' : 'Continue'}
-      secondaryAction={
-        profile && !isLast ? (
+    <div>
+      {onReturnToOverview && (
+        <div className="mb-4">
           <Button
+            type="button"
             variant="ghost"
-            disabled={saving}
-            onClick={async () => {
-              if (await save()) {
-                router.push('/applicant');
-                router.refresh();
-              }
-            }}
+            size="sm"
+            leftIcon={<ArrowLeft />}
+            onClick={onReturnToOverview}
           >
-            Save and finish later
+            Back to profile overview
           </Button>
-        ) : undefined
-      }
-    >
-      {step.id === 'personal' && <PersonalStep key={profile?.id ?? 'new'} {...stepProps} />}
-      {step.id === 'location' && <LocationStep {...stepProps} />}
-      {step.id === 'education' && <EducationStep {...stepProps} />}
-      {step.id === 'experience' && <ExperienceStep {...stepProps} />}
-      {step.id === 'skills' && <SkillsStep {...stepProps} />}
-      {step.id === 'preferences' && <PreferencesStep {...stepProps} maxRadiusM={maxRadiusM} />}
-      {step.id === 'documents' && profile && (
-        <DocumentsManager profile={profile} types={documentTypes} onProfile={setProfile} />
+        </div>
       )}
-    </WizardLayout>
+      <WizardLayout
+        title={profile ? 'Edit profile' : 'Create your profile'}
+        description={
+          profile
+            ? `${profile.completeness.percent}% complete. Changes are saved when you press Continue.`
+            : 'Takes about 10 minutes. You can save and finish later.'
+        }
+        steps={WIZARD_STEPS.map((s) => ({
+          id: s.id,
+          label: s.label,
+          description: 'description' in s ? s.description : undefined,
+        }))}
+        current={current}
+        onStepClick={profile ? go : undefined}
+        onBack={() => go(current - 1)}
+        onNext={next}
+        saving={saving}
+        nextLabel={isLast ? 'Finish' : profile ? 'Save and continue' : 'Continue'}
+        secondaryAction={
+          onReturnToOverview ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={async () => {
+                if (await save()) {
+                  onReturnToOverview();
+                }
+              }}
+            >
+              Save and view profile
+            </Button>
+          ) : profile && !isLast ? (
+            <Button
+              variant="ghost"
+              disabled={saving}
+              onClick={async () => {
+                if (await save()) {
+                  router.push('/applicant');
+                  router.refresh();
+                }
+              }}
+            >
+              Save and finish later
+            </Button>
+          ) : undefined
+        }
+      >
+        {step.id === 'personal' && <PersonalStep key={profile?.id ?? 'new'} {...stepProps} />}
+        {step.id === 'location' && <LocationStep {...stepProps} />}
+        {step.id === 'education' && <EducationStep {...stepProps} />}
+        {step.id === 'experience' && <ExperienceStep {...stepProps} />}
+        {step.id === 'skills' && <SkillsStep {...stepProps} />}
+        {step.id === 'preferences' && <PreferencesStep {...stepProps} maxRadiusM={maxRadiusM} />}
+        {step.id === 'documents' && profile && (
+          <DocumentsManager
+            profile={profile}
+            types={documentTypes}
+            onProfile={(p) => {
+              setProfile(p);
+              onProfileUpdate?.(p);
+            }}
+          />
+        )}
+      </WizardLayout>
+    </div>
   );
 }

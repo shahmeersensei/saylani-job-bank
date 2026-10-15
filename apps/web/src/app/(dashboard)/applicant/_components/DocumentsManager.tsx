@@ -1,6 +1,7 @@
 'use client';
 
 import { Lock } from 'lucide-react';
+import { missingApplicantDocumentRequirements } from '@jobbank/shared';
 import { Badge } from '@/components/atoms';
 import { FileUploader, toast, type UploadFn } from '@/components/molecules';
 import { DocumentList } from '@/components/organisms';
@@ -35,6 +36,28 @@ export function DocumentsManager({
   types: ApplicantDocumentType[];
   onProfile: (profile: ApplicantProfile) => void;
 }) {
+  const applicantCategories = new Set(profile.preferences?.categoryCodes ?? []);
+  const requirements = types.map((type) => ({ code: type.code, ...type.meta }));
+  const presentTypes = new Set(profile.documents.map((document) => document.typeCode));
+  const missingCount = missingApplicantDocumentRequirements(
+    requirements,
+    applicantCategories,
+    presentTypes,
+  );
+  const hasAlternativeUpload = (category: string) =>
+    types.some(
+      (type) =>
+        type.meta.requiredAlternativeForCategories.includes(category) &&
+        presentTypes.has(type.code),
+    );
+  const directlyRequiredFor = (type: ApplicantDocumentType) =>
+    type.meta.required ||
+    type.meta.requiredForCategories.some((category) => applicantCategories.has(category));
+  const alternativelyRequiredFor = (type: ApplicantDocumentType) =>
+    type.meta.requiredAlternativeForCategories.filter((category) =>
+      applicantCategories.has(category),
+    );
+
   const uploadFor =
     (type: ApplicantDocumentType): UploadFn =>
     async (file, { onProgress, signal }) => {
@@ -79,7 +102,24 @@ export function DocumentsManager({
     }
   };
 
-  const ordered = [...types].sort((a, b) => Number(b.meta.required) - Number(a.meta.required));
+  // Sort: globally required first, then category-required, then optional
+  const ordered = [...types].sort((a, b) => {
+    const aScore = directlyRequiredFor(a)
+      ? a.meta.required
+        ? 3
+        : 2
+      : alternativelyRequiredFor(a).length
+        ? 1
+        : 0;
+    const bScore = directlyRequiredFor(b)
+      ? b.meta.required
+        ? 3
+        : 2
+      : alternativelyRequiredFor(b).length
+        ? 1
+        : 0;
+    return bScore - aScore;
+  });
 
   return (
     <div className="grid gap-4">
@@ -87,7 +127,36 @@ export function DocumentsManager({
         const current = profile.documents.filter((d) => d.typeCode === type.code);
         const locked = profile.identityLocked && IDENTITY_TYPES.has(type.code);
         const formats = type.meta.mimeTypes.map((m) => FORMAT_LABELS[m] ?? m).join(', ');
-        const missing = type.meta.required && current.length === 0;
+        const directRequirement = directlyRequiredFor(type);
+        const alternativeCategories = alternativelyRequiredFor(type);
+        const alternativeMissing = alternativeCategories.some(
+          (category) => !hasAlternativeUpload(category),
+        );
+        const missing =
+          (directRequirement && current.length === 0) ||
+          (!directRequirement && alternativeMissing && current.length === 0);
+
+        // Build a readable label for why it's required
+        const requiredReason =
+          !type.meta.required && type.meta.requiredForCategories.length > 0
+            ? `Required for your selected job category`
+            : alternativeCategories.length > 0
+              ? `For your selected job category, upload one: ${[
+                  type.label,
+                  ...types
+                    .filter(
+                      (option) =>
+                        option.code !== type.code &&
+                        alternativeCategories.some((category) =>
+                          option.meta.requiredAlternativeForCategories.includes(category),
+                        ),
+                    )
+                    .map((option) => option.label),
+                ]
+                  .filter((label, index, labels) => labels.indexOf(label) === index)
+                  .join(' or ')}.`
+              : null;
+
         return (
           <section
             key={type.code}
@@ -98,9 +167,17 @@ export function DocumentsManager({
               <h3 id={`doc-${type.code}`} className="text-fg text-sm font-semibold">
                 {type.label}
               </h3>
-              {type.meta.required ? (
+              {directRequirement ? (
                 <Badge tone={missing ? 'warning' : 'success'} size="sm">
                   {missing ? 'Required' : 'Done'}
+                </Badge>
+              ) : alternativeCategories.length > 0 ? (
+                <Badge
+                  tone={missing ? 'warning' : current.length > 0 ? 'success' : 'neutral'}
+                  size="sm"
+                  variant={missing || current.length > 0 ? undefined : 'outline'}
+                >
+                  {missing ? 'Upload one option' : current.length > 0 ? 'Uploaded' : 'Alternative'}
                 </Badge>
               ) : (
                 <Badge tone="neutral" size="sm" variant="outline">
@@ -108,6 +185,10 @@ export function DocumentsManager({
                 </Badge>
               )}
             </div>
+
+            {/* Explain category-conditional requirement */}
+            {requiredReason && <p className="text-fg-muted text-xs">{requiredReason}</p>}
+
             <DocumentList
               label={`${type.label} uploads`}
               items={current.map((d) => ({
@@ -119,7 +200,17 @@ export function DocumentsManager({
                 uploadedAt: d.uploadedAt,
                 status: DOCUMENT_STATUS_PILL[d.status],
                 note: d.reviewNote,
-                removable: !type.meta.required && !locked,
+                removable:
+                  !locked &&
+                  missingApplicantDocumentRequirements(
+                    requirements,
+                    applicantCategories,
+                    new Set(
+                      profile.documents
+                        .filter((document) => document.id !== d.id)
+                        .map((document) => document.typeCode),
+                    ),
+                  ) <= missingCount,
               }))}
               onView={(item) => openDocument(`/api/v1/applicants/me/documents/${item.id}/url`)}
               onRemove={(item) => remove(item.id, type.label)}

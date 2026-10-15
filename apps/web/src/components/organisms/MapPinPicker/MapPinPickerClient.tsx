@@ -2,12 +2,10 @@
 
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Crosshair, LocateFixed } from 'lucide-react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { Crosshair, LocateFixed, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Circle, MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import { Button } from '@/components/atoms/Button';
-import { Input } from '@/components/atoms/Input';
-import { Label } from '@/components/atoms/Label';
 import { colorVar } from '@/design-system/tokens';
 import { env } from '@/lib/env';
 import { cn } from '@/lib/utils/cn';
@@ -39,40 +37,27 @@ function FollowValue({ value }: { value: LatLng | null }) {
   return null;
 }
 
-async function _reverseGeocode(lat: number, lng: number): Promise<string> {
+async function fetchReverseGeocode(
+  lat: number,
+  lng: number,
+): Promise<{ addressLine: string; city?: string }> {
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': 'SaylaniJobBank/1.0' } },
-    );
-    if (!res.ok) return '';
-    const json = (await res.json()) as {
-      address?: {
-        house_number?: string;
-        road?: string;
-        neighbourhood?: string;
-        suburb?: string;
-        town?: string;
-        city?: string;
-        village?: string;
-        state?: string;
-        country?: string;
-      };
-      display_name?: string;
+    const res = await fetch(`/api/v1/geocode/reverse?lat=${lat}&lng=${lng}`);
+    if (!res.ok) return { addressLine: '' };
+    const json = (await res.json()) as { data?: { addressLine?: string; cityLabel?: string } };
+    return {
+      addressLine: json.data?.addressLine ?? '',
+      city: json.data?.cityLabel ?? undefined,
     };
-    const a = json.address ?? {};
-    // Build a readable address line from the most useful parts
-    const parts = [a.house_number, a.road, a.neighbourhood ?? a.suburb].filter(Boolean);
-    return parts.length > 0 ? parts.join(', ') : (json.display_name ?? '');
   } catch {
-    return '';
+    return { addressLine: '' };
   }
 }
 
 export default function MapPinPickerClient({
   value,
   onChange,
-  onLocate: _onLocate,
+  onLocate,
   defaultCenter = KARACHI,
   zoom = 13,
   rings = [],
@@ -81,9 +66,11 @@ export default function MapPinPickerClient({
   label = 'Location',
   className,
 }: MapPinPickerProps) {
-  const id = useId();
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const center = value ?? defaultCenter;
 
   const pick = (next: LatLng) =>
@@ -107,9 +94,21 @@ export default function MapPinPickerClient({
     setLocating(true);
     setGeoError(null);
 
-    const onSuccess = (position: GeolocationPosition) => {
+    const onSuccess = async (position: GeolocationPosition) => {
+      const coords = {
+        lat: roundCoord(position.coords.latitude),
+        lng: roundCoord(position.coords.longitude),
+      };
+      pick(coords);
+      if (onLocate) {
+        try {
+          const { addressLine, city } = await fetchReverseGeocode(coords.lat, coords.lng);
+          onLocate(coords, addressLine, city);
+        } catch {
+          onLocate(coords, '');
+        }
+      }
       setLocating(false);
-      pick({ lat: position.coords.latitude, lng: position.coords.longitude });
     };
     const onFail = (error: GeolocationPositionError) => {
       setLocating(false);
@@ -128,11 +127,44 @@ export default function MapPinPickerClient({
     });
   };
 
-  const setCoordinate = (axis: keyof LatLng, raw: string) => {
-    const parsed = Number(raw);
-    const limit = axis === 'lat' ? 90 : 180;
-    if (raw === '' || !Number.isFinite(parsed) || Math.abs(parsed) > limit) return;
-    pick({ ...(value ?? defaultCenter), [axis]: parsed });
+  const handleSearch = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const res = await fetch(`/api/v1/geocode/search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error();
+      const json = (await res.json()) as {
+        data?: Array<{
+          lat: number;
+          lng: number;
+          addressLine: string;
+          cityCode: string | null;
+          cityLabel: string | null;
+          display: string;
+        }>;
+      };
+      const results = json.data ?? [];
+      if (results.length > 0 && results[0]) {
+        const item = results[0];
+        const nextCoords = {
+          lat: item.lat,
+          lng: item.lng,
+        };
+        pick(nextCoords);
+        if (onLocate) {
+          onLocate(nextCoords, item.addressLine || query, item.cityLabel ?? undefined);
+        }
+      } else {
+        setSearchError('Location not found in Pakistan. Try a nearby area, town or landmark.');
+      }
+    } catch {
+      setSearchError('Could not search location. Tap the map to place your pin.');
+    } finally {
+      setSearching(false);
+    }
   };
 
   return (
@@ -210,49 +242,62 @@ export default function MapPinPickerClient({
       )}
 
       {!readOnly && (
-        <div className="grid gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-end">
-          <Button
-            variant="secondary"
-            onClick={locate}
-            loading={locating}
-            leftIcon={<LocateFixed />}
-          >
-            Use my location
-          </Button>
-          <div className="grid gap-1.5">
-            <Label htmlFor={`${id}-lat`}>Latitude</Label>
-            <Input
-              id={`${id}-lat`}
-              type="number"
-              inputMode="decimal"
-              step="0.000001"
-              min={-90}
-              max={90}
-              value={value?.lat ?? ''}
-              onChange={(event) => setCoordinate('lat', event.target.value)}
-              className="numeric"
-            />
+        <div className="grid gap-2.5">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={locate}
+              loading={locating}
+              leftIcon={<LocateFixed />}
+              className="shrink-0"
+            >
+              Use my location
+            </Button>
+
+            <form onSubmit={handleSearch} className="flex flex-1 items-center gap-1.5">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search area or landmark to place pin..."
+                className="border-border-strong bg-surface text-fg placeholder:text-fg-subtle focus:border-focus h-10 w-full rounded-lg border px-3 text-sm shadow-xs outline-none"
+              />
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={searching || !searchQuery.trim()}
+                loading={searching}
+                leftIcon={<Search />}
+                aria-label="Search location on map"
+              >
+                Search
+              </Button>
+            </form>
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor={`${id}-lng`}>Longitude</Label>
-            <Input
-              id={`${id}-lng`}
-              type="number"
-              inputMode="decimal"
-              step="0.000001"
-              min={-180}
-              max={180}
-              value={value?.lng ?? ''}
-              onChange={(event) => setCoordinate('lng', event.target.value)}
-              className="numeric"
-            />
-          </div>
+
+          {value ? (
+            <p className="text-fg-muted text-xs">
+              Pin placed — tap anywhere on the map or drag the pin to fine-tune.
+            </p>
+          ) : (
+            <p className="text-fg-muted text-xs">
+              Tap the map, click &quot;Use my location&quot;, or search an area to drop your home
+              pin.
+            </p>
+          )}
+
+          {searchError && (
+            <p role="alert" className="text-warning-soft-fg text-xs">
+              {searchError}
+            </p>
+          )}
+          {geoError && (
+            <p role="alert" className="text-warning-soft-fg text-xs">
+              {geoError}
+            </p>
+          )}
         </div>
-      )}
-      {geoError && (
-        <p role="alert" className="text-warning-soft-fg text-sm">
-          {geoError}
-        </p>
       )}
     </div>
   );

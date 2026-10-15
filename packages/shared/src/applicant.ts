@@ -104,6 +104,40 @@ export const APPLICANT_DOCUMENT_STATUSES = [
 ] as const;
 export type ApplicantDocumentStatus = (typeof APPLICANT_DOCUMENT_STATUSES)[number];
 
+export interface ApplicantDocumentRequirement {
+  code: string;
+  required: boolean;
+  requiredForCategories: readonly string[];
+  requiredAlternativeForCategories: readonly string[];
+}
+
+/** Number of distinct required document requirements that are still unmet. */
+export function missingApplicantDocumentRequirements(
+  types: readonly ApplicantDocumentRequirement[],
+  categories: Iterable<string>,
+  presentTypes: Iterable<string>,
+): number {
+  const selectedCategories = new Set(categories);
+  const uploadedTypes = new Set(presentTypes);
+  let missing = types.filter(
+    (type) =>
+      (type.required ||
+        type.requiredForCategories.some((category) => selectedCategories.has(category))) &&
+      !uploadedTypes.has(type.code),
+  ).length;
+
+  for (const category of selectedCategories) {
+    const alternatives = types.filter((type) =>
+      type.requiredAlternativeForCategories.includes(category),
+    );
+    if (alternatives.length > 0 && !alternatives.some((type) => uploadedTypes.has(type.code))) {
+      missing += 1;
+    }
+  }
+
+  return missing;
+}
+
 export const MIN_APPLICANT_AGE = 18;
 export const MAX_APPLICANT_AGE = 80;
 
@@ -204,10 +238,11 @@ export const pakistanPointSchema = z
 export const applicantLocationSchema = z.object({
   location: pakistanPointSchema,
   addressLine: z
-    .string('Enter your address')
+    .string()
     .trim()
-    .min(5, 'Enter your address (house, street, block)')
-    .max(300),
+    .max(300)
+    .nullish()
+    .transform((v) => (v && v.length > 0 ? v : null)),
   cityCode: masterDataCodeSchema,
   areaCode: masterDataCodeSchema.nullish().transform((v) => v ?? null),
 });

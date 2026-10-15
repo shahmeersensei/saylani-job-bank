@@ -108,7 +108,19 @@ export const MASTER_DATA_META = {
   AREA: z.strictObject({}),
   DOCUMENT_TYPE: z.strictObject({
     appliesTo: z.enum(['APPLICANT', 'COMPANY']),
+    /** Globally required — must be uploaded by every applicant, regardless of category. */
     required: z.boolean(),
+    /**
+     * Category-conditional requirement. If the applicant has selected any of these
+     * JOB_CATEGORY codes in their preferences, this document becomes required for them.
+     * e.g. ['DRIVING'] makes a driving licence mandatory for applicants seeking driving jobs.
+     */
+    requiredForCategories: z.array(masterDataCodeSchema).default([]),
+    /**
+     * Alternative requirement. For each selected category, at least one document type
+     * listing that category must be uploaded (e.g. a healthcare licence OR degree).
+     */
+    requiredAlternativeForCategories: z.array(masterDataCodeSchema).default([]),
     mimeTypes: z.array(z.enum(DOCUMENT_MIME_TYPES)).min(1),
     maxSizeMb: z.number().int().min(1).max(20),
     /** Several files of this type may be kept (certificates); otherwise a new upload replaces. */

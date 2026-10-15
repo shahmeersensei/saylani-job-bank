@@ -16,9 +16,9 @@ export interface MapPinPickerProps {
   onChange?: (value: LatLng) => void;
   /**
    * Fired only when the user clicks "Use my location" and geolocation succeeds.
-   * Includes a reverse-geocoded address string (best-effort; may be empty).
+   * Includes a reverse-geocoded address string and detected city (best-effort; may be empty).
    */
-  onLocate?: (value: LatLng, addressLine: string) => void;
+  onLocate?: (value: LatLng, addressLine: string, cityName?: string) => void;
   /** Where the map opens when there is no value yet (defaults to Karachi). */
   defaultCenter?: LatLng;
   zoom?: number;

@@ -71,9 +71,21 @@ export function LocationStep({ profile, lists, bindSave }: StepProps) {
         <MapPinPicker
           value={pin}
           onChange={setPin}
-          onLocate={(coords, addressLine) => {
+          onLocate={(coords, addressLine, cityName) => {
             setPin(coords);
-            if (addressLine) set({ addressLine });
+            const changes: Partial<typeof form> = {};
+            if (addressLine && !form.addressLine) {
+              changes.addressLine = addressLine;
+            }
+            if (cityName && !form.cityCode) {
+              const matchedCity = lists.cities.find(
+                (c) =>
+                  c.label.toLowerCase().includes(cityName.toLowerCase()) ||
+                  cityName.toLowerCase().includes(c.label.toLowerCase()),
+              );
+              if (matchedCity) changes.cityCode = matchedCity.value;
+            }
+            if (Object.keys(changes).length > 0) set(changes);
           }}
           label="Your home location"
           height="18rem"
@@ -88,13 +100,13 @@ export function LocationStep({ profile, lists, bindSave }: StepProps) {
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           label="Address"
-          required
           error={errors.addressLine}
-          hint="House, street and block. Only Job Bank staff can see it."
+          hint="Optional. House, street, area or nearest landmark. Only Job Bank staff can see it."
           className="sm:col-span-2"
         >
           <Input
             autoComplete="street-address"
+            placeholder="e.g. House 12, Street 4, Block 13-D (optional)"
             value={form.addressLine}
             onChange={(e) => set({ addressLine: e.target.value })}
           />

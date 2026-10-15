@@ -259,7 +259,7 @@ export async function setMyLocation(
     }
 
     const values = {
-      addressLine: input.addressLine,
+      addressLine: input.addressLine ?? '',
       cityCode: input.cityCode,
       areaCode: input.areaCode ?? null,
       location: input.location,

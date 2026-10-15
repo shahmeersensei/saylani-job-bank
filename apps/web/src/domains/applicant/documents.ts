@@ -1,5 +1,5 @@
 import 'server-only';
-import type { PresignDocumentInput } from '@jobbank/shared';
+import { missingApplicantDocumentRequirements, type PresignDocumentInput } from '@jobbank/shared';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { recordAudit, runCommand } from '@/domains/shared/audit';
 import {
@@ -25,11 +25,13 @@ import {
   a,
   applicantDocumentTypes,
   buildProfile,
+  currentDocuments,
   docs,
   IDENTITY_DOCUMENT_TYPES,
   identityLocked,
   loadApplicant,
   PRESENT_DOCUMENT_STATUSES,
+  pref,
   refreshProfileState,
   requireOwnApplicant,
   type ApplicantDocumentType,
@@ -231,9 +233,29 @@ export async function removeMyDocument(
   const doc = await ownDocument(db, row, documentId);
   if (doc.replacedAt) return buildProfile(db, row);
   assertIdentityDocumentEditable(row, doc.typeCode);
-  const type = (await applicantDocumentTypes()).find((t) => t.code === doc.typeCode);
-  if (type?.meta.required) {
-    throw new ConflictError('Required documents can be replaced with a new upload, not removed');
+  const [types, [preferences], present] = await Promise.all([
+    applicantDocumentTypes(),
+    db.select({ categories: pref.categoryCodes }).from(pref).where(eq(pref.applicantId, row.id)),
+    currentDocuments(db, row.id),
+  ]);
+  const activeRequirements = types
+    .filter((type) => type.isActive)
+    .map((type) => ({ code: type.code, ...type.meta }));
+  const categories = preferences?.categories ?? [];
+  const missingBefore = missingApplicantDocumentRequirements(
+    activeRequirements,
+    categories,
+    present.map((document) => document.typeCode),
+  );
+  const missingAfter = missingApplicantDocumentRequirements(
+    activeRequirements,
+    categories,
+    present.filter((document) => document.id !== doc.id).map((document) => document.typeCode),
+  );
+  if (missingAfter > missingBefore) {
+    throw new ConflictError(
+      'This document is required for your selected job categories and cannot be removed',
+    );
   }
   await runCommand(ctx, async (cmd) => {
     await cmd.tx.update(docs).set({ replacedAt: new Date() }).where(eq(docs.id, doc.id));

@@ -38,9 +38,16 @@ BEGIN
 END
 $$;
 --> statement-breakpoint
-CREATE OR REPLACE FUNCTION jobbank_attach_updated_at(target regclass) RETURNS void
+CREATE OR REPLACE FUNCTION jobbank_attach_updated_at(target text) RETURNS void
 LANGUAGE plpgsql AS $$
 BEGIN
+  -- Some environments resume from a partially applied migration set. A missing table
+  -- is not a fatal condition for the migration bootstrap: the table will be created by
+  -- its later migration and the trigger can be installed then.
+  IF to_regclass(target) IS NULL THEN
+    RETURN;
+  END IF;
+
   EXECUTE format('DROP TRIGGER IF EXISTS jobbank_updated_at ON %s', target);
   EXECUTE format(
     'CREATE TRIGGER jobbank_updated_at BEFORE UPDATE ON %s '
@@ -61,9 +68,14 @@ $$;
 --> statement-breakpoint
 -- Two independent guards: a trigger (blocks everyone, including the owner) and
 -- revoked privileges (blocks the app role even if the trigger is ever dropped).
-CREATE OR REPLACE FUNCTION jobbank_make_append_only(target regclass) RETURNS void
+CREATE OR REPLACE FUNCTION jobbank_make_append_only(target text) RETURNS void
 LANGUAGE plpgsql AS $$
 BEGIN
+  -- Same partial-migration guard: skip append-only protection for tables not yet created.
+  IF to_regclass(target) IS NULL THEN
+    RETURN;
+  END IF;
+
   EXECUTE format('DROP TRIGGER IF EXISTS jobbank_append_only ON %s', target);
   EXECUTE format(
     'CREATE TRIGGER jobbank_append_only BEFORE UPDATE OR DELETE ON %s '
@@ -76,6 +88,6 @@ BEGIN
 END
 $$;
 --> statement-breakpoint
-REVOKE EXECUTE ON FUNCTION jobbank_attach_updated_at(regclass) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION jobbank_attach_updated_at(text) FROM PUBLIC;
 --> statement-breakpoint
-REVOKE EXECUTE ON FUNCTION jobbank_make_append_only(regclass) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION jobbank_make_append_only(text) FROM PUBLIC;

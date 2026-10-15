@@ -167,7 +167,7 @@ export default async function ApplicantHomePage() {
             </NextLink>
           </Button>
           <Button asChild variant="secondary" leftIcon={<UserRound />} size="sm">
-            <NextLink href="/applicant/profile">Edit profile</NextLink>
+            <NextLink href="/applicant/profile">My Profile</NextLink>
           </Button>
           <Button asChild variant="secondary" leftIcon={<FileText />} size="sm">
             <NextLink href="/applicant/documents">Documents</NextLink>

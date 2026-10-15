@@ -77,6 +77,17 @@ describe('geographyPoint column', () => {
   });
 });
 
+describe('jobbank helpers', () => {
+  it('ignores missing relations when attaching triggers or append-only guards', async () => {
+    await expect(
+      owner.client`SELECT jobbank_attach_updated_at('missing_table_should_not_exist')`,
+    ).resolves.toBeDefined();
+    await expect(
+      owner.client`SELECT jobbank_make_append_only('missing_table_should_not_exist')`,
+    ).resolves.toBeDefined();
+  });
+});
+
 describe('jobbank_make_append_only', () => {
   it('lets the app role insert and read', async () => {
     await app.client`INSERT INTO m0_append_probe (note) VALUES ('first')`;

@@ -29,6 +29,7 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: z.string().min(32).optional(),
     // SMS gateway for OTP codes. 'console' prints codes to the server log (development only).
     SMS_PROVIDER: z.enum(['console']).default('console'),
+    OPENCAGE_API_KEY: z.string().optional(),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.url(),
