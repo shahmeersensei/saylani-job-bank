@@ -10,7 +10,6 @@ import {
   assertPermission,
   cityScope,
   hasPermission,
-  isSuperAdmin,
   type Actor,
 } from '@/domains/shared/scope';
 import { db } from '@/lib/db';

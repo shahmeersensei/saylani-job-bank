@@ -1,21 +1,14 @@
 import 'server-only';
 import { schema } from '@jobbank/db';
-import type { CompanyStatus, DocumentReviewInput, VerificationState } from '@jobbank/shared';
-import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import type { DocumentReviewInput, VerificationState } from '@jobbank/shared';
+import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
-import { masterDataLabels } from '@/domains/settings';
-import { getWorkingCalendar, pktDate } from '@/domains/settings';
+import { masterDataLabels, pktDate } from '@/domains/settings';
 import { runCommand } from '@/domains/shared/audit';
-import {
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  ValidationError,
-} from '@/domains/shared/errors';
+import { ConflictError, ForbiddenError, NotFoundError } from '@/domains/shared/errors';
 import { paginationMeta, type ListQuery } from '@/domains/shared/pagination';
 import { assertCityAccess, assertPermission, cityScope, type Actor } from '@/domains/shared/scope';
 import { db } from '@/lib/db';
-import { formatDate } from '@/lib/format/date';
 import {
   companyInfoRequestedEmail,
   companyRejectedEmail,
@@ -27,17 +20,13 @@ import {
   buildCompanyView,
   c,
   contacts,
-  currentDocuments,
   docs,
   documentsNotAccepted,
   loadCompany,
   openVerification,
   recordTransition,
   submissionMissing,
-  toDocumentView,
-  toVerificationSummary,
   ver,
-  verificationDueOn,
   type CompanyView,
   type SignedIn,
   type VerificationRow,

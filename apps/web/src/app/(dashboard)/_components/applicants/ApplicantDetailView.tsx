@@ -806,7 +806,7 @@ const INTERVIEW_STATUSES = new Set([
 ]);
 
 function ApplicationsCard({
-  applicant,
+  applicant: _applicant,
   applications,
   canScheduleInterview,
   canReferToEmployer,

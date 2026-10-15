@@ -15,6 +15,11 @@ import { FormField } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import type { CompanyView } from '@/domains/company';
 
+function friendlyError(err: unknown): string {
+  if (err instanceof ApiClientError) return err.message;
+  return 'Something went wrong. Please try again.';
+}
+
 type WizardStep = 'details' | 'contacts' | 'location' | 'documents' | 'submit';
 
 const STEPS: { id: WizardStep; label: string; title: string; description: string }[] = [

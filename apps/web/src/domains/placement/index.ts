@@ -4,12 +4,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { runCommand } from '@/domains/shared/audit';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/domains/shared/errors';
-import {
-  assertCityAccess,
-  assertPermission,
-  hasPermission,
-  type Actor,
-} from '@/domains/shared/scope';
+import { assertCityAccess, assertPermission, type Actor } from '@/domains/shared/scope';
 import { db } from '@/lib/db';
 import { createNotification, notifyCompanyEmployers } from '@/domains/notifications';
 import type { RequestContext } from '@/domains/shared/audit';
@@ -105,7 +100,7 @@ async function buildView(row: typeof ap.$inferSelect): Promise<ApplicationView> 
     .where(eq(schema.jobs.id, row.jobId));
 
   let companyName = '';
-  let companyId = jobRow?.companyId ?? '';
+  const companyId = jobRow?.companyId ?? '';
   if (jobRow) {
     const [c] = await db
       .select({ name: schema.companies.tradeName, legal: schema.companies.legalName })

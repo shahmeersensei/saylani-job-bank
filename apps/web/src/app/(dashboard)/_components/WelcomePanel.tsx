@@ -30,23 +30,6 @@ import { listApplicants, getMyProfile } from '@/domains/applicant';
 import { listCompanies, listQueue } from '@/domains/company';
 import { listStaff } from '@/domains/user';
 import { listMyJobs } from '@/domains/job';
-import { formatPkMobileDisplay } from '@/lib/format/phone';
-
-/* ─── Monthly chart labels ──────────────────────────────────────── */
-const MONTHS_SHORT = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
 
 /* ─── Chart shape (illustrative — real time-series coming later) ── */
 const ROLE_CHART: Record<Role, { values: number[]; peak: number; label: string }> = {

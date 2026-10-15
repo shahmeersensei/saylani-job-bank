@@ -525,7 +525,7 @@ export async function refuseJobOffer(
     .where(eq(schema.jobs.id, row.jobId))
     .limit(1);
 
-  const [applicantRow] = await db
+  const [_applicantRow] = await db
     .select({ userId: schema.applicants.userId })
     .from(schema.applicants)
     .where(eq(schema.applicants.id, row.applicantId))
