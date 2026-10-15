@@ -1,13 +1,14 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as apiClientModule from '@/lib/api/client';
 import type { CompanyView } from '@/domains/company';
 import { VerifierReviewPanel } from './VerifierReviewPanel';
 
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('@/lib/api/client', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/api/client')>();
+  const actual = await importOriginal<typeof apiClientModule>();
   return { ...actual, apiFetch: apiFetchMock };
 });
 

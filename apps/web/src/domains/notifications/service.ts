@@ -1,6 +1,6 @@
 import 'server-only';
 import { schema } from '@jobbank/db';
-import { and, count, desc, eq, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, gt, isNull } from 'drizzle-orm';
 import { NotFoundError } from '@/domains/shared/errors';
 import type { Actor } from '@/domains/shared/scope';
 import { db, type DbExecutor } from '@/lib/db';
@@ -9,7 +9,15 @@ const n = schema.notifications;
 const cm = schema.companyMembers;
 
 export type NotificationType =
-  'MATCH_SHORTLISTED' | 'MATCH_HIRED' | 'MATCH_REJECTED' | 'OFFER_ACCEPTED' | 'OFFER_DECLINED';
+  | 'MATCH_SHORTLISTED'
+  | 'MATCH_HIRED'
+  | 'MATCH_REJECTED'
+  | 'OFFER_ACCEPTED'
+  | 'OFFER_DECLINED'
+  | 'INTERVIEW_POSTPONED'
+  | 'INTERVIEW_CANCELLED'
+  | 'INTERVIEW_RESCHEDULED'
+  | 'APPLICANT_REFERRED';
 
 export interface NotificationView {
   id: string;
@@ -99,6 +107,28 @@ export async function listMyNotifications(
     total: totalRow[0]?.total ?? 0,
     unread: unreadRow[0]?.total ?? 0,
   };
+}
+
+/** Poll for notifications newer than a given ISO timestamp (used by SSE stream). */
+export async function getNewNotificationsSince(
+  userId: string,
+  since: Date,
+): Promise<NotificationView[]> {
+  const rows = await db
+    .select()
+    .from(n)
+    .where(and(eq(n.userId, userId), gt(n.createdAt, since)))
+    .orderBy(desc(n.createdAt))
+    .limit(20);
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type,
+    title: r.title,
+    body: r.body,
+    data: r.data as Record<string, unknown>,
+    readAt: r.readAt,
+    createdAt: r.createdAt,
+  }));
 }
 
 export async function markNotificationRead(actor: Actor, id: string): Promise<void> {

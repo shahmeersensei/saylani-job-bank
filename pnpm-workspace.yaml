@@ -6,9 +6,9 @@ allowBuilds:
   esbuild: true
   '@parcel/watcher': true
   unrs-resolver: true
-  '@playwright/browser-chromium': set this to true or false
-  protobufjs: set this to true or false
-  unix-dgram: set this to true or false
+  '@playwright/browser-chromium': false
+  protobufjs: false
+  unix-dgram: false
 # Packages pnpm's release-age policy flagged as too new; pinned on purpose.
 minimumReleaseAgeExclude:
   - '@next/env@15.5.27'

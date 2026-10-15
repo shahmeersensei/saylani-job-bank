@@ -1,6 +1,6 @@
 # Saylani Job Bank — Project Handoff
 
-> Last updated: **3 Oct 2026** · Status: **M0–M7 complete + UI polish** · Next: **M8 — Jobs & Postings** (awaiting owner "go")
+> Last updated: **14 Oct 2026** · Status: **M0–M8 complete (employer workflow)** · Next: **M9 — Jobs & Postings** (awaiting owner "go")
 
 This document hands the project over between Claude sessions. It covers:
 

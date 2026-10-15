@@ -5,6 +5,25 @@ import { JOB_TYPES, SKILL_LEVELS } from './applicant';
 
 export const JOB_STATUSES = ['DRAFT', 'OPEN', 'PAUSED', 'FILLED', 'CLOSED', 'EXPIRED'] as const;
 
+// ─── Benefits enums ─────────────────────────────────────────────────────
+
+export const MEDICAL_COVERAGE_TYPES = ['NONE', 'BASIC', 'COMPREHENSIVE'] as const;
+export type MedicalCoverageType = (typeof MEDICAL_COVERAGE_TYPES)[number];
+export const MEDICAL_COVERAGE_LABELS: Record<MedicalCoverageType, string> = {
+  NONE: 'None',
+  BASIC: 'Basic',
+  COMPREHENSIVE: 'Comprehensive',
+};
+
+export const BONUS_TIERS = ['NONE', 'TIER_1', 'TIER_2', 'TIER_3'] as const;
+export type BonusTier = (typeof BONUS_TIERS)[number];
+export const BONUS_TIER_LABELS: Record<BonusTier, string> = {
+  NONE: 'None',
+  TIER_1: '1× monthly salary / year',
+  TIER_2: '2× monthly salary / year',
+  TIER_3: '3× monthly salary / year',
+};
+
 export type JobStatus = (typeof JOB_STATUSES)[number];
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
@@ -43,8 +62,6 @@ export const GENDER_PREFERENCE_LABELS: Record<GenderPreference, string> = {
 
 // ─── Schemas ────────────────────────────────────────────────────────────
 
-const optText = (max = 2000) => z.string().trim().max(max).optional();
-
 export const createJobSchema = z.object({
   title: z.string().trim().min(3).max(200),
   categoryCode: z.string().trim().min(1).max(50),
@@ -56,6 +73,17 @@ export const createJobSchema = z.object({
   salaryMin: z.number().int().min(0).optional(),
   salaryMax: z.number().int().min(0).optional(),
   closesAt: z.string().datetime().optional(),
+  // Benefits & Perks
+  fuelAllowance: z.boolean().default(false),
+  flexibleHours: z.boolean().default(false),
+  annualLeaveDays: z.number().int().min(0).max(365).optional(),
+  medicalCoverage: z.enum(MEDICAL_COVERAGE_TYPES).default('NONE'),
+  bonusTier: z.enum(BONUS_TIERS).default('NONE'),
+  workFromHome: z.boolean().default(false),
+  providentFund: z.boolean().default(false),
+  transportAllowance: z.boolean().default(false),
+  eobi: z.boolean().default(false),
+  lifeInsurance: z.boolean().default(false),
 });
 
 export type CreateJobInput = z.infer<typeof createJobSchema>;

@@ -44,9 +44,9 @@ describe('permission matrix encodes the PRD rules', () => {
     expect(holders('restriction:lift')).toEqual(['SUPER_ADMIN']);
   });
 
-  it('only Job Bank staff refer candidates and run Job Bank interviews', () => {
-    expect(holders('match_case:refer')).toEqual(['STAFF']);
-    expect(holders('interview:schedule_jobbank')).toEqual(['STAFF']);
+  it('Job Bank staff and branch admins refer candidates and run Job Bank interviews', () => {
+    expect(holders('match_case:refer')).toEqual(['BRANCH_ADMIN', 'STAFF']);
+    expect(holders('interview:schedule_jobbank')).toEqual(['BRANCH_ADMIN', 'STAFF']);
   });
 
   it('every assigned permission exists in the catalogue', () => {

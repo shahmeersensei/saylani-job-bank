@@ -13,7 +13,16 @@ import {
   type IdentityMethod,
   type IdentityOutcome,
 } from '@jobbank/shared';
-import { ArrowRightLeft, BadgeCheck, Pencil, Phone, UserCheck, UserX } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  BadgeCheck,
+  Briefcase,
+  Calendar,
+  Pencil,
+  Phone,
+  UserCheck,
+  UserX,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Badge, Button, Input, RadioGroup, Select, Textarea } from '@/components/atoms';
@@ -29,6 +38,7 @@ import {
 } from '@/components/molecules';
 import { DocumentList, MapPinPicker, Timeline } from '@/components/organisms';
 import type { ApplicantStaffView } from '@/domains/applicant';
+import type { ApplicationView } from '@/domains/placement';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import { formatCnic } from '@/lib/format/cnic';
 import { formatDate } from '@/lib/format/date';
@@ -430,17 +440,484 @@ function TransferDialog({
   );
 }
 
+// ─── Shortlist dialog ──────────────────────────────────────────────────
+
+function ShortlistDialog({
+  applicant,
+  openJobs,
+}: {
+  applicant: ApplicantStaffView;
+  openJobs: SelectOption[];
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [jobId, setJobId] = useState('');
+  const [note, setNote] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await apiFetch('/api/v1/applications', {
+        method: 'POST',
+        body: { applicantId: applicant.id, jobId, note: note || undefined },
+      });
+      toast.success('Applicant shortlisted for the job');
+      setOpen(false);
+      setJobId('');
+      setNote('');
+      router.refresh();
+    } catch (err) {
+      if (err instanceof ApiClientError && err.issues.length) setErrors(toFieldErrors(err.issues));
+      else toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Shortlist for a job"
+      description={`Select an open job to shortlist ${applicant.personal.fullName} for.`}
+      open={open}
+      onOpenChange={setOpen}
+      trigger={<Button leftIcon={<Briefcase />}>Shortlist for job</Button>}
+    >
+      <form className="grid gap-4" onSubmit={submit} noValidate>
+        <FormField label="Job" required error={errors.jobId}>
+          {openJobs.length === 0 ? (
+            <p className="text-fg-muted text-sm">No open jobs found in this city.</p>
+          ) : (
+            <Select
+              placeholder="Choose a job"
+              value={jobId}
+              onChange={(e) => setJobId(e.target.value)}
+              options={openJobs}
+            />
+          )}
+        </FormField>
+        <FormField label="Note" hint="Optional note for staff reference.">
+          <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+        </FormField>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={saving} disabled={!jobId}>
+            Shortlist
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Schedule interview dialog ─────────────────────────────────────────
+
+function ScheduleInterviewDialog({ applicationId }: { applicationId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [interviewAt, setInterviewAt] = useState('');
+  const [location, setLocation] = useState('');
+  const [interviewNote, setInterviewNote] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await apiFetch(`/api/v1/applications/${applicationId}/interview`, {
+        method: 'POST',
+        body: {
+          interviewAt: new Date(interviewAt).toISOString(),
+          interviewLocation: location || undefined,
+          interviewNote: interviewNote || undefined,
+        },
+      });
+      toast.success('Interview scheduled');
+      setOpen(false);
+      router.refresh();
+    } catch (err) {
+      if (err instanceof ApiClientError && err.issues.length) setErrors(toFieldErrors(err.issues));
+      else toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Schedule interview"
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <Button size="sm" variant="secondary" leftIcon={<Calendar />}>
+          Schedule interview
+        </Button>
+      }
+    >
+      <form className="grid gap-4" onSubmit={submit} noValidate>
+        <FormField label="Date & time" required error={errors.interviewAt}>
+          <Input
+            type="datetime-local"
+            value={interviewAt}
+            onChange={(e) => setInterviewAt(e.target.value)}
+          />
+        </FormField>
+        <FormField label="Location" error={errors.interviewLocation}>
+          <Input
+            placeholder="Branch office, room number, etc."
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+        </FormField>
+        <FormField label="Note for applicant" error={errors.interviewNote}>
+          <Textarea
+            rows={2}
+            value={interviewNote}
+            onChange={(e) => setInterviewNote(e.target.value)}
+          />
+        </FormField>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={saving} disabled={!interviewAt}>
+            Confirm interview
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Update interview status dialog ───────────────────────────────────────
+
+function UpdateInterviewDialog({ applicationId }: { applicationId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState('INTERVIEW_POSTPONED');
+  const [interviewAt, setInterviewAt] = useState('');
+  const [location, setLocation] = useState('');
+  const [note, setNote] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await apiFetch(`/api/v1/applications/${applicationId}/interview`, {
+        method: 'PATCH',
+        body: {
+          status,
+          ...(status === 'INTERVIEW_SCHEDULED' && interviewAt
+            ? { interviewAt: new Date(interviewAt).toISOString() }
+            : {}),
+          ...(location ? { interviewLocation: location } : {}),
+          ...(note ? { note } : {}),
+        },
+      });
+      toast.success('Interview status updated');
+      setOpen(false);
+      router.refresh();
+    } catch (err) {
+      if (err instanceof ApiClientError && err.issues.length) setErrors(toFieldErrors(err.issues));
+      else toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Update interview"
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <Button size="sm" variant="secondary" leftIcon={<Calendar />}>
+          Update interview
+        </Button>
+      }
+    >
+      <form className="grid gap-4" onSubmit={submit} noValidate>
+        <FormField label="New status" required error={errors.status}>
+          <Select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            options={[
+              { value: 'INTERVIEW_SCHEDULED', label: 'Reschedule (new time)' },
+              { value: 'INTERVIEW_POSTPONED', label: 'Postpone' },
+              { value: 'INTERVIEW_CANCELLED', label: 'Cancel interview' },
+            ]}
+          />
+        </FormField>
+        {status === 'INTERVIEW_SCHEDULED' && (
+          <FormField label="New date & time" required error={errors.interviewAt}>
+            <Input
+              type="datetime-local"
+              value={interviewAt}
+              onChange={(e) => setInterviewAt(e.target.value)}
+            />
+          </FormField>
+        )}
+        <FormField label="Location" error={errors.interviewLocation}>
+          <Input
+            placeholder="Leave blank to keep existing location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+        </FormField>
+        <FormField label="Note for applicant" error={errors.note}>
+          <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+        </FormField>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            loading={saving}
+            disabled={status === 'INTERVIEW_SCHEDULED' && !interviewAt}
+          >
+            Save
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Refer to employer dialog ─────────────────────────────────────────────
+
+function ReferToEmployerDialog({
+  applicationId,
+  jobTitle,
+  companyName,
+}: {
+  applicationId: string;
+  jobTitle: string;
+  companyName: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await apiFetch(`/api/v1/applications/${applicationId}/refer`, {
+        method: 'POST',
+        body: { ...(note ? { note } : {}) },
+      });
+      toast.success('Applicant referred to employer');
+      setOpen(false);
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err));
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Refer to employer"
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <Button size="sm" variant="secondary" leftIcon={<ArrowRightLeft />}>
+          Refer to employer
+        </Button>
+      }
+    >
+      <form className="grid gap-4" onSubmit={submit} noValidate>
+        <div
+          className="rounded-lg px-3 py-2 text-sm"
+          style={{ background: 'var(--surface-muted)' }}
+        >
+          <p className="text-fg-muted">
+            Referring this applicant to <strong className="text-fg">{companyName}</strong> for{' '}
+            <strong className="text-fg">{jobTitle}</strong>. They will be notified immediately.
+          </p>
+        </div>
+        <FormField label="Note (optional)">
+          <Textarea
+            rows={2}
+            placeholder="Any context for the employer or internal record…"
+            value={note}
+            onChange={(e) => {
+              setNote(e.target.value);
+              setError(null);
+            }}
+          />
+        </FormField>
+        {error && (
+          <p className="text-danger text-sm" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={saving}>
+            Confirm referral
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Applications list ─────────────────────────────────────────────────
+
+const APPLICATION_STATUS_LABELS: Record<
+  string,
+  { label: string; tone: 'neutral' | 'info' | 'warning' | 'success' | 'danger' }
+> = {
+  SHORTLISTED: { label: 'Shortlisted', tone: 'info' },
+  INTERVIEW_SCHEDULED: { label: 'Interview scheduled', tone: 'warning' },
+  INTERVIEW_POSTPONED: { label: 'Postponed', tone: 'warning' },
+  INTERVIEW_CANCELLED: { label: 'Interview cancelled', tone: 'neutral' },
+  FORWARDED: { label: 'Referred', tone: 'success' },
+  EMPLOYER_INTERVIEW_SCHEDULED: { label: 'Employer interview', tone: 'warning' },
+  EMPLOYER_INTERVIEW_POSTPONED: { label: 'Employer interview postponed', tone: 'warning' },
+  EMPLOYER_INTERVIEW_CANCELLED: { label: 'Employer interview cancelled', tone: 'neutral' },
+  ON_HOLD: { label: 'On hold', tone: 'warning' },
+  OFFER_EXTENDED: { label: 'Offer extended', tone: 'success' },
+  EMPLOYER_REJECTED: { label: 'Not selected by employer', tone: 'danger' },
+  APPLICANT_REFUSED: { label: 'Offer refused', tone: 'neutral' },
+  HIRED: { label: 'Hired', tone: 'success' },
+  REJECTED: { label: 'Not progressed', tone: 'neutral' },
+};
+
+const INTERVIEW_STATUSES = new Set([
+  'INTERVIEW_SCHEDULED',
+  'INTERVIEW_POSTPONED',
+  'INTERVIEW_CANCELLED',
+]);
+
+function ApplicationsCard({
+  applicant: _applicant,
+  applications,
+  canScheduleInterview,
+  canReferToEmployer,
+}: {
+  applicant: ApplicantStaffView;
+  applications: ApplicationView[];
+  /** True for staff/branch-admin; false for super-admin (read-only). */
+  canScheduleInterview: boolean;
+  canReferToEmployer: boolean;
+}) {
+  if (applications.length === 0) {
+    return (
+      <Card title="Applications">
+        <p className="text-fg-muted text-sm">No applications yet.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="Applications">
+      <ul className="grid gap-3">
+        {applications.map((app) => {
+          const pill = APPLICATION_STATUS_LABELS[app.status] ?? {
+            label: app.status,
+            tone: 'neutral' as const,
+          };
+          return (
+            <li key={app.id} className="border-border grid gap-2 rounded-lg border p-3 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-fg font-medium">{app.jobTitle}</p>
+                  <p className="text-fg-muted text-xs">{app.companyName}</p>
+                </div>
+                <Badge tone={pill.tone}>{pill.label}</Badge>
+              </div>
+              {app.interviewAt && (
+                <p className="text-fg-muted text-xs">
+                  Interview:{' '}
+                  {new Date(app.interviewAt).toLocaleString('en-PK', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                  {app.interviewLocation ? ` · ${app.interviewLocation}` : ''}
+                </p>
+              )}
+              {app.interviewNote && <p className="text-fg-muted text-xs">{app.interviewNote}</p>}
+              {app.employerInterviewAt && (
+                <p className="text-fg-muted text-xs">
+                  Employer interview:{' '}
+                  {new Date(app.employerInterviewAt).toLocaleString('en-PK', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                  {app.employerInterviewLocation ? ` · ${app.employerInterviewLocation}` : ''}
+                </p>
+              )}
+              {app.employerDecision && (
+                <p className="text-fg-muted text-xs">
+                  Employer decision: <span className="font-medium">{app.employerDecision}</span>
+                  {app.employerDecisionNote ? ` — ${app.employerDecisionNote}` : ''}
+                </p>
+              )}
+              {app.applicantRefusalReason && (
+                <p className="text-fg-muted text-xs">
+                  Refusal reason: {app.applicantRefusalReason}
+                </p>
+              )}
+              {app.note && <p className="text-fg-muted text-xs">Note: {app.note}</p>}
+              {(canScheduleInterview || canReferToEmployer) && (
+                <div className="flex flex-wrap justify-end gap-2">
+                  {canScheduleInterview && app.status === 'SHORTLISTED' && (
+                    <ScheduleInterviewDialog applicationId={app.id} />
+                  )}
+                  {canScheduleInterview && INTERVIEW_STATUSES.has(app.status) && (
+                    <UpdateInterviewDialog applicationId={app.id} />
+                  )}
+                  {canReferToEmployer &&
+                    (app.status === 'SHORTLISTED' ||
+                      app.status === 'INTERVIEW_SCHEDULED' ||
+                      app.status === 'INTERVIEW_POSTPONED') && (
+                      <ReferToEmployerDialog
+                        applicationId={app.id}
+                        jobTitle={app.jobTitle}
+                        companyName={app.companyName}
+                      />
+                    )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
 // ─── Page body ─────────────────────────────────────────────────────────
 
 export function ApplicantDetailView({
   applicant,
   labels,
   branches,
+  openJobs,
+  existingApplications,
   listPath,
 }: {
   applicant: ApplicantStaffView;
   labels: ProfileLabels;
   branches: SelectOption[];
+  openJobs?: SelectOption[];
+  existingApplications?: ApplicationView[];
   listPath: string;
 }) {
   const router = useRouter();
@@ -467,6 +944,12 @@ export function ApplicantDetailView({
             .join(', ')}
           .
         </p>
+      )}
+
+      {applicant.can.shortlist && (
+        <div className="flex flex-wrap gap-2">
+          <ShortlistDialog applicant={applicant} openJobs={openJobs ?? []} />
+        </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -699,6 +1182,15 @@ export function ApplicantDetailView({
           )}
         </Card>
       </div>
+
+      {existingApplications && existingApplications.length > 0 && (
+        <ApplicationsCard
+          applicant={applicant}
+          applications={existingApplications}
+          canScheduleInterview={!!applicant.can.scheduleInterview}
+          canReferToEmployer={!!applicant.can.referToEmployer}
+        />
+      )}
 
       {(applicant.can.manage || applicant.can.transfer) && (
         <Card title="Account">

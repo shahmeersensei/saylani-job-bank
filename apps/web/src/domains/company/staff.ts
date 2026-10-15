@@ -6,18 +6,14 @@ import {
   type CompanyStatus,
   type RegisterCompanyInput,
   type UpdateCompanyInput,
+  type VerificationState,
 } from '@jobbank/shared';
 import { and, asc, count, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { getBranchContact } from '@/domains/branch';
 import { masterDataLabels } from '@/domains/settings';
 import { runCommand } from '@/domains/shared/audit';
-import {
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  ValidationError,
-} from '@/domains/shared/errors';
+import { ConflictError, NotFoundError, ValidationError } from '@/domains/shared/errors';
 import { paginationMeta, type ListQuery } from '@/domains/shared/pagination';
 import {
   assertBranchAccess,
@@ -29,12 +25,10 @@ import {
 } from '@/domains/shared/scope';
 import { db } from '@/lib/db';
 import { companyMachine, READY } from './machine';
-import { emailEmployers } from './notify';
 import {
   buildCompanyView,
   c,
   loadCompany,
-  members,
   openVerification,
   recordTransition,
   ver,
@@ -243,7 +237,7 @@ export async function assignVerifier(
     const prevVerifier = round.assignedVerifierId;
     await tx
       .update(ver)
-      .set({ state: to as any, assignedVerifierId: input.verifierId })
+      .set({ state: to as VerificationState, assignedVerifierId: input.verifierId })
       .where(eq(ver.id, round.id));
     if (row.status !== to) {
       await tx.update(c).set({ status: to }).where(eq(c.id, row.id));

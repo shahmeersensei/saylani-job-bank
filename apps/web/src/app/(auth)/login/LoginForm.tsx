@@ -5,7 +5,7 @@ import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Button, Checkbox, Input } from '@/components/atoms';
-import { FormField, OTPInput, PhoneInput, Tabs } from '@/components/molecules';
+import { FormField, OTPInput, PhoneInput } from '@/components/molecules';
 import { ApiClientError, apiFetch, safeNextPath } from '@/lib/api/client';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
 

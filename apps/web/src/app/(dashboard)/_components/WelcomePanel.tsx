@@ -30,23 +30,6 @@ import { listApplicants, getMyProfile } from '@/domains/applicant';
 import { listCompanies, listQueue } from '@/domains/company';
 import { listStaff } from '@/domains/user';
 import { listMyJobs } from '@/domains/job';
-import { formatPkMobileDisplay } from '@/lib/format/phone';
-
-/* ─── Monthly chart labels ──────────────────────────────────────── */
-const MONTHS_SHORT = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
 
 /* ─── Chart shape (illustrative — real time-series coming later) ── */
 const ROLE_CHART: Record<Role, { values: number[]; peak: number; label: string }> = {
@@ -100,7 +83,7 @@ const ROLE_ACTIONS: Record<
   },
   EMPLOYER: {
     action1: { label: 'Post a Job', href: '/employer/jobs/new' },
-    action2: { label: 'View Candidates', href: '/employer/candidates' },
+    action2: { label: 'View My Jobs', href: '/employer/jobs' },
   },
   APPLICANT: {
     action1: { label: 'Edit Profile', href: '/applicant/profile' },
@@ -108,18 +91,30 @@ const ROLE_ACTIONS: Record<
   },
 };
 
+/* ─── Relative date helper ──────────────────────────────────────── */
+function relativeDate(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+  if (diffH < 1) return 'Just now';
+  if (diffH < 24) return `${diffH}h ago`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD === 1) return 'Yesterday';
+  if (diffD < 7) return `${diffD} days ago`;
+  return new Date(iso).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' });
+}
+
+/* ─── Activity item type ────────────────────────────────────────── */
+type ActivityItem = {
+  icon: LucideIcon;
+  action: string;
+  detail: string;
+  when: string;
+  price: string;
+  status: 'success' | 'pending' | 'info' | 'warning';
+};
+
 /* ─── Recent activity (illustrative until audit log is built) ───── */
-const ROLE_ACTIVITY: Record<
-  Role,
-  {
-    icon: LucideIcon;
-    action: string;
-    detail: string;
-    when: string;
-    price: string;
-    status: 'success' | 'pending' | 'info' | 'warning';
-  }[]
-> = {
+const ROLE_ACTIVITY: Partial<Record<Role, ActivityItem[]>> = {
   SUPER_ADMIN: [
     {
       icon: Building2,
@@ -288,48 +283,6 @@ const ROLE_ACTIVITY: Record<
       status: 'info',
     },
   ],
-  EMPLOYER: [
-    {
-      icon: Users,
-      action: 'Candidate Referred',
-      detail: 'Imran Malik — Cook',
-      when: 'Today, 10:00 AM',
-      price: 'Pending',
-      status: 'pending',
-    },
-    {
-      icon: Calendar,
-      action: 'Interview Scheduled',
-      detail: 'Saima Bibi',
-      when: 'Yesterday',
-      price: 'Thu 11 AM',
-      status: 'success',
-    },
-    {
-      icon: Briefcase,
-      action: 'Job Posted',
-      detail: 'Guard — DHA Karachi',
-      when: '2 days ago',
-      price: 'Open',
-      status: 'success',
-    },
-    {
-      icon: CheckCircle2,
-      action: 'Hire Confirmed',
-      detail: 'Nadeem Khan',
-      when: '3 days ago',
-      price: 'Placed',
-      status: 'success',
-    },
-    {
-      icon: Building2,
-      action: 'Profile Updated',
-      detail: 'License renewed',
-      when: '4 days ago',
-      price: 'Done',
-      status: 'info',
-    },
-  ],
   APPLICANT: [
     {
       icon: UserRound,
@@ -432,6 +385,7 @@ export async function WelcomePanel({ role }: { role: Role }) {
   let main: DashMain;
   let smallStats: DashSmallStat[];
   let pipeline: DashPipeline;
+  let jobs: { title: string; status: string; vacancies: number | null; createdAt: string }[] = [];
 
   if (role === 'SUPER_ADMIN') {
     const [r_all, r_active, r_co_all, r_co_ver, r_staff] = await Promise.all([
@@ -721,14 +675,12 @@ export async function WelcomePanel({ role }: { role: Role }) {
       ],
     };
   } else if (role === 'EMPLOYER') {
-    let jobs: { title: string; status: string; vacancies: number | null }[] = [];
     try {
       jobs = await listMyJobs(actor);
     } catch {
       /* no company yet */
     }
     const activeJobs = jobs.filter((j) => j.status === 'OPEN');
-    const filled = jobs.map((j) => j.vacancies ?? 1);
     const jobItems: DashMain['subItems'] = activeJobs.slice(0, 4).map((j) => ({
       icon: Briefcase as LucideIcon,
       label: j.title,
@@ -866,7 +818,34 @@ export async function WelcomePanel({ role }: { role: Role }) {
 
   const actions = ROLE_ACTIONS[role];
   const chart = ROLE_CHART[role];
-  const activity = ROLE_ACTIVITY[role];
+
+  /* ── Build activity list ──────────────────────────────────────── */
+  const JOB_STATUS_ACTIVITY: Record<string, ActivityItem['status']> = {
+    OPEN: 'success',
+    DRAFT: 'pending',
+    PAUSED: 'warning',
+    FILLED: 'success',
+    CLOSED: 'info',
+    EXPIRED: 'warning',
+  };
+  let activity: ActivityItem[];
+  if (role === 'EMPLOYER') {
+    activity = jobs.slice(0, 5).map((j) => ({
+      icon: Briefcase,
+      action:
+        j.status === 'FILLED'
+          ? 'Position Filled'
+          : j.status === 'OPEN'
+            ? 'Job Posted'
+            : 'Job Updated',
+      detail: j.title,
+      when: relativeDate(j.createdAt),
+      price: j.vacancies != null ? `${j.vacancies} slot${j.vacancies !== 1 ? 's' : ''}` : 'Open',
+      status: JOB_STATUS_ACTIVITY[j.status] ?? 'info',
+    }));
+  } else {
+    activity = ROLE_ACTIVITY[role] ?? [];
+  }
   const MainIcon = main.icon;
 
   const firstName = user.name.split(' ')[0];
@@ -1189,6 +1168,11 @@ export async function WelcomePanel({ role }: { role: Role }) {
               <span>Detail</span>
               <span>Status</span>
             </div>
+            {activity.length === 0 ? (
+              <div className="px-6 py-8 text-center text-sm" style={{ color: 'var(--fg-muted)' }}>
+                No activity yet. Post a job to get started.
+              </div>
+            ) : null}
             <ul>
               {activity.map((item, idx) => {
                 const AIcon = item.icon;

@@ -22,7 +22,7 @@ export const WIZARD_STEPS = [
     id: 'documents',
     label: 'Documents',
     description:
-      'Clear photos of both sides of your CNIC are required. A CV and certificates help employers trust your profile.',
+      'Clear photos of both sides of your CNIC are required. Additional documents (e.g. a driving licence) may be required depending on the type of work you are seeking.',
   },
 ] as const;
 

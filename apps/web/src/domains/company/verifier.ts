@@ -1,26 +1,14 @@
 import 'server-only';
 import { schema } from '@jobbank/db';
-import type { CompanyStatus, DocumentReviewInput, VerificationState } from '@jobbank/shared';
-import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import type { DocumentReviewInput, VerificationState } from '@jobbank/shared';
+import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
-import { masterDataLabels } from '@/domains/settings';
-import { getWorkingCalendar, pktDate } from '@/domains/settings';
+import { masterDataLabels, pktDate } from '@/domains/settings';
 import { runCommand } from '@/domains/shared/audit';
-import {
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  ValidationError,
-} from '@/domains/shared/errors';
+import { ConflictError, ForbiddenError, NotFoundError } from '@/domains/shared/errors';
 import { paginationMeta, type ListQuery } from '@/domains/shared/pagination';
-import {
-  assertBranchAccess,
-  assertPermission,
-  branchScope,
-  type Actor,
-} from '@/domains/shared/scope';
+import { assertCityAccess, assertPermission, cityScope, type Actor } from '@/domains/shared/scope';
 import { db } from '@/lib/db';
-import { formatDate } from '@/lib/format/date';
 import {
   companyInfoRequestedEmail,
   companyRejectedEmail,
@@ -32,17 +20,13 @@ import {
   buildCompanyView,
   c,
   contacts,
-  currentDocuments,
   docs,
   documentsNotAccepted,
   loadCompany,
   openVerification,
   recordTransition,
   submissionMissing,
-  toDocumentView,
-  toVerificationSummary,
   ver,
-  verificationDueOn,
   type CompanyView,
   type SignedIn,
   type VerificationRow,
@@ -99,7 +83,7 @@ export async function listQueue(
   const today = pktDate(now);
 
   const conditions: (SQL | undefined)[] = [
-    branchScope(actor, ver.branchId),
+    cityScope(actor, ver.branchId),
     inArray(ver.state, [...QUEUE_STATES]),
     f.state ? eq(ver.state, f.state) : undefined,
     f.mine ? eq(ver.assignedVerifierId, actor.userId) : undefined,
@@ -167,7 +151,7 @@ export async function listQueue(
 export async function getCompanyForReview(actor: Actor, companyId: string): Promise<CompanyView> {
   assertPermission(actor, 'company:verify');
   const row = await loadCompany(db, companyId);
-  assertBranchAccess(actor, row.branchId, { entityType: 'company', entityId: row.id });
+  await assertCityAccess(actor, row.branchId, { entityType: 'company', entityId: row.id });
   return buildCompanyView(db, row);
 }
 
@@ -212,7 +196,7 @@ export async function claimCompany(ctx: SignedIn, companyId: string): Promise<Co
   }
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
-    assertBranchAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+    await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
     const to = companyMachine.transition(row.status, 'CLAIM', READY, ctx.actor.roles);
     const round = await openVerification(tx, row.id, { forUpdate: true });
     if (!round) throw new NotFoundError('Open verification for company', companyId);
@@ -253,7 +237,7 @@ export async function releaseCompany(
   assertPermission(ctx.actor, 'company:verify');
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
-    assertBranchAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+    await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
     const event = input.conflict ? 'DECLARE_CONFLICT' : 'RELEASE';
     const to = companyMachine.transition(row.status, event, READY, ctx.actor.roles);
     const round = await openVerification(tx, row.id, { forUpdate: true });
@@ -297,7 +281,7 @@ export async function reviewDocument(
   assertPermission(ctx.actor, 'company:verify');
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
-    assertBranchAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+    await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
     const round = await openVerification(tx, row.id, { forUpdate: true });
     if (!round) throw new NotFoundError('Open verification for company', companyId);
     assertAssignedVerifier(round, ctx.actor);
@@ -345,7 +329,7 @@ export async function requestInfo(
   assertPermission(ctx.actor, 'company:verify');
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
-    assertBranchAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+    await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
     const machineCtx: CompanyMachineContext = {
       submissionMissing: await submissionMissing(tx, row),
       documentsNotAccepted: [],
@@ -399,7 +383,7 @@ export async function verifyCompany(
   assertPermission(ctx.actor, 'company:verify');
   await runCommand(ctx, async ({ tx, audit, emit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
-    assertBranchAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+    await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
     const machineCtx: CompanyMachineContext = {
       submissionMissing: await submissionMissing(tx, row),
       documentsNotAccepted: await documentsNotAccepted(tx, row),
@@ -448,7 +432,7 @@ export async function rejectCompany(
   assertPermission(ctx.actor, 'company:verify');
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
-    assertBranchAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+    await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
     const machineCtx: CompanyMachineContext = {
       submissionMissing: await submissionMissing(tx, row),
       documentsNotAccepted: [],

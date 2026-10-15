@@ -8,12 +8,20 @@ import { reverseGeocode, reverseGeocodeQuery } from '@/lib/geocode/reverse';
  * the employer job form to autofill the location after placing a pin.
  */
 export const GET = apiHandler({
+  auth: 'public',
   query: reverseGeocodeQuery,
   handler: async ({ actor, query }) => {
-    const cities = (await listMasterData(actor!, { type: 'CITY' })).map((c) => ({
-      code: c.code,
-      label: c.label,
-    }));
+    let cities: { code: string; label: string }[] = [];
+    if (actor) {
+      try {
+        cities = (await listMasterData(actor, { type: 'CITY' })).map((c) => ({
+          code: c.code,
+          label: c.label,
+        }));
+      } catch {
+        // Fallback
+      }
+    }
     return ok(await reverseGeocode(query.lat, query.lng, cities));
   },
 });

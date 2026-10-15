@@ -26,7 +26,6 @@ import { companySubmittedEmail } from '@/lib/mail/templates';
 import { companyMachine } from './machine';
 import { emailEmployers } from './notify';
 import {
-  assertCityArea,
   buildCompanyView,
   c,
   contacts,
@@ -152,34 +151,43 @@ export async function updateMyCompany(
 ): Promise<CompanyView> {
   assertPermission(ctx.actor, 'company:register');
   try {
-    await runCommand(ctx, async ({ tx, audit }) => {
-      const row = await requireOwnCompany(tx, ctx.actor, { forUpdate: true });
-      const changes = Object.fromEntries(
-        Object.entries(input).filter(
-          ([key, value]) => value !== undefined && value !== row[key as keyof CompanyRow],
-        ),
-      ) as UpdateCompanyInput;
-      if (Object.keys(changes).length === 0) return;
-      const editable = companyEditability(row.status);
-      const touchesLegal = Object.keys(changes).some((key) => LEGAL.has(key));
-      if (touchesLegal && !editable.legal) throw readOnlyError(row, 'its legal details');
-      if (!editable.details) throw readOnlyError(row, 'its details');
-      if (changes.industryCode) {
-        await assertActiveMasterData(tx, 'INDUSTRY', [changes.industryCode], () => 'industryCode');
-      }
-      if (changes.ntn) await assertNtnFree(tx, changes.ntn, row.id);
-      await tx.update(c).set(changes).where(eq(c.id, row.id));
-      audit({
-        action: 'company.update',
-        entityType: 'company',
-        entityId: row.id,
-        branchId: row.branchId,
-        before: Object.fromEntries(
-          Object.keys(changes).map((k) => [k, row[k as keyof CompanyRow]]),
-        ),
-        after: changes,
-      });
-    });
+    await runCommand(
+      ctx,
+      async ({ tx, audit }) => {
+        const row = await requireOwnCompany(tx, ctx.actor, { forUpdate: true });
+        const changes = Object.fromEntries(
+          Object.entries(input).filter(
+            ([key, value]) => value !== undefined && value !== row[key as keyof CompanyRow],
+          ),
+        ) as UpdateCompanyInput;
+        if (Object.keys(changes).length === 0) return; // valid no-op; audited:false below
+        const editable = companyEditability(row.status);
+        const touchesLegal = Object.keys(changes).some((key) => LEGAL.has(key));
+        if (touchesLegal && !editable.legal) throw readOnlyError(row, 'its legal details');
+        if (!editable.details) throw readOnlyError(row, 'its details');
+        if (changes.industryCode) {
+          await assertActiveMasterData(
+            tx,
+            'INDUSTRY',
+            [changes.industryCode],
+            () => 'industryCode',
+          );
+        }
+        if (changes.ntn) await assertNtnFree(tx, changes.ntn, row.id);
+        await tx.update(c).set(changes).where(eq(c.id, row.id));
+        audit({
+          action: 'company.update',
+          entityType: 'company',
+          entityId: row.id,
+          branchId: row.branchId,
+          before: Object.fromEntries(
+            Object.keys(changes).map((k) => [k, row[k as keyof CompanyRow]]),
+          ),
+          after: changes,
+        });
+      },
+      { audited: false },
+    );
   } catch (error) {
     if (isUniqueViolation(error, ACTIVE_NTN_CONSTRAINT)) throw ntnTaken();
     throw error;
@@ -230,7 +238,6 @@ export async function setMyHeadOffice(
         'Your company has been submitted, so only Job Bank can move it to another branch. Please contact your branch.',
       );
     }
-    await assertCityArea(tx, input);
     const branch = await getBranchContact(input.branchId, tx);
     if (!branch?.isActive) {
       throw new ValidationError([{ path: 'branchId', message: 'Choose an active branch' }]);
@@ -277,7 +284,6 @@ export async function addMySite(ctx: SignedIn, input: CompanySiteInput): Promise
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await requireOwnCompany(tx, ctx.actor, { forUpdate: true });
     if (!companyEditability(row.status).locations) throw readOnlyError(row, 'its locations');
-    await assertCityArea(tx, input);
     const existing = await tx
       .select({ id: locs.id, archivedAt: locs.archivedAt })
       .from(locs)
@@ -311,7 +317,6 @@ export async function updateMySite(
     const row = await requireOwnCompany(tx, ctx.actor, { forUpdate: true });
     if (!companyEditability(row.status).locations) throw readOnlyError(row, 'its locations');
     const site = await ownSite(tx, row, siteId);
-    await assertCityArea(tx, input);
     await tx.update(locs).set(input).where(eq(locs.id, site.id));
     audit({
       action: 'company.update_site',

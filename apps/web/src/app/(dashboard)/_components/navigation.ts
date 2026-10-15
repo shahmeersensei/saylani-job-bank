@@ -1,6 +1,7 @@
 import type { Role } from '@jobbank/shared';
 import { ROLE_HOME } from '@jobbank/shared';
 import {
+  Bell,
   Building2,
   CheckSquare,
   Contact,
@@ -9,6 +10,7 @@ import {
   Gauge,
   ListTree,
   SlidersHorizontal,
+  TrendingUp,
   UserRound,
   Users,
   type LucideIcon,
@@ -90,7 +92,10 @@ export function navigationFor(role: Role): { title?: string; items: NavItemConfi
         {
           items: [
             overview,
-            { href: '/applicant/profile', label: 'My profile', icon: UserRound },
+            { href: '/applicant/jobs', label: 'Job Matches', icon: Briefcase },
+            { href: '/applicant/progress', label: 'My Progress', icon: TrendingUp },
+            { href: '/applicant/notifications', label: 'Notifications', icon: Bell },
+            { href: '/applicant/profile', label: 'My Profile', icon: UserRound },
             { href: '/applicant/documents', label: 'Documents', icon: FileText },
           ],
         },
@@ -102,6 +107,7 @@ export function navigationFor(role: Role): { title?: string; items: NavItemConfi
             overview,
             { href: '/employer/company', label: 'Company', icon: Building2 },
             { href: '/employer/jobs', label: 'Jobs', icon: Briefcase },
+            { href: '/employer/referrals', label: 'Referrals', icon: Users },
           ],
         },
       ];

@@ -1,5 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
+import { env } from '@/lib/env';
 
 /**
  * Reverse geocoding via OpenStreetMap Nominatim: map pin → address line + city
@@ -87,6 +88,40 @@ async function fetchNominatim(lat: number, lng: number): Promise<NominatimAddres
   return data?.address ?? null;
 }
 
+async function fetchOpenCageReverse(
+  lat: number,
+  lng: number,
+  key: string,
+): Promise<{ address: NominatimAddress; formatted: string } | null> {
+  const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${key}&countrycode=pk&no_annotations=1&limit=1`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    results?: Array<{
+      formatted: string;
+      components?: {
+        house_number?: string;
+        road?: string;
+        neighbourhood?: string;
+        suburb?: string;
+        city?: string;
+        town?: string;
+        village?: string;
+        state?: string;
+      };
+    }>;
+  };
+  if (!data.results || data.results.length === 0) return null;
+  const item = data.results[0]!;
+  return {
+    address: item.components ?? {},
+    formatted: item.formatted,
+  };
+}
+
 /**
  * Resolve a pin to an address line + city code. Cities are matched against
  * active CITY master data (exact label, then contains). Failures degrade to
@@ -107,6 +142,28 @@ export async function reverseGeocode(
     cityLabel: null,
     display: '',
   };
+
+  const openCageKey = env.OPENCAGE_API_KEY;
+  if (openCageKey) {
+    try {
+      const oc = await fetchOpenCageReverse(lat, lng, openCageKey);
+      if (oc) {
+        const osmCity = pickCity(oc.address);
+        const matched = matchCityCode(osmCity, cities);
+        const result: ReverseGeocodeResult = {
+          addressLine: buildAddressLine(oc.address, matched?.label ?? osmCity),
+          cityCode: matched?.code ?? null,
+          cityLabel: matched?.label ?? osmCity,
+          display: oc.formatted,
+        };
+        cache.set(key, result);
+        return result;
+      }
+    } catch {
+      // Fall through to Nominatim
+    }
+  }
+
   let address: NominatimAddress | null = null;
   try {
     address = await fetchNominatim(lat, lng);

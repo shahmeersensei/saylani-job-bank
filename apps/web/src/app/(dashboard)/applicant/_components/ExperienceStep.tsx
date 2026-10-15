@@ -4,6 +4,7 @@ import { experienceSchema } from '@jobbank/shared';
 import { useState } from 'react';
 import { Checkbox, Input, Select, Textarea } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
+import { MonthYearPicker } from './MonthYearPicker';
 import type { ApplicantProfile } from '@/domains/applicant';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import {
@@ -24,8 +25,6 @@ interface JobRow {
   isCurrent: boolean;
   description: string;
 }
-
-const thisMonth = () => new Date().toISOString().slice(0, 7);
 
 export function ExperienceStep({ profile, lists, bindSave }: StepProps) {
   const [noExperience, setNoExperience] = useState(profile?.hasNoExperience ?? false);
@@ -140,20 +139,18 @@ export function ExperienceStep({ profile, lists, bindSave }: StepProps) {
                 />
               </div>
               <FormField label="Started (month)" required error={errors[`items.${i}.startMonth`]}>
-                <Input
-                  type="month"
-                  max={thisMonth()}
+                <MonthYearPicker
                   value={row.startMonth}
-                  onChange={(e) => update({ startMonth: e.target.value })}
+                  onChange={(v) => update({ startMonth: v })}
+                  maxYear={new Date().getFullYear()}
                 />
               </FormField>
               {!row.isCurrent && (
                 <FormField label="Ended (month)" required error={errors[`items.${i}.endMonth`]}>
-                  <Input
-                    type="month"
-                    max={thisMonth()}
+                  <MonthYearPicker
                     value={row.endMonth}
-                    onChange={(e) => update({ endMonth: e.target.value })}
+                    onChange={(v) => update({ endMonth: v })}
+                    maxYear={new Date().getFullYear()}
                   />
                 </FormField>
               )}

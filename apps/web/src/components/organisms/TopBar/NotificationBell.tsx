@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Check } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -40,7 +40,9 @@ export function NotificationBell({ viewAllHref = '/notifications' }: { viewAllHr
       );
       setUnread((u) => Math.max(0, u - 1));
       router.refresh();
-    } catch {}
+    } catch {
+      // mark-read failure is non-critical; UI already updated optimistically
+    }
   }
 
   async function markAll() {
@@ -48,7 +50,9 @@ export function NotificationBell({ viewAllHref = '/notifications' }: { viewAllHr
       await apiFetch('/api/v1/notifications/read-all', { method: 'POST' });
       setItems((prev) => prev.map((i) => ({ ...i, readAt: new Date().toISOString() })));
       setUnread(0);
-    } catch {}
+    } catch {
+      // mark-all failure is non-critical
+    }
   }
 
   return (

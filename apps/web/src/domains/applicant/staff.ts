@@ -27,9 +27,8 @@ import {
 import { maskCnic, maskPhone } from '@/domains/shared/masking';
 import { paginationMeta, type ListQuery } from '@/domains/shared/pagination';
 import {
-  assertBranchAccess,
+  assertCityAccess,
   assertPermission,
-  branchScope,
   hasPermission,
   isSuperAdmin,
   type Actor,
@@ -105,8 +104,25 @@ export async function listApplicants(
     });
   }
 
+  // City-based scoping: staff see all applicants whose city matches any city of their branches.
+  const cityScope: SQL | undefined = isSuperAdmin(actor)
+    ? undefined
+    : actor.branchIds.length === 0
+      ? sql`false`
+      : exists(
+          db
+            .select({ one: sql`1` })
+            .from(schema.branches)
+            .where(
+              and(
+                inArray(schema.branches.id, actor.branchIds),
+                sql`upper(${schema.branches.city}) = upper(${addr.cityCode})`,
+              ),
+            ),
+        );
+
   const conditions: (SQL | undefined)[] = [
-    branchScope(actor, a.branchId),
+    cityScope,
     f.status ? eq(a.status, f.status) : undefined,
     f.identityStatus ? eq(a.identityStatus, f.identityStatus) : undefined,
     f.branchId ? eq(a.branchId, f.branchId) : undefined,
@@ -211,12 +227,19 @@ export interface ApplicantStaffView extends ApplicantProfile {
   statusReason: string | null;
   identityHistory: IdentityCheckView[];
   /** What the signed-in staff member may do (drives the UI). */
-  can: { verifyIdentity: boolean; manage: boolean; transfer: boolean };
+  can: {
+    verifyIdentity: boolean;
+    manage: boolean;
+    transfer: boolean;
+    shortlist: boolean;
+    scheduleInterview: boolean;
+    referToEmployer: boolean;
+  };
 }
 
 async function scopedApplicant(actor: Actor, applicantId: string): Promise<ApplicantRow> {
   const row = await loadApplicant(db, applicantId);
-  assertBranchAccess(actor, row.branchId, { entityType: 'applicant', entityId: row.id });
+  await assertCityAccess(actor, row.branchId, { entityType: 'applicant', entityId: row.id });
   return row;
 }
 
@@ -261,6 +284,10 @@ export async function getApplicantForStaff(
         hasPermission(actor, 'applicant:verify_identity') && actor.userId !== row.userId,
       manage: hasPermission(actor, 'applicant:manage'),
       transfer: hasPermission(actor, 'applicant:transfer'),
+      shortlist: hasPermission(actor, 'match_case:manage') && row.status === 'ACTIVE',
+      scheduleInterview:
+        hasPermission(actor, 'interview:schedule_jobbank') && row.status === 'ACTIVE',
+      referToEmployer: hasPermission(actor, 'match_case:refer') && row.status === 'ACTIVE',
     },
   };
 }

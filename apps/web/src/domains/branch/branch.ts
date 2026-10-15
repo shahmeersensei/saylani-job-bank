@@ -242,29 +242,33 @@ export async function updateBranch(
   if (Object.keys(changes).length === 0 && matchRadius === undefined) {
     return getBranch(ctx.actor, branchId);
   }
-  await runCommand(ctx, async (cmd) => {
-    const { tx, audit } = cmd;
-    // Radius changes are audited by the policy writes themselves.
-    if (matchRadius) await writeRadiusPolicy(cmd, { scope: 'BRANCH', branchId }, matchRadius);
-    if (matchRadius === null) await deleteRadiusPolicy(cmd, { scope: 'BRANCH', branchId });
-    if (Object.keys(changes).length === 0) return;
-    await tx.update(b).set(changes).where(eq(b.id, branchId));
-    audit({
-      action:
-        changes.isActive === false
-          ? 'branch.deactivate'
-          : changes.isActive === true
-            ? 'branch.activate'
-            : 'branch.update',
-      entityType: 'branch',
-      entityId: branchId,
-      branchId,
-      before: Object.fromEntries(
-        Object.keys(changes).map((k) => [k, before[k as keyof typeof before]]),
-      ),
-      after: changes,
-    });
-  });
+  await runCommand(
+    ctx,
+    async (cmd) => {
+      const { tx, audit } = cmd;
+      // Radius changes are audited by the policy writes themselves.
+      if (matchRadius) await writeRadiusPolicy(cmd, { scope: 'BRANCH', branchId }, matchRadius);
+      if (matchRadius === null) await deleteRadiusPolicy(cmd, { scope: 'BRANCH', branchId });
+      if (Object.keys(changes).length === 0) return;
+      await tx.update(b).set(changes).where(eq(b.id, branchId));
+      audit({
+        action:
+          changes.isActive === false
+            ? 'branch.deactivate'
+            : changes.isActive === true
+              ? 'branch.activate'
+              : 'branch.update',
+        entityType: 'branch',
+        entityId: branchId,
+        branchId,
+        before: Object.fromEntries(
+          Object.keys(changes).map((k) => [k, before[k as keyof typeof before]]),
+        ),
+        after: changes,
+      });
+    },
+    { audited: false },
+  );
   return getBranch(ctx.actor, branchId);
 }
 

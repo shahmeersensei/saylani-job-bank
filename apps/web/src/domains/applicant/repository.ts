@@ -2,6 +2,7 @@ import 'server-only';
 import { schema, type GeoPoint } from '@jobbank/db';
 import {
   computeCompleteness,
+  missingApplicantDocumentRequirements,
   MASTER_DATA_META,
   type ApplicantDocumentStatus,
   type ApplicantStatus,
@@ -255,10 +256,13 @@ export async function completenessFor(
     applicantDocumentTypes(executor),
     currentDocuments(executor, row.id),
   ]);
+  const applicantCategories = new Set(preferences[0]?.categories ?? []);
   const presentTypes = new Set(present.map((d) => d.typeCode));
-  const missingRequiredDocuments = types.filter(
-    (t) => t.isActive && t.meta.required && !presentTypes.has(t.code),
-  ).length;
+  const missingRequiredDocuments = missingApplicantDocumentRequirements(
+    types.filter((t) => t.isActive).map((t) => ({ code: t.code, ...t.meta })),
+    applicantCategories,
+    presentTypes,
+  );
 
   return computeCompleteness({
     hasPersonal: true,

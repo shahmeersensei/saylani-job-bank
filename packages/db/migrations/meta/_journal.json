@@ -120,6 +120,55 @@
                         "when":  1792015643000,
                         "tag":  "0017_match_decisions",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  17,
+                        "version":  "7",
+                        "when":  1792100000000,
+                        "tag":  "0018_notifications",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  18,
+                        "version":  "7",
+                        "when":  1792100001000,
+                        "tag":  "0019_embeddings",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  19,
+                        "version":  "7",
+                        "when":  1792100001500,
+                        "tag":  "0014_job_benefits",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  20,
+                        "version":  "7",
+                        "when":  1792100001600,
+                        "tag":  "0015_applications",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  21,
+                        "version":  "7",
+                        "when":  1792100002000,
+                        "tag":  "0020_interview_statuses",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  22,
+                        "version":  "7",
+                        "when":  1792100003000,
+                        "tag":  "0021_employer_interview",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  23,
+                        "version":  "7",
+                        "when":  1792100004000,
+                        "tag":  "0022_applicant_category_documents",
+                        "breakpoints":  true
                     }
                 ]
 }

@@ -7,8 +7,8 @@ import {
   type JobStatusInput,
   type UpdateJobInput,
 } from '@jobbank/shared';
-import { and, eq, sql } from 'drizzle-orm';
-import { requireOwnCompany } from '@/domains/company/repository';
+import { eq, sql } from 'drizzle-orm';
+import { requireOwnCompany } from '@/domains/company';
 import { enqueueJobMatch } from '@/domains/matching';
 import { runCommand } from '@/domains/shared/audit';
 import { ForbiddenError, NotFoundError } from '@/domains/shared/errors';
@@ -62,6 +62,16 @@ export async function createJob(ctx: SignedIn, input: CreateJobInput): Promise<J
         salaryMax: input.salaryMax ?? null,
         status: 'DRAFT',
         closesAt: input.closesAt ? new Date(input.closesAt) : null,
+        fuelAllowance: input.fuelAllowance ?? false,
+        flexibleHours: input.flexibleHours ?? false,
+        annualLeaveDays: input.annualLeaveDays ?? null,
+        medicalCoverage: input.medicalCoverage ?? 'NONE',
+        bonusTier: input.bonusTier ?? 'NONE',
+        workFromHome: input.workFromHome ?? false,
+        providentFund: input.providentFund ?? false,
+        transportAllowance: input.transportAllowance ?? false,
+        eobi: input.eobi ?? false,
+        lifeInsurance: input.lifeInsurance ?? false,
         createdBy: ctx.actor.userId,
       })
       .returning();
@@ -80,7 +90,7 @@ export async function updateJob(
   const row = await loadJob(db, jobId);
   if (row.companyId !== company.id) throw new NotFoundError('Job', jobId);
   if (jobEditability(row.status) !== 'editable') {
-    throw new ForbiddenError('Job can only be edited while in DRAFT status');
+    throw new ForbiddenError('Job can only be edited while in DRAFT, OPEN, or PAUSED status');
   }
 
   return runCommand(ctx, async ({ tx, audit }) => {
@@ -99,6 +109,18 @@ export async function updateJob(
         ...(input.closesAt !== undefined && {
           closesAt: input.closesAt ? new Date(input.closesAt) : null,
         }),
+        ...(input.fuelAllowance !== undefined && { fuelAllowance: input.fuelAllowance }),
+        ...(input.flexibleHours !== undefined && { flexibleHours: input.flexibleHours }),
+        ...(input.annualLeaveDays !== undefined && { annualLeaveDays: input.annualLeaveDays }),
+        ...(input.medicalCoverage !== undefined && { medicalCoverage: input.medicalCoverage }),
+        ...(input.bonusTier !== undefined && { bonusTier: input.bonusTier }),
+        ...(input.workFromHome !== undefined && { workFromHome: input.workFromHome }),
+        ...(input.providentFund !== undefined && { providentFund: input.providentFund }),
+        ...(input.transportAllowance !== undefined && {
+          transportAllowance: input.transportAllowance,
+        }),
+        ...(input.eobi !== undefined && { eobi: input.eobi }),
+        ...(input.lifeInsurance !== undefined && { lifeInsurance: input.lifeInsurance }),
         updatedAt: new Date(),
       })
       .where(eq(j.id, jobId))
@@ -139,7 +161,9 @@ export async function transitionJobStatus(
       input.status === 'OPEN'
         ? row.status === 'DRAFT'
           ? 'PUBLISH'
-          : 'RESUME'
+          : row.status === 'CLOSED'
+            ? 'REOPEN'
+            : 'RESUME'
         : input.status === 'PAUSED'
           ? 'PAUSE'
           : 'CLOSE';
@@ -147,13 +171,15 @@ export async function transitionJobStatus(
     const check = jobMachine.check(row.status, event, {}, ctx.actor.roles);
     if (!check.ok) throw new ForbiddenError(check.message);
 
+    const now = new Date();
     const [updated] = await tx
       .update(j)
       .set({
         status: check.to,
-        publishedAt: check.to === 'OPEN' && !row.publishedAt ? new Date() : row.publishedAt,
-        closedAt: check.to === 'CLOSED' ? new Date() : row.closedAt,
-        updatedAt: new Date(),
+        publishedAt: check.to === 'OPEN' && !row.publishedAt ? now : row.publishedAt,
+        closedAt: check.to === 'CLOSED' ? now : row.closedAt,
+        reopenedAt: event === 'REOPEN' ? now : row.reopenedAt,
+        updatedAt: now,
       })
       .where(eq(j.id, jobId))
       .returning();

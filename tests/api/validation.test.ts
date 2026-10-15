@@ -1,8 +1,73 @@
 import { describe, expect, it } from '@jest/globals';
+import { applicantLocationSchema, missingApplicantDocumentRequirements } from '@jobbank/shared';
 import { POST as login } from '@/app/api/v1/auth/login/route';
 import { bodyOf, call, errorOf } from './helpers';
 
 describe('request validation pipeline', () => {
+  it('requires a driving licence for driving and one qualifying document for healthcare', () => {
+    const requirements = [
+      {
+        code: 'DRIVING_LICENSE',
+        required: false,
+        requiredForCategories: ['DRIVING_DELIVERY'],
+        requiredAlternativeForCategories: [],
+      },
+      {
+        code: 'HEALTHCARE_LICENSE',
+        required: false,
+        requiredForCategories: [],
+        requiredAlternativeForCategories: ['HEALTHCARE'],
+      },
+      {
+        code: 'EDUCATION_CERTIFICATE',
+        required: false,
+        requiredForCategories: [],
+        requiredAlternativeForCategories: ['HEALTHCARE'],
+      },
+    ];
+
+    expect(missingApplicantDocumentRequirements(requirements, ['DRIVING_DELIVERY'], [])).toBe(1);
+    expect(missingApplicantDocumentRequirements(requirements, ['HEALTHCARE'], [])).toBe(1);
+    expect(
+      missingApplicantDocumentRequirements(requirements, ['HEALTHCARE'], ['HEALTHCARE_LICENSE']),
+    ).toBe(0);
+    expect(
+      missingApplicantDocumentRequirements(requirements, ['HEALTHCARE'], ['EDUCATION_CERTIFICATE']),
+    ).toBe(0);
+    expect(
+      missingApplicantDocumentRequirements(
+        requirements,
+        ['DRIVING_DELIVERY', 'HEALTHCARE'],
+        ['EDUCATION_CERTIFICATE'],
+      ),
+    ).toBe(1);
+    expect(
+      missingApplicantDocumentRequirements(
+        requirements,
+        ['DRIVING_DELIVERY', 'HEALTHCARE'],
+        ['DRIVING_LICENSE', 'EDUCATION_CERTIFICATE'],
+      ),
+    ).toBe(0);
+  });
+
+  it('allows optional address when saving an applicant location', () => {
+    const location = {
+      location: { lat: 24.9256, lng: 67.0899 },
+      cityCode: 'KARACHI',
+    };
+
+    for (const addressLine of [undefined, '', '   ', null]) {
+      expect(applicantLocationSchema.safeParse({ ...location, addressLine }).success).toBe(true);
+    }
+
+    expect(
+      applicantLocationSchema.parse({
+        ...location,
+        addressLine: ' House 12, Block 13-D ',
+      }).addressLine,
+    ).toBe('House 12, Block 13-D');
+  });
+
   it('answers 422 with field issues for an empty body', async () => {
     const response = await call(login, '/api/v1/auth/login', { body: {} });
     expect(response.status).toBe(422);
