@@ -1,6 +1,6 @@
 -- M16-lite: In-app notifications table
 
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type       TEXT        NOT NULL CHECK (type ~ '^[A-Z0-9]+(_[A-Z0-9]+)*$'),
@@ -11,4 +11,4 @@ CREATE TABLE notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX notifications_user_idx ON notifications(user_id, created_at);
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, created_at);

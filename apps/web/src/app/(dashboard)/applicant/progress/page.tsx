@@ -1,6 +1,5 @@
 import { requireRole } from '@/domains/auth';
 import { listMyApplications, listMessages } from '@/domains/placement';
-import { Badge, Button } from '@/components/atoms';
 import {
   CalendarCheck,
   CalendarX,
@@ -10,7 +9,6 @@ import {
   TrendingUp,
   XCircle,
 } from 'lucide-react';
-import NextLink from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import type { ApplicationView } from '@/domains/placement';
 import { RefuseOfferButton } from './_components/RefuseOfferButton';

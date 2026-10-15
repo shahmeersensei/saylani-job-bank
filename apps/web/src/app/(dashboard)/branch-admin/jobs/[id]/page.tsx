@@ -1,6 +1,6 @@
 import { requireRole } from '@/domains/auth';
 import { getJobDetail } from '@/domains/job';
-import { masterDataLabels } from '@/domains/settings/master-data';
+import { masterDataLabels } from '@/domains/settings';
 import { NotFoundError } from '@/domains/shared/errors';
 import { Badge } from '@/components/atoms';
 import {
@@ -23,7 +23,6 @@ import {
   Banknote,
   BookOpen,
   Briefcase,
-  Building2,
   Calendar,
   CheckCircle2,
   Clock,

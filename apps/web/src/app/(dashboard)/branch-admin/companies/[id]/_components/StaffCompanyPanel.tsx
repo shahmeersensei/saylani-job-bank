@@ -1,14 +1,14 @@
 'use client';
 
 import { COMPANY_SIZE_LABELS, LEGAL_STRUCTURE_LABELS, type CompanyStatus } from '@jobbank/shared';
-import { ArrowLeft, Building2, ExternalLink, Pause, Play } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Pause, Play } from 'lucide-react';
 import NextLink from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { Badge, Button, StatusPill, Textarea } from '@/components/atoms';
 import { FormField, KeyValue } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
-import type { CompanyView } from '@/domains/company/repository';
+import type { CompanyView } from '@/domains/company';
 
 const STATUS_PILL: Record<
   CompanyStatus,
@@ -27,7 +27,7 @@ const STATUS_PILL: Record<
 export function StaffCompanyPanel({
   company,
   canSuspend,
-  canManage,
+  canManage: _canManage,
 }: {
   company: CompanyView;
   canSuspend: boolean;

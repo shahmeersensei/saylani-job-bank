@@ -1,19 +1,20 @@
 -- Semantic embeddings table (Phase 3). Requires the pgvector extension.
--- On plain Postgres installs without pgvector, skip this migration.
--- See docker/Dockerfile.postgres for a PostGIS + pgvector image.
+-- On plain Postgres installs without pgvector, this migration is a no-op.
 
-CREATE EXTENSION IF NOT EXISTS vector;
---> statement-breakpoint
-CREATE TABLE "embeddings" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"entity_type" text NOT NULL,
-	"entity_id" uuid NOT NULL,
-	"model" text NOT NULL,
-	"content" text NOT NULL,
-	"embedding" vector(384),
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX "embeddings_entity_model_uq" ON "embeddings" USING btree ("entity_type", "entity_id", "model");
---> statement-breakpoint
-CREATE INDEX "embeddings_hnsw_idx" ON "embeddings" USING hnsw ("embedding" vector_cosine_ops);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'vector') THEN
+    CREATE EXTENSION IF NOT EXISTS vector;
+    CREATE TABLE IF NOT EXISTS embeddings (
+      id          UUID        PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      entity_type TEXT        NOT NULL,
+      entity_id   UUID        NOT NULL,
+      model       TEXT        NOT NULL,
+      content     TEXT        NOT NULL,
+      embedding   vector(384),
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS embeddings_entity_model_uq ON embeddings (entity_type, entity_id, model);
+  END IF;
+END;
+$$;

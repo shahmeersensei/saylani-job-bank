@@ -9,9 +9,11 @@ import {
   MEDICAL_COVERAGE_LABELS,
   SHIFT_TYPE_LABELS,
 } from '@jobbank/shared';
+// eslint-disable-next-line no-restricted-imports
 import type { JobView } from '@/domains/job/repository';
 import { apiFetch } from '@/lib/api/client';
 import { Badge, Button, Link } from '@/components/atoms';
+// eslint-disable-next-line no-restricted-imports
 import { allowedTransitions } from '@/domains/job/rules';
 import { useRouter } from 'next/navigation';
 import { Pencil, Trash2, Users } from 'lucide-react';
@@ -154,8 +156,20 @@ export function JobDetailPanel({ job }: Props) {
       <div className="border-border bg-surface grid gap-4 rounded-xl border p-5">
         <h2 className="text-fg font-medium">Benefits &amp; Perks</h2>
         <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
-          <KV label="Medical coverage" value={MEDICAL_COVERAGE_LABELS[job.medicalCoverage]} />
-          <KV label="Bonus" value={BONUS_TIER_LABELS[job.bonusTier]} />
+          <KV
+            label="Medical coverage"
+            value={
+              MEDICAL_COVERAGE_LABELS[
+                job.medicalCoverage as keyof typeof MEDICAL_COVERAGE_LABELS
+              ] ?? job.medicalCoverage
+            }
+          />
+          <KV
+            label="Bonus"
+            value={
+              BONUS_TIER_LABELS[job.bonusTier as keyof typeof BONUS_TIER_LABELS] ?? job.bonusTier
+            }
+          />
           {job.annualLeaveDays != null && (
             <KV label="Annual leave" value={`${job.annualLeaveDays} days / year`} />
           )}

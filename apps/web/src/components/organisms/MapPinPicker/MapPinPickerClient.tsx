@@ -39,7 +39,7 @@ function FollowValue({ value }: { value: LatLng | null }) {
   return null;
 }
 
-async function reverseGeocode(lat: number, lng: number): Promise<string> {
+async function _reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
@@ -72,7 +72,7 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
 export default function MapPinPickerClient({
   value,
   onChange,
-  onLocate,
+  onLocate: _onLocate,
   defaultCenter = KARACHI,
   zoom = 13,
   rings = [],

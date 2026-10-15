@@ -25,6 +25,7 @@ export {
   updateMyCompany,
   updateMySite,
 } from './profile';
+export { companyDocumentTypes, requireOwnCompany } from './repository';
 export type {
   CompanyContactView,
   CompanyDocumentType,

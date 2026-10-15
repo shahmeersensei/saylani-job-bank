@@ -107,7 +107,7 @@ function JobCard({ job }: { job: MatchedJob }) {
           className="rounded-full px-2.5 py-0.5 text-xs font-medium"
           style={{ background: 'var(--surface-muted)', color: 'var(--fg-muted)' }}
         >
-          {JOB_TYPE_LABELS[job.jobType] ?? job.jobType}
+          {JOB_TYPE_LABELS[job.jobType as keyof typeof JOB_TYPE_LABELS] ?? job.jobType}
         </span>
         <span
           className="rounded-full px-2.5 py-0.5 text-xs font-medium"

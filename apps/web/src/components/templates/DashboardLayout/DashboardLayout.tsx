@@ -3,7 +3,6 @@
 import { X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
 import { useState } from 'react';
-import { Button } from '@/components/atoms/Button';
 import { BrandMark } from '@/components/brand';
 import { AppSidebar } from '@/components/organisms/AppSidebar';
 import { TopBar } from '@/components/organisms/TopBar';
