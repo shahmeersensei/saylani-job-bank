@@ -51,11 +51,9 @@ const routes = discover(API_ROOT);
 describe('error envelope contract', () => {
   for (const key of routes) {
     it(`${key} failures use the shared envelope`, async () => {
-      const handler = (await import(/* webpackIgnore: true */ path.join(
-        API_ROOT,
-        key,
-        'route.ts',
-      ))) as Record<string, unknown>;
+      const handler = (await import(
+        /* webpackIgnore: true */ path.join(API_ROOT, key, 'route.ts')
+      )) as Record<string, unknown>;
       const problems: string[] = [];
       let checked = 0;
 
@@ -106,7 +104,9 @@ describe('error envelope contract', () => {
           problems.push(`${verb} ${status}: empty message`);
         }
         if (typeof error.correlation_id !== 'string' || error.correlation_id.length < 8) {
-          problems.push(`${verb} ${status}: bad correlation_id ${JSON.stringify(error.correlation_id)}`);
+          problems.push(
+            `${verb} ${status}: bad correlation_id ${JSON.stringify(error.correlation_id)}`,
+          );
         } else if (headerId && error.correlation_id !== headerId) {
           problems.push(
             `${verb} ${status}: correlation_id ${error.correlation_id} !== header ${headerId}`,
