@@ -1,0 +1,25 @@
+# Keep the build context tiny: only source needed to build the two backend images.
+**/node_modules
+**/.next
+**/.next-*
+**/.turbo
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+**/.pytest_cache
+**/.ruff_cache
+.git
+.gitignore
+tests
+**/tests
+**/playwright-report
+**/test-results
+**/*.log
+**/*.err.log
+Dockerfile*
+docker-compose*.yml
+docker
+docs
+*.md
+!README.md

@@ -81,6 +81,63 @@ services:
       - '1025:1025'
       - '8025:8025'
 
+  # ── App images (slim, multi-stage — see apps/web/Dockerfile) ───────────────
+  # Opt-in so plain `docker compose up -d` still only starts infra.
+  #   docker compose --profile app up -d --build
+  web:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '3001:3000'
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_URL: http://localhost:3001
+      DATABASE_URL: postgres://app_rw:app_rw@postgres:5432/jobbank
+      DATABASE_MIGRATOR_URL: postgres://jobbank:jobbank@postgres:5432/jobbank
+      S3_ENDPOINT: http://seaweedfs:8333
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: mailpit
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  matching:
+    profiles: ['app']
+    build:
+      context: services/matching
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    env_file: .env
+    environment:
+      MATCHING_DATABASE_URL: postgres://jobbank:jobbank@postgres:5432/jobbank
+      MATCHING_WORKER_ENABLED: 'false' # dedicated worker container below
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  matching-worker:
+    profiles: ['app']
+    build:
+      context: services/matching
+      dockerfile: Dockerfile
+    command: ['python', 'run_worker.py']
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MATCHING_DATABASE_URL: postgres://jobbank:jobbank@postgres:5432/jobbank
+      MATCHING_WORKER_ENABLED: 'true'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:
   s3data:

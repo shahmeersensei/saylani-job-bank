@@ -12,6 +12,9 @@ loadEnvConfig(repoRoot, process.env.NODE_ENV !== 'production', console, true);
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Emit a self-contained server bundle for the production Docker image
+  // (`node .next/standalone/apps/web/server.js`); dev is unaffected.
+  output: 'standalone',
   // Lets a production build run alongside `next dev` without clobbering its .next folder.
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
   poweredByHeader: false,
