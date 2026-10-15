@@ -4,14 +4,13 @@ import {
   COMPANY_STATUS_LABELS,
   LEGAL_STRUCTURE_LABELS,
   COMPANY_SIZE_LABELS,
-  VERIFICATION_EVENT_LABELS,
   type CompanyStatus,
 } from '@jobbank/shared';
 import { Building2, CheckCircle2, XCircle, AlertCircle, Clock } from 'lucide-react';
 import NextLink from 'next/link';
 import { Button, StatusPill } from '@/components/atoms';
 import { KeyValue } from '@/components/molecules';
-import type { CompanyView } from '@/domains/company/repository';
+import type { CompanyView } from '@/domains/company';
 
 const STATUS_PILL: Record<
   CompanyStatus,
@@ -32,24 +31,24 @@ export function CompanyStatusPanel({ company }: { company: CompanyView }) {
   const v = company.verification;
 
   return (
-    <div className="grid w-full gap-6">
+    <div className="grid w-full gap-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-1">
           <h1 className="text-fg text-2xl font-semibold">{company.details.legalName}</h1>
           {company.details.tradeName && (
             <p className="text-fg-muted text-sm">Trading as {company.details.tradeName}</p>
           )}
-          <StatusPill label={pill.label} tone={pill.variant} />
         </div>
-        {company.status === 'VERIFIED' && (
-          <div className="flex items-center gap-2 text-sm">
-            <CheckCircle2 className="text-success size-5" />
-            <span className="text-fg-muted">
-              Verified{' '}
-              {company.verifiedAt ? new Date(company.verifiedAt).toLocaleDateString('en-PK') : ''}
-            </span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <StatusPill
+            label={
+              company.status === 'VERIFIED' && company.verifiedAt
+                ? `Verified · ${new Date(company.verifiedAt).toLocaleDateString('en-PK')}`
+                : pill.label
+            }
+            tone={pill.variant}
+          />
+        </div>
       </header>
 
       {company.status === 'SUSPENDED' && (
@@ -59,7 +58,7 @@ export function CompanyStatusPanel({ company }: { company: CompanyView }) {
         </div>
       )}
 
-      <section className="border-border bg-surface grid gap-4 rounded-xl border p-5">
+      <section className="border-border bg-surface grid gap-4 rounded-xl border p-4 sm:p-5">
         <h2 className="text-fg font-semibold">Company details</h2>
         <KeyValue
           columns={2}
@@ -75,8 +74,8 @@ export function CompanyStatusPanel({ company }: { company: CompanyView }) {
         />
       </section>
 
-      {v && (
-        <section className="border-border bg-surface grid gap-4 rounded-xl border p-5">
+      {v && company.status !== 'VERIFIED' && (
+        <section className="border-border bg-surface grid gap-4 rounded-xl border p-4 sm:p-5">
           <h2 className="text-fg font-semibold">Verification history</h2>
           <ol className="grid gap-2 text-sm">
             {[v].map((ver) => (
@@ -104,7 +103,7 @@ export function CompanyStatusPanel({ company }: { company: CompanyView }) {
         </section>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex">
         <Button asChild variant="secondary" leftIcon={<Building2 />}>
           <NextLink href="/employer/company?step=details">Edit details</NextLink>
         </Button>

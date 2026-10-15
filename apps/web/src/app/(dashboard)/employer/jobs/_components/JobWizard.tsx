@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   JOB_TYPES,
   JOB_TYPE_LABELS,
@@ -9,14 +9,26 @@ import {
   GENDER_PREFERENCES,
   GENDER_PREFERENCE_LABELS,
 } from '@jobbank/shared';
-import type { JobView } from '@/domains/job/repository';
+import type { JobView } from '@/domains/job';
 import { apiFetch } from '@/lib/api/client';
-import { Button, Input, Select, Textarea } from '@/components/atoms';
+import { Button, Input, Select, Spinner, Textarea } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
+import { MapPinPicker, type LatLng } from '@/components/organisms';
 import { useRouter } from 'next/navigation';
 
 interface Props {
   initialJob?: JobView | null;
+}
+
+interface CityOption {
+  value: string;
+  label: string;
+}
+
+interface ReverseResult {
+  addressLine: string;
+  cityCode: string | null;
+  cityLabel: string | null;
 }
 
 const JOB_TYPE_OPTIONS = JOB_TYPES.map((v) => ({ value: v, label: JOB_TYPE_LABELS[v] }));
@@ -47,7 +59,57 @@ export function JobWizard({ initialJob = null }: Props) {
     initialJob?.salaryMax != null ? String(initialJob.salaryMax) : '',
   );
 
+  // ── Location: pin on the map, address/city autofilled by reverse geocode ──
+  const saved = initialJob?.locations[0] ?? null;
+  const [pin, setPin] = useState<LatLng | null>(saved?.location ?? null);
+  const [addressLine, setAddressLine] = useState(saved?.addressLine ?? '');
+  const [cityCode, setCityCode] = useState(saved?.cityCode ?? '');
+  const [cities, setCities] = useState<CityOption[]>([]);
+  const [geocoding, setGeocoding] = useState(false);
+  /** True while the address text is machine-filled (so a new pin may replace it). */
+  const autoFilled = useRef(!saved?.addressLine);
+
   const isNew = !initialJob;
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ code: string; label: string }[]>('/api/v1/master-data?type=CITY')
+      .then(({ data }) => {
+        if (!cancelled) setCities(data.map((c) => ({ value: c.code, label: c.label })));
+      })
+      .catch(() => {
+        // City list is a nicety; the form still works with manual entry.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Pin change → reverse geocode → autofill address + city (debounced).
+  useEffect(() => {
+    if (!pin || cities.length === 0) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setGeocoding(true);
+      try {
+        const { data } = await apiFetch<ReverseResult>(
+          `/api/v1/geocode/reverse?lat=${pin.lat}&lng=${pin.lng}`,
+          { signal: controller.signal },
+        );
+        if (autoFilled.current || !addressLine) setAddressLine(data.addressLine || addressLine);
+        if (data.cityCode) setCityCode(data.cityCode);
+      } catch {
+        // Offline or Nominatim down: keep whatever the employer typed.
+      } finally {
+        setGeocoding(false);
+      }
+    }, 450);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run on pin/cities only; addressLine read at fire time
+  }, [pin, cities]);
 
   function handleSubmit() {
     startTransition(async () => {
@@ -65,24 +127,41 @@ export function JobWizard({ initialJob = null }: Props) {
           salaryMax: salaryMax ? parseInt(salaryMax, 10) : undefined,
         };
 
+        let jobId: string;
         if (isNew) {
           const { data: created } = await apiFetch<JobView>('/api/v1/jobs/me', {
             method: 'POST',
             body,
           });
-          router.push(`/employer/jobs/${created.id}`);
+          jobId = created.id;
         } else {
-          await apiFetch<JobView>(`/api/v1/jobs/me/${initialJob.id}`, {
+          const { data: updated } = await apiFetch<JobView>(`/api/v1/jobs/me/${initialJob.id}`, {
             method: 'PATCH',
             body,
           });
-          router.refresh();
+          jobId = updated.id;
         }
+
+        if (pin && addressLine.trim().length >= 3 && cityCode) {
+          await apiFetch<JobView>(`/api/v1/jobs/me/${jobId}/location`, {
+            method: 'PUT',
+            body: {
+              location: pin,
+              addressLine: addressLine.trim(),
+              cityCode,
+            },
+          });
+        }
+
+        if (isNew) router.push(`/employer/jobs/${jobId}`);
+        else router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
       }
     });
   }
+
+  const locationReady = pin && addressLine.trim().length >= 3 && cityCode;
 
   return (
     <div className="grid w-full gap-8">
@@ -173,6 +252,64 @@ export function JobWizard({ initialJob = null }: Props) {
               placeholder="Optional"
             />
           </FormField>
+        </div>
+
+        <div className="grid gap-4 border-t pt-6">
+          <div>
+            <h2 className="text-fg text-lg font-semibold">Work location</h2>
+            <p className="text-fg-muted text-sm">
+              Tap the job site on the map — we will fill in the address for you. Matching uses this
+              pin to rank nearby applicants.
+            </p>
+          </div>
+
+          <MapPinPicker value={pin} onChange={setPin} label="Job site location" height="18rem" />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              label="Address"
+              hint={
+                geocoding ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Spinner className="size-3" /> Looking up the address…
+                  </span>
+                ) : pin ? (
+                  'Autofilled from the map — edit if needed.'
+                ) : (
+                  'Place the pin on the map first.'
+                )
+              }
+              className="sm:col-span-2"
+            >
+              <Input
+                value={addressLine}
+                onChange={(e) => {
+                  setAddressLine(e.target.value);
+                  autoFilled.current = false;
+                }}
+                placeholder="House, street and block"
+              />
+            </FormField>
+
+            <FormField
+              label="City"
+              hint={pin && !cityCode ? 'Could not match a city — pick it manually.' : undefined}
+            >
+              <Select
+                placeholder={cities.length ? 'Choose the city' : 'Loading cities…'}
+                value={cityCode}
+                onChange={(e) => setCityCode(e.target.value)}
+                options={cities}
+              />
+            </FormField>
+          </div>
+
+          {!locationReady && (
+            <p className="text-fg-muted text-sm">
+              The location is saved once you place a pin, fill the address (3+ characters) and pick
+              a city — required before publishing.
+            </p>
+          )}
         </div>
 
         {error && <p className="text-danger text-sm">{error}</p>}

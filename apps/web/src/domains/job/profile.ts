@@ -9,6 +9,7 @@ import {
 } from '@jobbank/shared';
 import { and, eq, sql } from 'drizzle-orm';
 import { requireOwnCompany } from '@/domains/company/repository';
+import { enqueueJobMatch } from '@/domains/matching';
 import { runCommand } from '@/domains/shared/audit';
 import { ForbiddenError, NotFoundError } from '@/domains/shared/errors';
 import { assertPermission, type Actor } from '@/domains/shared/scope';
@@ -165,6 +166,12 @@ export async function transitionJobStatus(
       after: { status: check.to },
       reason: input.note ?? null,
     });
+
+    // Auto matching: going OPEN (publish or resume) queues a shortlist rebuild.
+    // The Python worker (services/matching) claims the outbox row and runs it.
+    if (check.to === 'OPEN') {
+      await enqueueJobMatch(tx, jobId, event === 'PUBLISH' ? 'PUBLISH' : 'RESUME');
+    }
     return updated!;
   }).then((row) => buildJobView(db, row));
 }

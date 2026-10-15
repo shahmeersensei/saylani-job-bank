@@ -27,5 +27,7 @@ export interface TopBarProps {
   userMenuItems?: UserMenuItem[];
   /** Extra controls (notifications bell, etc.) placed before the theme toggle. */
   actions?: ReactNode;
+  /** Path for the bell's "View all" link; defaults to /notifications. */
+  notificationsHref?: string;
   className?: string;
 }
