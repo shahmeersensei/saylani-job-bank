@@ -25,6 +25,7 @@ export default async function SuperAdminCompanyDetailPage({
       canSuspend
       canManage
       canOnboard
+      canVerify={actor.permissions.has('company:verify')}
       jobs={jobs}
       canManageJobs={actor.permissions.has('job:manage')}
       categories={categories.map((item) => ({ code: item.code, label: item.label }))}

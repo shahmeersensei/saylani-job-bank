@@ -134,7 +134,6 @@ export function CompanyRegistrationFormPrint({
               label="Visit date"
               value={onboarding.visitDate ? formatDate(onboarding.visitDate) : null}
             />
-            <Field label="Company agreed to work with us" value={onboarding.agreed ? 'Yes' : ''} />
           </div>
         </FormSection>
 

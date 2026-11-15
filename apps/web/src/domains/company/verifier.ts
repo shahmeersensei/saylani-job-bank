@@ -1,7 +1,7 @@
 import 'server-only';
 import { schema } from '@jobbank/db';
 import type { DocumentReviewInput, VerificationState } from '@jobbank/shared';
-import { and, asc, count, desc, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lt, max, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   assertActiveMasterData,
@@ -38,6 +38,7 @@ import {
   recordTransition,
   submissionMissing,
   ver,
+  verificationDueOn,
   type CompanyRow,
   type CompanyView,
   type SignedIn,
@@ -81,9 +82,8 @@ export interface QueueItem {
 }
 
 /**
- * Verifier queue: all open rounds in the verifier's branch(es), sorted by SLA urgency.
- * Verifiers see the whole branch queue so they know what is waiting; their own claimed
- * items are highlighted with the `mine` filter.
+ * Branch Admin verification queue: all open rounds in the Branch Admin's
+ * branch(es), sorted by SLA urgency.
  */
 export async function listQueue(
   actor: Actor,
@@ -160,9 +160,9 @@ export async function listQueue(
 // ─── Review helpers ────────────────────────────────────────────────────
 
 /**
- * Monthly verifications done by the signed-in verifier (H8), current calendar year,
+ * Monthly verifications done by the signed-in Branch Admin (H8), current calendar year,
  * branch-scoped exactly like the queue (cityScope): counts verification rounds this
- * verifier decided VERIFIED, bucketed by decidedAt in PKT months (M1 — a decision
+ * reviewer decided VERIFIED, bucketed by decidedAt in PKT months (M1 — a decision
  * at 00:30 PKT on 1 November belongs to November, not October). Months with no
  * decisions are 0 — the dashboard chart shows real decisions, never invented bars.
  * The year window is PKT too: 1 Jan 00:00 PKT = 31 Dec 19:00 UTC the year before.
@@ -194,12 +194,44 @@ export async function countVerificationsDoneByMonth(actor: Actor, year: number):
   return values;
 }
 
-/** The verifier's full view of a company — same as the employer's view plus the verification. */
+/** The reviewer's full view of a company — same as the employer's view plus the verification. */
 export async function getCompanyForReview(actor: Actor, companyId: string): Promise<CompanyView> {
   assertPermission(actor, 'company:verify');
   const row = await loadCompany(db, companyId);
   await assertCityAccess(actor, row.branchId, { entityType: 'company', entityId: row.id });
   return buildCompanyView(db, row);
+}
+
+/**
+ * The open verification round for a company, creating one when the company
+ * has none yet. Field-visit companies are reviewed straight from DRAFT and
+ * never went through SUBMIT, so no round exists for them until the Branch
+ * Admin's first review action. The round's submittedAt honours a paper form
+ * already marked verified & signed, preserving the old invariant (signing
+ * and submitting happened in one transaction, so signedAt == submittedAt)
+ * that the freshness gate in verifyCompany relies on.
+ */
+async function ensureOpenVerification(tx: DbExecutor, row: CompanyRow): Promise<VerificationRow> {
+  const existing = await openVerification(tx, row.id, { forUpdate: true });
+  if (existing) return existing;
+  const now = new Date();
+  const dueOn = await verificationDueOn(now);
+  const [{ last } = { last: 0 }] = await tx
+    .select({ last: max(ver.round) })
+    .from(ver)
+    .where(eq(ver.companyId, row.id));
+  const [round] = await tx
+    .insert(ver)
+    .values({
+      companyId: row.id,
+      branchId: row.branchId!,
+      round: (last ?? 0) + 1,
+      submittedAt: row.registrationVerifiedSignedAt ?? now,
+      clockStartedAt: now,
+      slaDueOn: dueOn,
+    })
+    .returning();
+  return round!;
 }
 
 function assertAssignedVerifier(round: VerificationRow, actor: Actor) {
@@ -245,7 +277,7 @@ async function assertNoConflictOfInterest(
   const conflict = await autoConflictCheck(actor, companyId, ex);
   if (conflict) {
     throw new ConflictError(
-      `You cannot verify this company: ${conflict}. Ask another verifier or your Super Admin.`,
+      `You cannot verify this company: ${conflict}. Ask another Branch Admin or your Super Admin.`,
       { reason: 'CONFLICT_OF_INTEREST' },
     );
   }
@@ -305,7 +337,12 @@ export async function assertAssignableVerifier(
 
 // ─── Claim / release ───────────────────────────────────────────────────
 
-/** Pick up a SUBMITTED company from the queue. */
+/** Pick up a SUBMITTED company from the queue.
+ * Legacy Verifier-queue flow: since verification moved to the Branch Admin
+ * (2026-11-14) nothing claims companies any more — the Branch Admin reviews
+ * straight from DRAFT or SUBMITTED. Kept so in-flight rounds stay readable;
+ * the route is permission-gated to company:verify, which Verifiers no
+ * longer hold, and the machine CLAIM transition still requires VERIFIER. */
 export async function claimCompany(ctx: SignedIn, companyId: string): Promise<CompanyView> {
   assertPermission(ctx.actor, 'company:verify');
   // M33: scope BEFORE the conflict check — the conflict signal must not leak
@@ -415,15 +452,15 @@ export async function reviewDocument(
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
     await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
-    const round = await openVerification(tx, row.id, { forUpdate: true });
-    if (!round) throw new NotFoundError('Open verification for company', companyId);
-    assertAssignedVerifier(round, ctx.actor);
-    // The contact-conflict check is re-run here: a Super Admin assignment
-    // bypasses claimCompany, so the review paths check it themselves.
+    // A round must exist before a document is reviewed: DRAFT companies
+    // have none until the first review action opens one.
+    await ensureOpenVerification(tx, row);
+    // The contact-conflict check is re-run here: the review paths check it
+    // themselves.
     await assertNoConflictOfInterest(ctx.actor, companyId);
-    if (!['UNDER_VERIFICATION', 'RESUBMITTED'].includes(row.status)) {
+    if (!['DRAFT', 'SUBMITTED', 'UNDER_VERIFICATION', 'RESUBMITTED'].includes(row.status)) {
       throw new ForbiddenError(
-        'Documents can only be reviewed while the company is under verification',
+        'Documents can only be reviewed while the company is awaiting verification',
       );
     }
     const [doc] = await tx
@@ -475,9 +512,7 @@ export async function requestInfo(
       documentsNotAccepted: [],
     };
     const to = companyMachine.transition(row.status, 'REQUEST_INFO', machineCtx, ctx.actor.roles);
-    const round = await openVerification(tx, row.id, { forUpdate: true });
-    if (!round) throw new NotFoundError('Open verification for company', companyId);
-    assertAssignedVerifier(round, ctx.actor);
+    const round = await ensureOpenVerification(tx, row);
     await assertNoConflictOfInterest(ctx.actor, companyId);
     const now = new Date();
     // Working days left on the SLA, counting the due day itself and
@@ -530,7 +565,7 @@ export async function requestInfo(
     userId,
     type: 'COMPANY_INFO_REQUESTED',
     title: `More information needed — ${view.details.legalName}`,
-    body: `The verifier asked for more information about ${view.details.legalName}: ${input.note}`,
+    body: `The Branch Admin asked for more information about ${view.details.legalName}: ${input.note}`,
     data: { companyId },
   })).catch((err) => ctx.log.error('company info-request notification failed', { companyId, err }));
   return view;
@@ -551,9 +586,7 @@ export async function verifyCompany(
       documentsNotAccepted: await documentsNotAccepted(tx, row),
     };
     const to = companyMachine.transition(row.status, 'VERIFY', machineCtx, ctx.actor.roles);
-    const round = await openVerification(tx, row.id, { forUpdate: true });
-    if (!round) throw new NotFoundError('Open verification for company', companyId);
-    assertAssignedVerifier(round, ctx.actor);
+    const round = await ensureOpenVerification(tx, row);
     // Audit 2026-11-11 (M-11): for field-visit (onboarded) companies the
     // paper-form attestation must be fresh for THIS round. A legal
     // correction clears it (see correctCompanyDetails), so a VERIFY on a
@@ -650,9 +683,7 @@ export async function rejectCompany(
       documentsNotAccepted: [],
     };
     const to = companyMachine.transition(row.status, 'REJECT', machineCtx, ctx.actor.roles);
-    const round = await openVerification(tx, row.id, { forUpdate: true });
-    if (!round) throw new NotFoundError('Open verification for company', companyId);
-    assertAssignedVerifier(round, ctx.actor);
+    const round = await ensureOpenVerification(tx, row);
     await assertNoConflictOfInterest(ctx.actor, companyId);
     const now = new Date();
     await tx

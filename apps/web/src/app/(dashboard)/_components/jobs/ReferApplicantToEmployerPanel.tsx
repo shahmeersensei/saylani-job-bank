@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react';
 import { Button, Select, Textarea, type SelectOption } from '@/components/atoms';
 import { FormField, toast } from '@/components/molecules';
 import { apiFetch, friendlyApiError } from '@/lib/api/client';
+import { formatDate } from '@/lib/format/date';
 import type { ApplicationView, JobCandidateReferralView } from '@/domains/placement';
 
 interface Props {
@@ -13,14 +14,6 @@ interface Props {
   /** Applicants in this staff member's city scope (verified + unverified, for now). */
   targets: SelectOption[];
   initialReferrals: JobCandidateReferralView[];
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-PK', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
 }
 
 const STATUS_LABELS: Record<string, string> = {

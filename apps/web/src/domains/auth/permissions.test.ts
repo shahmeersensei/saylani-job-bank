@@ -17,8 +17,9 @@ describe('permission matrix encodes the PRD rules', () => {
     expect(holders('blacklist:decide')).toEqual(['BRANCH_ADMIN']);
   });
 
-  it('rule 2: only Verification Officers verify companies', () => {
-    expect(holders('company:verify')).toEqual(['VERIFIER']);
+  it('rule 2: only Branch Admins verify companies (2026-11-14: moved from Verifier)', () => {
+    expect(holders('company:verify')).toEqual(['BRANCH_ADMIN']);
+    expect(ROLE_PERMISSIONS.VERIFIER).not.toContain('company:verify');
   });
 
   it('field-visit onboarding: branch admins, verifiers and Super Admin onboard companies — staff do not', () => {
@@ -110,7 +111,7 @@ describe('permission matrix encodes the PRD rules', () => {
   });
 
   it('combines permissions across roles and picks the most senior home page', () => {
-    expect(permissionsFor(['VERIFIER', 'STAFF']).has('company:verify')).toBe(true);
+    expect(permissionsFor(['BRANCH_ADMIN', 'STAFF']).has('company:verify')).toBe(true);
     expect(permissionsFor(['VERIFIER', 'STAFF']).has('match_case:refer')).toBe(true);
     expect(homePathFor(['STAFF', 'BRANCH_ADMIN'])).toBe('/branch-admin');
     expect(homePathFor(['APPLICANT'])).toBe('/applicant');

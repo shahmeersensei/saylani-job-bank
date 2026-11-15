@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Textarea } from '@/components/atoms';
 import { toast } from '@/components/molecules';
 import { apiFetch, friendlyApiError } from '@/lib/api/client';
+import { formatDateTime } from '@/lib/format/date';
 import type { MessageView } from '@/domains/placement';
 
 interface Props {
@@ -56,12 +57,7 @@ export function ChatPanel({ applicationId, messages, currentUserRole }: Props) {
               >
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-xs font-semibold">{msg.senderName}</span>
-                  <span className="text-xs opacity-60">
-                    {new Date(msg.createdAt).toLocaleString('en-PK', {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    })}
-                  </span>
+                  <span className="text-xs opacity-60">{formatDateTime(msg.createdAt)}</span>
                 </div>
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>

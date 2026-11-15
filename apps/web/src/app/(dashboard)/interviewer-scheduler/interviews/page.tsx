@@ -6,6 +6,7 @@ import {
   ScheduleInterviewDialog,
   UpdateInterviewDialog,
 } from '../../_components/applicants/InterviewDialogs';
+import { formatDateTime } from '@/lib/format/date';
 
 export const metadata = { title: 'Interviews — Saylani Job Bank' };
 
@@ -30,7 +31,7 @@ const INTERVIEW_STATUSES = new Set([
 
 function formatInterviewAt(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
+  return formatDateTime(iso);
 }
 
 function InterviewRow({ item }: { item: InterviewListItem }) {

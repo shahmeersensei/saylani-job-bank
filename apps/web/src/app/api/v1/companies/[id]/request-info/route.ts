@@ -3,7 +3,7 @@ import { requestInfo } from '@/domains/company';
 import { apiHandler, ok } from '@/domains/shared/http';
 import { z } from 'zod';
 
-/** POST /api/v1/companies/{id}/request-info — verifier asks the employer for more information. */
+/** POST /api/v1/companies/{id}/request-info — Branch Admin asks the employer for more information. */
 export const POST = apiHandler({
   permission: 'company:verify',
   idempotent: true,

@@ -4,6 +4,7 @@ import type { PaginationMeta } from '@jobbank/shared';
 import { and, count, desc, eq, inArray, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { runCommand } from '@/domains/shared/audit';
+import { formatDateTime } from '@/lib/format/date';
 import { paginationMeta, type ListQuery } from '@/domains/shared/pagination';
 import { enforceRateLimit } from '@/domains/shared/rate-limit';
 import {
@@ -484,7 +485,7 @@ async function notifyApplicantOfInterviewUpdate(
     INTERVIEW_SCHEDULED: {
       title: `Interview scheduled — ${view.jobTitle}`,
       body: view.interviewAt
-        ? `Your interview is on ${new Date(view.interviewAt).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })}${view.interviewLocation ? ` at ${view.interviewLocation}` : ''}.`
+        ? `Your interview is on ${formatDateTime(view.interviewAt)}${view.interviewLocation ? ` at ${view.interviewLocation}` : ''}.`
         : 'Your interview has been scheduled. Staff will contact you with details.',
     },
     INTERVIEW_POSTPONED: {
@@ -498,7 +499,7 @@ async function notifyApplicantOfInterviewUpdate(
     INTERVIEW_RESCHEDULED: {
       title: `Interview rescheduled — ${view.jobTitle}`,
       body: view.interviewAt
-        ? `Your interview is now on ${new Date(view.interviewAt).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })}${view.interviewLocation ? ` at ${view.interviewLocation}` : ''}.`
+        ? `Your interview is now on ${formatDateTime(view.interviewAt)}${view.interviewLocation ? ` at ${view.interviewLocation}` : ''}.`
         : 'Your interview has been rescheduled.',
     },
   };

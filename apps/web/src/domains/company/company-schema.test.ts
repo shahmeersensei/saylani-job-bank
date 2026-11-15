@@ -90,7 +90,6 @@ describe('staffOnboardCompanySchema NTN (optional)', () => {
     contactName: 'Aisha Khan',
     contactPhone: '0300 1234567',
     visitDate: '2026-11-01',
-    agreed: true,
   };
 
   it('accepts a missing NTN as null', () => {

@@ -21,6 +21,7 @@ import { requireRole } from '@/domains/auth';
 import { listMatchedJobs } from '@/domains/matching';
 import { listMyNotifications } from '@/domains/notifications';
 import { listMyApplications } from '@/domains/placement';
+import { formatDate, formatDateTime } from '@/lib/format/date';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
 import { APPLICANT_STATUS_PILL, IDENTITY_PILL } from '../_components/applicants/labels';
 import { StatusToggle } from './_components/StatusToggle';
@@ -155,12 +156,7 @@ export default async function ApplicantHomePage() {
   const firstName = profile.personal.fullName.split(/\s+/)[0];
 
   const now = new Date();
-  const dateStr = now.toLocaleDateString('en-PK', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const dateStr = `${now.toLocaleDateString('en-PK', { weekday: 'short' })}, ${formatDate(now)}`;
 
   return (
     <div className="grid w-full gap-6">
@@ -251,10 +247,7 @@ export default async function ApplicantHomePage() {
             <p className="font-semibold">Interview scheduled: {app.jobTitle}</p>
             {app.interviewAt && (
               <p className="mt-0.5">
-                {new Date(app.interviewAt).toLocaleString('en-PK', {
-                  dateStyle: 'full',
-                  timeStyle: 'short',
-                })}
+                {formatDateTime(app.interviewAt)}
                 {app.interviewLocation ? ` · ${app.interviewLocation}` : ''}
               </p>
             )}

@@ -23,8 +23,14 @@ const submissionGuard = ({ submissionMissing }: CompanyMachineContext) =>
  * DRAFT → SUBMITTED → UNDER_VERIFICATION → (INFO_REQUESTED ⇄ RESUBMITTED) → VERIFIED | REJECTED.
  * A rejected company may correct its details and submit a new round (owner decision 10).
  * VERIFIED ⇄ SUSPENDED by Branch Admin (blacklist-driven suspension arrives in M14).
- * The verifier-only rules that need data (assigned verifier, conflict of interest, branch
- * scope) are checked in the service before firing an event.
+ * Since 2026-11-14 verification belongs to the Branch Admin of the company's
+ * branch — not the Verifier, who only registers companies. The Branch Admin
+ * reviews a company straight from DRAFT (field-visit companies never leave
+ * DRAFT before review) as well as from SUBMITTED / UNDER_VERIFICATION /
+ * RESUBMITTED (employer-submitted companies). There is no claim step for
+ * Branch Admin review; branch scope is enforced in the service.
+ * The CLAIM / RELEASE / ASSIGN transitions below are legacy Verifier-queue
+ * mechanics, kept for in-flight rounds; they are not part of the new flow.
  */
 export const companyMachine = defineMachine<
   CompanyStatus,
@@ -72,10 +78,10 @@ export const companyMachine = defineMachine<
     { from: 'RESUBMITTED', event: 'ASSIGN', to: 'RESUBMITTED', actors: ['SUPER_ADMIN'] },
     { from: 'INFO_REQUESTED', event: 'ASSIGN', to: 'INFO_REQUESTED', actors: ['SUPER_ADMIN'] },
     {
-      from: ['UNDER_VERIFICATION', 'RESUBMITTED'],
+      from: ['DRAFT', 'SUBMITTED', 'UNDER_VERIFICATION', 'RESUBMITTED'],
       event: 'REQUEST_INFO',
       to: 'INFO_REQUESTED',
-      actors: ['VERIFIER'],
+      actors: ['BRANCH_ADMIN'],
     },
     {
       from: 'INFO_REQUESTED',
@@ -90,10 +96,10 @@ export const companyMachine = defineMachine<
       guard: submissionGuard,
     },
     {
-      from: ['UNDER_VERIFICATION', 'RESUBMITTED'],
+      from: ['DRAFT', 'SUBMITTED', 'UNDER_VERIFICATION', 'RESUBMITTED'],
       event: 'VERIFY',
       to: 'VERIFIED',
-      actors: ['VERIFIER'],
+      actors: ['BRANCH_ADMIN'],
       guard: ({ documentsNotAccepted, submissionMissing }) =>
         documentsNotAccepted.length === 0 && submissionMissing.length === 0
           ? true
@@ -102,13 +108,13 @@ export const companyMachine = defineMachine<
             : `Complete the submission first (${submissionMissing.join(', ')})`,
     },
     {
-      // M24: REJECT is not allowed from INFO_REQUESTED — the verifier is
+      // M24: REJECT is not allowed from INFO_REQUESTED — the reviewer is
       // waiting for the employer's reply; they request info or wait, they
       // do not reject mid-wait. (VERIFY is blocked there for the same reason.)
-      from: ['UNDER_VERIFICATION', 'RESUBMITTED'],
+      from: ['DRAFT', 'SUBMITTED', 'UNDER_VERIFICATION', 'RESUBMITTED'],
       event: 'REJECT',
       to: 'REJECTED',
-      actors: ['VERIFIER'],
+      actors: ['BRANCH_ADMIN'],
     },
     // H20: Super Admin can suspend/reinstate too (company:suspend is on
     // SUPER_ADMIN permissions since round 1); previously BRANCH_ADMIN only.

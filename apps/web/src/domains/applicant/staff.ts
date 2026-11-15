@@ -1309,7 +1309,7 @@ export async function staffRegisterApplicant(
  *
  * Deliberate asymmetry with companies, kept as a product decision: for companies the
  * verified-and-signed mark GATES the next step (markCompanyRegistrationVerifiedSigned
- * submits the DRAFT to the verifier queue in the same step). For applicants it is
+ * submits the DRAFT to Branch Admin review in the same step). For applicants it is
  * record-only evidence of the paper review — it does NOT gate anything. Nothing in
  * the codebase gates applicant activation or matching on
  * registrationVerifiedSignedAt; the timestamp is the audit evidence that the

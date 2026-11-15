@@ -6,8 +6,7 @@ import {
   CNICInput,
   FileUploader,
   FormField,
-  LatLngFields,
-  type LatLng,
+  GeocodeAddressPicker,
   toast,
 } from '@/components/molecules';
 import { WizardLayout } from '@/components/templates';
@@ -31,7 +30,7 @@ const steps = [
 export default function WizardDemoPage() {
   const [current, setCurrent] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [pin, setPin] = useState<LatLng | null>(null);
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
 
   const next = () => {
     setSaving(true);
@@ -75,7 +74,7 @@ export default function WizardDemoPage() {
             </FormField>
           </div>
         )}
-        {current === 1 && <LatLngFields value={pin} onChange={setPin} />}
+        {current === 1 && <GeocodeAddressPicker value={pin} onChange={setPin} />}
         {current === 2 && (
           <FormField label="Main trade" required>
             <Select

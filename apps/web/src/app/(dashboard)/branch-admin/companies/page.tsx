@@ -25,9 +25,13 @@ const STATUS_BADGE: Record<
 };
 const FILTER_STATUSES = [
   { value: 'VERIFIED', label: 'Verified' },
-  { value: 'SUSPENDED', label: 'Suspended' },
+  // 2026-11-14: verification moved to Branch Admin — Draft and Submitted
+  // companies awaiting review show here, next to Verified.
+  { value: 'DRAFT', label: 'Draft — needs review' },
+  { value: 'SUBMITTED', label: 'Submitted' },
   { value: 'UNDER_VERIFICATION', label: 'Under Review' },
   { value: 'INFO_REQUESTED', label: 'Info needed' },
+  { value: 'SUSPENDED', label: 'Suspended' },
   { value: 'REJECTED', label: 'Rejected' },
 ] as const;
 
@@ -44,7 +48,15 @@ export default async function BranchAdminCompaniesPage({
     defaultSort: { field: 'legalName', direction: 'asc' },
     filters: {
       ...companyFilters,
-      status: z.enum(['VERIFIED', 'SUSPENDED', 'UNDER_VERIFICATION', 'INFO_REQUESTED', 'REJECTED']),
+      status: z.enum([
+        'VERIFIED',
+        'DRAFT',
+        'SUBMITTED',
+        'SUSPENDED',
+        'UNDER_VERIFICATION',
+        'INFO_REQUESTED',
+        'REJECTED',
+      ]),
     },
   });
   const [{ items, pagination }, allCompanies] = await Promise.all([
@@ -74,9 +86,10 @@ export default async function BranchAdminCompaniesPage({
           Admins register companies from the sidebar "Register Company" dialog
           (RegisterCompanyDialog → POST /api/v1/companies/onboard), the same
           field-visit flow Super Admins and Verifiers use: outreach record,
-          Review & Print, verified-signed. The old page rendered
-          StaffRegisterCompanyForm, which created a bare DRAFT with no
-          outreach record and no path to VERIFIED.
+          then a plain confirmation — printing and marking the form verified
+          & signed happen on the company detail page (2026-11-14). The old
+          page rendered StaffRegisterCompanyForm, which created a bare DRAFT
+          with no outreach record and no path to VERIFIED.
         */}
       </header>
 

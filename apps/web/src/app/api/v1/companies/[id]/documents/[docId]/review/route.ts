@@ -3,7 +3,7 @@ import { reviewDocument } from '@/domains/company';
 import { apiHandler, ok } from '@/domains/shared/http';
 import { z } from 'zod';
 
-/** PATCH /api/v1/companies/{id}/documents/{docId}/review — verifier accepts or rejects one doc. */
+/** PATCH /api/v1/companies/{id}/documents/{docId}/review — Branch Admin accepts or rejects one doc. */
 export const PATCH = apiHandler({
   permission: 'company:verify',
   idempotent: true,

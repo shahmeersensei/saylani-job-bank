@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Button, Select, Textarea } from '@/components/atoms';
 import { EmptyState, FormField, Modal, toast } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { formatDateTime } from '@/lib/format/date';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
 import type { CallListItem } from '@/domains/placement';
 
@@ -185,10 +186,7 @@ export function CallList({
             <p className="text-fg-muted">{item.message}</p>
             {item.interviewAt && (
               <p className="text-fg-muted">
-                {new Date(item.interviewAt).toLocaleString('en-PK', {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })}
+                {formatDateTime(item.interviewAt)}
                 {item.interviewLocation ? ` · ${item.interviewLocation}` : ''}
               </p>
             )}

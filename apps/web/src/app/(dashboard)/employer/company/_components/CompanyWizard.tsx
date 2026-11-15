@@ -5,6 +5,7 @@ import {
   LEGAL_STRUCTURE_LABELS,
   COMPANY_SIZE_BANDS,
   COMPANY_SIZE_LABELS,
+  CITY_CENTRES,
   RESUBMIT_NOTE_MIN_LENGTH,
   companyContactsSchema,
   companyHeadOfficeSchema,
@@ -596,37 +597,6 @@ function toCityCode(label: string): string {
     .replace(/[^A-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
 }
-
-/** Approximate city centres for the seeded CITY list. Used only when the
- * server geocode lookup returns nothing or is unreachable (the laptop
- * network has blocked external geocoders before), so Save still works:
- * the exact address text is saved and the pin is the city centre, near
- * enough for the nearest-branch lookup. Never a substitute for a real
- * geocode result when one is available. */
-const CITY_CENTRES: Record<string, { lat: number; lng: number }> = {
-  KARACHI: { lat: 24.8607, lng: 67.0011 },
-  LAHORE: { lat: 31.5204, lng: 74.3587 },
-  ISLAMABAD: { lat: 33.6844, lng: 73.0479 },
-  RAWALPINDI: { lat: 33.6007, lng: 73.0679 },
-  FAISALABAD: { lat: 31.4504, lng: 73.135 },
-  MULTAN: { lat: 30.1575, lng: 71.5249 },
-  HYDERABAD: { lat: 25.396, lng: 68.3578 },
-  GUJRANWALA: { lat: 32.1877, lng: 74.1945 },
-  PESHAWAR: { lat: 34.0151, lng: 71.5249 },
-  QUETTA: { lat: 30.1798, lng: 66.975 },
-  SIALKOT: { lat: 32.4945, lng: 74.5229 },
-  SARGODHA: { lat: 32.0837, lng: 72.6711 },
-  BAHAWALPUR: { lat: 29.3544, lng: 71.6911 },
-  SUKKUR: { lat: 27.7052, lng: 68.8574 },
-  LARKANA: { lat: 27.5589, lng: 68.212 },
-  ABBOTTABAD: { lat: 34.1688, lng: 73.2215 },
-  MARDAN: { lat: 34.1986, lng: 72.0231 },
-  GUJRAT: { lat: 32.5731, lng: 74.1005 },
-  SHEIKHUPURA: { lat: 31.7166, lng: 73.985 },
-  RAHIM_YAR_KHAN: { lat: 28.4202, lng: 70.2989 },
-  MUZAFFARABAD: { lat: 34.37, lng: 73.471 },
-  GILGIT: { lat: 35.8819, lng: 74.4645 },
-};
 
 function LocationStep({
   company,

@@ -6,6 +6,7 @@ import { Badge, Button } from '@/components/atoms';
 import { EmptyState } from '@/components/molecules';
 import { Users } from 'lucide-react';
 import NextLink from 'next/link';
+import { formatDate } from '@/lib/format/date';
 
 export const metadata = { title: 'Referrals — Saylani Job Bank' };
 
@@ -131,10 +132,7 @@ export default async function EmployerReferralsPage({
                             </Badge>
                           </td>
                           <td className="px-4 py-3 text-xs opacity-70">
-                            {new Date(app.updatedAt).toLocaleDateString('en-PK', {
-                              day: 'numeric',
-                              month: 'short',
-                            })}
+                            {formatDate(app.updatedAt)}
                           </td>
                           <td className="px-4 py-3">
                             <NextLink

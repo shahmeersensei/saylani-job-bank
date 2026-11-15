@@ -25,6 +25,7 @@ import {
 import { requireReasonCode } from '@/domains/matching';
 import { db } from '@/lib/db';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
+import { formatDateTime } from '@/lib/format/date';
 import { createNotification, notifyCompanyEmployers } from '@/domains/notifications';
 import type { RequestContext } from '@/domains/shared/audit';
 import {
@@ -527,14 +528,7 @@ async function notifyApplicantOfEmployerInterview(
       CANCELLED: 'INTERVIEW_CANCELLED',
     } as const
   )[kind];
-  const when = view.employerInterviewAt
-    ? new Date(view.employerInterviewAt).toLocaleString('en-PK', {
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    : '';
+  const when = view.employerInterviewAt ? formatDateTime(view.employerInterviewAt) : '';
   const verb =
     kind === 'SCHEDULED'
       ? 'has scheduled an interview with you'

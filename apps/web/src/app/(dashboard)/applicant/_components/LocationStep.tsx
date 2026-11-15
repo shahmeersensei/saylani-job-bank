@@ -3,7 +3,7 @@
 import { applicantLocationSchema } from '@jobbank/shared';
 import { useState } from 'react';
 import { Input, Select } from '@/components/atoms';
-import { FormField, LatLngFields, type LatLng } from '@/components/molecules';
+import { FormField, GeocodeAddressPicker } from '@/components/molecules';
 import type { ApplicantProfile } from '@/domains/applicant';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import {
@@ -16,7 +16,7 @@ import { useStepSave, type StepProps } from './step';
 
 export function LocationStep({ profile, lists, bindSave }: StepProps) {
   const address = profile?.address;
-  const [pin, setPin] = useState<LatLng | null>(address?.location ?? null);
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(address?.location ?? null);
   const [form, setForm] = useState({
     addressLine: address?.addressLine ?? '',
     cityCode: address?.cityCode ?? '',
@@ -34,7 +34,7 @@ export function LocationStep({ profile, lists, bindSave }: StepProps) {
     });
     if (!parsed.success) {
       const next = zodFieldErrors(parsed.error);
-      if (!pin) next.location = 'Enter your latitude and longitude';
+      if (!pin) next.location = 'Search for your home area and pick a match from the list';
       setErrors(next);
       return null;
     }
@@ -63,17 +63,27 @@ export function LocationStep({ profile, lists, bindSave }: StepProps) {
         </p>
       )}
 
-      <div className="grid gap-2">
-        <p className="text-fg text-sm font-medium">
-          Your home location <span className="text-danger">*</span>
-        </p>
-        <LatLngFields value={pin} onChange={setPin} />
-        {pinError && (
-          <p role="alert" className="text-danger text-sm">
-            {pinError}
-          </p>
-        )}
-      </div>
+      <GeocodeAddressPicker
+        value={pin}
+        onChange={setPin}
+        onPick={(result) => {
+          // The city is a seeded-code select: only fill it when the
+          // geocoder matched one of the seeded cities.
+          if (result.cityCode && lists.cities.some((c) => c.value === result.cityCode)) {
+            set({ cityCode: result.cityCode });
+          }
+          if (result.addressLine && !form.addressLine) {
+            set({ addressLine: result.addressLine });
+          }
+        }}
+        cityCode={form.cityCode || null}
+        cityLabel={lists.cities.find((c) => c.value === form.cityCode)?.label ?? null}
+        label="Your home location"
+        hint="Search your area, street or a nearby landmark, then pick a match. The exact house address below stays private to Job Bank staff."
+        initialQuery={address?.addressLine ?? ''}
+        required
+        error={pinError}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField

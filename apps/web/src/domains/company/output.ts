@@ -119,7 +119,6 @@ export const companyOnboardingSchema = z.object({
     .object({ name: z.string().nullable(), roleLabel: z.string().nullable() })
     .nullable(),
   visitDate: z.string().nullable(),
-  agreed: z.boolean(),
   notes: z.object({
     headOfficeAddress: z.string().nullable(),
     otherSites: z.string().nullable(),

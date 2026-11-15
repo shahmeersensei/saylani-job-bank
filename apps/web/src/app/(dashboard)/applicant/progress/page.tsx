@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ApplicationView } from '@/domains/placement';
+import { formatDate, formatDateTime } from '@/lib/format/date';
 import { AcceptOfferButton } from './_components/AcceptOfferButton';
 import { RefuseOfferButton } from './_components/RefuseOfferButton';
 import { ApplicantChatPanel } from './_components/ApplicantChatPanel';
@@ -106,10 +107,7 @@ async function ApplicationCard({
         >
           <p className="font-semibold">Job Bank Interview</p>
           <p>
-            {new Date(app.interviewAt).toLocaleString('en-PK', {
-              dateStyle: 'full',
-              timeStyle: 'short',
-            })}
+            {formatDateTime(app.interviewAt)}
             {app.interviewLocation ? ` · ${app.interviewLocation}` : ''}
           </p>
         </div>
@@ -122,10 +120,7 @@ async function ApplicationCard({
         >
           <p className="font-semibold">Employer Interview</p>
           <p>
-            {new Date(app.employerInterviewAt).toLocaleString('en-PK', {
-              dateStyle: 'full',
-              timeStyle: 'short',
-            })}
+            {formatDateTime(app.employerInterviewAt)}
             {app.employerInterviewLocation ? ` · ${app.employerInterviewLocation}` : ''}
           </p>
         </div>
@@ -161,9 +156,7 @@ async function ApplicationCard({
         </div>
       )}
 
-      <p className="text-fg-muted mt-3 text-xs">
-        Last updated {new Date(app.updatedAt).toLocaleDateString('en-PK')}
-      </p>
+      <p className="text-fg-muted mt-3 text-xs">Last updated {formatDate(app.updatedAt)}</p>
     </article>
   );
 }

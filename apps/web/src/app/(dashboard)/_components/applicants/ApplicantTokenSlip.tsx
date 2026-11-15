@@ -3,6 +3,7 @@
 import type { ApplicantTokenView } from '@jobbank/shared';
 import Image from 'next/image';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
+import { formatDate, formatTime } from '@/lib/format/date';
 
 /**
  * Token slip styled exactly like the approved demo: Saylani logo top-left,
@@ -27,18 +28,8 @@ import { formatPkMobileDisplay } from '@/lib/format/phone';
  * consent checkbox — the CNIC is required to issue the token at all.
  */
 export function ApplicantTokenSlip({ token }: { token: ApplicantTokenView }) {
-  const date = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Karachi',
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-  }).format(new Date(token.issuedAt));
-  const time = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Karachi',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  }).format(new Date(token.issuedAt));
+  const date = formatDate(token.issuedAt);
+  const time = formatTime(token.issuedAt);
 
   return (
     <article className="token-slip">

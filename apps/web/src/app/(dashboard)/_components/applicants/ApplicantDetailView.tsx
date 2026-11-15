@@ -45,7 +45,7 @@ import type { StaffMatchedJob } from '@/domains/matching';
 import type { ApplicationView } from '@/domains/placement';
 import { ApiClientError, apiFetch, friendlyApiError } from '@/lib/api/client';
 import { formatCnic } from '@/lib/format/cnic';
-import { formatDate } from '@/lib/format/date';
+import { formatDate, formatDateTime } from '@/lib/format/date';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
 import { errorMessage, toFieldErrors, type FieldErrors } from './form';
 import { DOCUMENT_STATUS_PILL, IDENTITY_PILL } from './labels';
@@ -915,22 +915,14 @@ function ApplicationsCard({
               </div>
               {app.interviewAt && (
                 <p className="text-fg-muted text-xs">
-                  Interview:{' '}
-                  {new Date(app.interviewAt).toLocaleString('en-PK', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })}
+                  Interview: {formatDateTime(app.interviewAt)}
                   {app.interviewLocation ? ` · ${app.interviewLocation}` : ''}
                 </p>
               )}
               {app.interviewNote && <p className="text-fg-muted text-xs">{app.interviewNote}</p>}
               {app.employerInterviewAt && (
                 <p className="text-fg-muted text-xs">
-                  Employer interview:{' '}
-                  {new Date(app.employerInterviewAt).toLocaleString('en-PK', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })}
+                  Employer interview: {formatDateTime(app.employerInterviewAt)}
                   {app.employerInterviewLocation ? ` · ${app.employerInterviewLocation}` : ''}
                 </p>
               )}

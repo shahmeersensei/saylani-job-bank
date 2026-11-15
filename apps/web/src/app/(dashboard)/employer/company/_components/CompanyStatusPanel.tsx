@@ -10,6 +10,7 @@ import { CheckCircle2, XCircle, AlertCircle, Clock, PlusCircle } from 'lucide-re
 import { Button, Link, StatusPill } from '@/components/atoms';
 import { KeyValue } from '@/components/molecules';
 import type { CompanyView } from '@/domains/company';
+import { formatDate } from '@/lib/format/date';
 
 const STATUS_PILL: Record<
   CompanyStatus,
@@ -50,7 +51,7 @@ export function CompanyStatusPanel({ company }: { company: CompanyView }) {
           <StatusPill
             label={
               company.status === 'VERIFIED' && company.verifiedAt
-                ? `Verified · ${new Date(company.verifiedAt).toLocaleDateString('en-PK')}`
+                ? `Verified · ${formatDate(company.verifiedAt)}`
                 : pill.label
             }
             tone={pill.variant}
@@ -100,9 +101,7 @@ export function CompanyStatusPanel({ company }: { company: CompanyView }) {
                   <span className="text-fg">{COMPANY_STATUS_LABELS[company.status]}</span>
                   {ver.infoRequest && <p className="text-fg-muted">{ver.infoRequest}</p>}
                   {ver.decisionNote && <p className="text-fg-muted">{ver.decisionNote}</p>}
-                  <span className="text-fg-subtle text-xs">
-                    Due {new Date(ver.slaDueOn).toLocaleDateString('en-PK')}
-                  </span>
+                  <span className="text-fg-subtle text-xs">Due {formatDate(ver.slaDueOn)}</span>
                 </div>
               </li>
             ))}

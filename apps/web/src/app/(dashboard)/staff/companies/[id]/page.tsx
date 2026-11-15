@@ -33,6 +33,7 @@ export default async function StaffCompanyDetailPage({
       canSuspend={false}
       canManage={false}
       canOnboard={false}
+      canVerify={actor.permissions.has('company:verify')}
       jobs={jobs}
       canManageJobs={actor.permissions.has('job:manage')}
       categories={categories.map((item) => ({ code: item.code, label: item.label }))}

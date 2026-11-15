@@ -3,7 +3,7 @@ import { verifyCompany } from '@/domains/company';
 import { apiHandler, ok } from '@/domains/shared/http';
 import { z } from 'zod';
 
-/** POST /api/v1/companies/{id}/verify — verifier approves the company. */
+/** POST /api/v1/companies/{id}/verify — Branch Admin approves the company. */
 export const POST = apiHandler({
   permission: 'company:verify',
   idempotent: true,

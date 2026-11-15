@@ -21,6 +21,7 @@ import {
   type ShiftType,
   type SkillLevel,
 } from '@jobbank/shared';
+import { formatDate } from '@/lib/format/date';
 import {
   ArrowLeft,
   Award,
@@ -116,15 +117,6 @@ function formatSalary(min: number | null, max: number | null) {
   if (min != null && max != null) return `${fmt(min)} – ${fmt(max)} / month`;
   if (max != null) return `Up to ${fmt(max)} / month`;
   return `From ${fmt(min!)} / month`;
-}
-
-function formatDate(iso: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleDateString('en-PK', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
 }
 
 function PerkChip({ label }: { label: string }) {

@@ -6,6 +6,7 @@ import { useState, type FormEvent } from 'react';
 import { Button, Input, Select, type SelectOption } from '@/components/atoms';
 import { CNICInput, FormField } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { formatDateTime } from '@/lib/format/date';
 import { errorMessage, toFieldErrors, type FieldErrors } from './form';
 import { StaffRegisterApplicantForm } from './StaffRegisterApplicantForm';
 
@@ -21,14 +22,7 @@ interface Props {
 }
 
 function formatIssuedAt(issuedAt: string) {
-  return new Date(issuedAt).toLocaleString('en-GB', {
-    timeZone: 'Asia/Karachi',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatDateTime(issuedAt);
 }
 
 function tokenState(token: ApplicantTokenView) {

@@ -4,7 +4,6 @@ import {
   Bell,
   Building2,
   Calendar,
-  CheckSquare,
   Contact,
   FileText,
   Briefcase,
@@ -68,6 +67,7 @@ export function navigationFor(
         {
           items: [
             overview,
+            { href: '/branch-admin/companies', label: 'Companies', icon: Building2 },
             { href: '/branch-admin/applicants', label: 'Applicants', icon: Contact },
             { href: '/branch-admin/jobs', label: 'Jobs', icon: Briefcase },
             { href: '/branch-admin/staff', label: 'Staff', icon: Users },
@@ -82,7 +82,6 @@ export function navigationFor(
             overview,
             { href: '/verifier/companies', label: 'Companies', icon: Building2 },
             { href: '/verifier/jobs', label: 'Jobs', icon: Briefcase },
-            { href: '/verifier/queue', label: 'Verification queue', icon: CheckSquare },
           ],
         },
       ];

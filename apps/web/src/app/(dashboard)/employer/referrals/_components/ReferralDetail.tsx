@@ -5,6 +5,7 @@ import { KeyValue } from '@/components/molecules';
 import { MessageCircle } from 'lucide-react';
 import { EmployerInterviewScheduler } from './EmployerInterviewScheduler';
 import { ChatPanel } from './ChatPanel';
+import { formatDate } from '@/lib/format/date';
 
 const STATUS_LABELS: Record<string, string> = {
   FORWARDED: 'Referred',
@@ -52,11 +53,7 @@ export async function ReferralDetail({ actor, id }: { actor: Actor; id: string }
     { label: 'Gender', value: applicant.gender },
     {
       label: 'Date of birth',
-      value: new Date(applicant.dateOfBirth).toLocaleDateString('en-PK', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      }),
+      value: formatDate(applicant.dateOfBirth),
     },
     { label: 'Email', value: applicant.email ?? '—' },
     { label: 'Phone', value: applicant.phone ?? '—' },
@@ -212,10 +209,7 @@ export async function ReferralDetail({ actor, id }: { actor: Actor; id: string }
                     {
                       label: 'Available from',
                       value: applicant.preferences.availableFrom
-                        ? new Date(applicant.preferences.availableFrom).toLocaleDateString(
-                            'en-PK',
-                            { day: 'numeric', month: 'short', year: 'numeric' },
-                          )
+                        ? formatDate(applicant.preferences.availableFrom)
                         : '—',
                     },
                     {
@@ -321,11 +315,7 @@ export async function ReferralDetail({ actor, id }: { actor: Actor; id: string }
                   { label: 'Branch', value: applicant.referredBy.branchName ?? '—' },
                   {
                     label: 'Referred on',
-                    value: new Date(applicant.referredBy.referredAt).toLocaleDateString('en-PK', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    }),
+                    value: formatDate(applicant.referredBy.referredAt),
                   },
                 ]}
               />
@@ -347,12 +337,8 @@ export async function ReferralDetail({ actor, id }: { actor: Actor; id: string }
                   Current: {STATUS_LABELS[app.status] ?? app.status}
                 </span>
               </div>
-              <p className="text-fg-muted text-xs">
-                Referred on {new Date(app.createdAt).toLocaleDateString('en-PK')}
-              </p>
-              <p className="text-fg-muted text-xs">
-                Last updated {new Date(app.updatedAt).toLocaleDateString('en-PK')}
-              </p>
+              <p className="text-fg-muted text-xs">Referred on {formatDate(app.createdAt)}</p>
+              <p className="text-fg-muted text-xs">Last updated {formatDate(app.updatedAt)}</p>
             </div>
           </section>
         </div>

@@ -12,7 +12,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import type { FormEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Checkbox, Input, Select, Textarea } from '@/components/atoms';
+import { Button, Input, Select, Textarea } from '@/components/atoms';
 import type { SelectOption } from '@/components/atoms';
 import { FormField, Modal } from '@/components/molecules';
 import type { CompanyOnboarding, CompanyView } from '@/domains/company';
@@ -24,7 +24,6 @@ import {
   humanizeFieldKey,
   useFocusFieldErrors,
 } from '../FormErrorSummary';
-import { CompanyRegistrationFormPrint } from './CompanyRegistrationFormPrint';
 
 interface MasterDataOption {
   id: string;
@@ -43,44 +42,6 @@ const todayIso = () => {
 interface Props {
   branches: SelectOption[];
   placement?: 'default' | 'sidebar';
-}
-
-function ReviewChart() {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  const values = [8, 12, 17, 15, 22, 19, 28, 25, 31, 24, 29, 34];
-
-  return (
-    <div className="w-full max-w-[32rem] rounded-2xl border border-[#1f413a] bg-[#081d18] p-4 shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
-      <div className="flex items-center justify-between border-b border-[#1f413a] pb-3 text-xs tracking-[0.2em] text-[#8ca8a1] uppercase">
-        <span>24</span>
-        <span>Monthly</span>
-      </div>
-      <div className="mt-4 flex items-end justify-between gap-2">
-        {values.map((value, index) => (
-          <div key={months[index]} className="flex flex-1 flex-col items-center gap-2">
-            <div
-              className="w-full rounded-t-md bg-[#1d6b52] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-              style={{ height: `${value * 3.2}px` }}
-            />
-            <span className="text-[10px] text-[#8ca8a1]">{months[index]}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 const STRUCTURE_OPTIONS = LEGAL_STRUCTURES.map((v) => ({
@@ -106,7 +67,6 @@ const COMPANY_FIELD_LABELS: Record<string, string> = {
   contactPhone: 'Phone',
   contactEmail: 'Email',
   visitDate: 'Visit date',
-  agreed: 'Company agreed to work with us',
   headOfficeAddress: 'Head-office address',
   otherSites: 'Other sites',
   workforceRoles: 'Roles to hire for',
@@ -153,8 +113,8 @@ const STEPS = [
   },
   {
     title: 'Outreach record',
-    description: 'When you visited, and that the company agreed to work with us.',
-    fields: ['visitDate', 'agreed'],
+    description: 'When you visited the company.',
+    fields: ['visitDate'],
   },
   {
     title: 'Address & locations',
@@ -195,14 +155,6 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
   const formRef = useRef<HTMLFormElement | null>(null);
   const { requestErrorFocus, requestAlertFocus } = useFocusFieldErrors(errors, formRef, alert);
   const [company, setCompany] = useState<OnboardedCompany | null>(null);
-  const [printReady, setPrintReady] = useState(false);
-  // True once the print form's QR code and logo have settled. The Print
-  // button stays disabled until then — and until the industry label fetch
-  // has settled too, or the form prints the raw industry code.
-  const [printLabelsReady, setPrintLabelsReady] = useState(false);
-  const [industriesSettled, setIndustriesSettled] = useState(false);
-  const [verifiedSigned, setVerifiedSigned] = useState(false);
-  const [markingSigned, setMarkingSigned] = useState(false);
   const [industries, setIndustries] = useState<MasterDataOption[]>([]);
   const [step, setStep] = useState(0);
   // Highest step reached: the stepper only lets the user jump back to a
@@ -229,7 +181,6 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
     contactPhone: '',
     contactEmail: '',
     visitDate: todayIso(),
-    agreed: false,
     headOfficeAddress: '',
     otherSites: '',
     workforceRoles: '',
@@ -266,14 +217,9 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
   };
 
   useEffect(() => {
-    setPrintReady(true);
-  }, []);
-
-  useEffect(() => {
     if (previousPathname.current === pathname) return;
     previousPathname.current = pathname;
     setCompany(null);
-    setPrintLabelsReady(false);
   }, [pathname]);
 
   const companyId = company?.id;
@@ -288,11 +234,7 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
 
   useEffect(() => {
     if (!open) return;
-    if (industries.length > 0) {
-      // Already loaded on a previous open: the label is available.
-      setIndustriesSettled(true);
-      return;
-    }
+    if (industries.length > 0) return;
     let active = true;
     setLoadingOptions(true);
     setAlert(null);
@@ -304,10 +246,7 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
         if (active) setAlert(errorMessage(error));
       })
       .finally(() => {
-        if (active) {
-          setLoadingOptions(false);
-          setIndustriesSettled(true);
-        }
+        if (active) setLoadingOptions(false);
       });
     return () => {
       active = false;
@@ -318,8 +257,6 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
     setOpen(next);
     if (next) {
       setCompany(null);
-      setPrintLabelsReady(false);
-      setVerifiedSigned(false);
       setErrors({});
       setAlert(null);
       setStep(0);
@@ -340,7 +277,6 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
         contactPhone: '',
         contactEmail: '',
         visitDate: todayIso(),
-        agreed: false,
         headOfficeAddress: '',
         otherSites: '',
         workforceRoles: '',
@@ -383,10 +319,6 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
         idempotencyKey: crypto.randomUUID(),
       });
       setCompany(data);
-      // A new company mounts a fresh print form (keyed by id): its QR and
-      // logo have not loaded yet.
-      setPrintLabelsReady(false);
-      setVerifiedSigned(Boolean(data.registrationVerifiedSignedAt));
       setOpen(false);
       router.replace(pathname);
       router.refresh();
@@ -418,53 +350,14 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
     }
   };
 
-  const markAsVerifiedSigned = async () => {
-    if (!company) return;
-    setMarkingSigned(true);
-    setAlert(null);
-    try {
-      const { data } = await apiFetch<{
-        verifiedSigned: boolean;
-        status: string;
-        company: CompanyView;
-      }>(`/api/v1/companies/${company.id}/registration-form/verified-signed`, {
-        method: 'POST',
-      });
-      setCompany((current) =>
-        current ? { ...current, ...data.company, onboarding: current.onboarding } : current,
-      );
-      setVerifiedSigned(true);
-      router.refresh();
-    } catch (error) {
-      setAlert(errorMessage(error));
-    } finally {
-      setMarkingSigned(false);
-    }
-  };
-
   const industryOptions = industries.map((i) => ({ value: i.code, label: i.label }));
   const branchOptions = branches;
-  const industryLabel =
-    industries.find((i) => i.code === company?.details.industryCode)?.label ?? null;
-  const printForm =
-    company && printReady
-      ? createPortal(
-          <CompanyRegistrationFormPrint
-            key={company.id}
-            company={company}
-            onboarding={company.onboarding}
-            industryLabel={industryLabel}
-            onReady={() => setPrintLabelsReady(true)}
-          />,
-          document.body,
-        )
-      : null;
 
   return (
     <>
       <Modal
         title="Register company"
-        description="Register a company you visited and onboarded, then review and print the form for verification and signature."
+        description="Register a company you visited and onboarded. The Branch Admin reviews it after you save it."
         open={open}
         onOpenChange={setDialogOpen}
         size="lg"
@@ -734,19 +627,7 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
                     onChange={(e) => updateForm({ visitDate: e.target.value })}
                   />
                 </FormField>
-                <div className="flex items-end pb-1" id={fieldControlId('agreed')}>
-                  <Checkbox
-                    label="Company agreed to work with us"
-                    checked={form.agreed}
-                    onCheckedChange={(checked) => updateForm({ agreed: checked === true })}
-                  />
-                </div>
               </div>
-              {errors.agreed && (
-                <p role="alert" className="text-danger text-sm">
-                  {errors.agreed}
-                </p>
-              )}
               <p className="text-fg-muted text-sm">
                 Your name is recorded automatically as the person who onboarded this company.
               </p>
@@ -920,7 +801,7 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
                   loading={loading}
                   disabled={branches.length === 0 || loadingOptions}
                 >
-                  Save draft and review
+                  Save company
                 </Button>
               )}
             </div>
@@ -929,7 +810,6 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
       </Modal>
 
       {company &&
-        printReady &&
         createPortal(
           <section className="registration-review-screen pointer-events-auto fixed inset-0 z-[100] overflow-y-auto bg-[#021b15] p-4 text-[#edf5f2] sm:p-8">
             <div className="mx-auto max-w-5xl">
@@ -937,25 +817,18 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
                 <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#24453e] pb-4">
                   <div className="space-y-1">
                     <h1 className="text-3xl font-black tracking-tight text-[#f2f8f5] sm:text-4xl">
-                      Review
+                      Company registered
                     </h1>
                     <p className="max-w-3xl text-sm text-[#a5beb5] sm:text-base">
-                      Review the saved draft with the company representative. Print the complete
-                      form, have it signed, then mark it verified and signed.
+                      Saved as a draft. The Branch Admin will review it — printing and signing the
+                      form now happen on the company page, not here.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
-                      onClick={() => window.print()}
-                      disabled={!printLabelsReady || !industriesSettled}
-                    >
-                      {printLabelsReady && industriesSettled ? 'Print form' : 'Preparing print…'}
-                    </Button>
-                    <Button
                       variant="secondary"
                       onClick={() => {
                         setCompany(null);
-                        setPrintLabelsReady(false);
                         router.refresh();
                       }}
                     >
@@ -985,38 +858,12 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[#2d473f] bg-[#0b201c] p-4">
-                    <h2 className="text-2xl font-bold text-[#f6faf8]">Registration form preview</h2>
-                    <p className="mt-2 text-sm text-[#a5beb5] sm:text-base">
-                      The print version contains all sections, the outreach record, a QR code for
-                      the company reference, and the representative and staff signature fields.
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Button
-                        onClick={() => void markAsVerifiedSigned()}
-                        loading={markingSigned}
-                        disabled={verifiedSigned}
-                      >
-                        {verifiedSigned ? 'Verified & signed' : 'Mark as verified & signed'}
-                      </Button>
-                      {verifiedSigned && (
-                        <p role="status" className="text-sm text-[#9fe4c0]">
-                          Verification and signature recorded. The company is now in the verifier
-                          queue (Submitted).
-                        </p>
-                      )}
-                    </div>
-                    <ReviewChart />
-                  </div>
                 </div>
               </div>
             </div>
           </section>,
           document.body,
         )}
-      {printForm}
     </>
   );
 }

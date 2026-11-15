@@ -3,7 +3,7 @@ import { rejectCompany } from '@/domains/company';
 import { apiHandler, ok } from '@/domains/shared/http';
 import { z } from 'zod';
 
-/** POST /api/v1/companies/{id}/reject — verifier rejects the company registration. */
+/** POST /api/v1/companies/{id}/reject — Branch Admin rejects the company registration. */
 export const POST = apiHandler({
   permission: 'company:verify',
   idempotent: true,

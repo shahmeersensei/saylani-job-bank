@@ -8,16 +8,11 @@ import { Button, Input, Select, StatusPill, Switch } from '@/components/atoms';
 import { DateTimePicker, EmptyState, FormField, Modal, toast } from '@/components/molecules';
 import { DataTable } from '@/components/organisms';
 import { ApiClientError, apiFetch, friendlyApiError } from '@/lib/api/client';
+import { formatDate } from '@/lib/format/date';
 
 const weekday = (date: string) =>
   new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
-const longDate = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+const longDate = (date: string) => formatDate(`${date}T00:00:00Z`);
 
 function HolidayDialog({
   holiday,

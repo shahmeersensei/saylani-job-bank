@@ -56,6 +56,7 @@ export {
   COMPANY_SORTABLE,
   companyFilters,
   correctCompanyDetails,
+  countCompaniesOnboardedByMonth,
   getCompanyDetail,
   getCompanyOnboarding,
   listCompanies,

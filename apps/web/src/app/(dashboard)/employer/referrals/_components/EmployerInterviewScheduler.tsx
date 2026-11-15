@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Input, Textarea } from '@/components/atoms';
 import { FormField, toast } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { formatDateTime } from '@/lib/format/date';
 import type { ApplicationView } from '@/domains/placement';
 
 const SCHEDULABLE: ApplicationView['status'][] = [
@@ -88,7 +89,11 @@ export function EmployerInterviewScheduler({
       interviewNote: note.trim() || undefined,
     };
     if (scheduled) {
-      void call('PATCH', { ...body, status: 'EMPLOYER_INTERVIEW_SCHEDULED' }, 'Interview rescheduled');
+      void call(
+        'PATCH',
+        { ...body, status: 'EMPLOYER_INTERVIEW_SCHEDULED' },
+        'Interview rescheduled',
+      );
     } else {
       void call('POST', body, 'Interview scheduled — the applicant has been notified');
     }
@@ -103,12 +108,7 @@ export function EmployerInterviewScheduler({
         >
           <p className="font-semibold">Interview scheduled</p>
           <p className="mt-1">
-            {new Date(employerInterviewAt!).toLocaleString('en-PK', {
-              day: 'numeric',
-              month: 'short',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
+            {formatDateTime(employerInterviewAt!)}
             {employerInterviewLocation ? ` · ${employerInterviewLocation}` : ''}
           </p>
           {employerInterviewNote && <p className="mt-1 opacity-80">{employerInterviewNote}</p>}
@@ -117,11 +117,7 @@ export function EmployerInterviewScheduler({
 
       <form className="grid gap-3" onSubmit={submit} noValidate>
         <FormField label="Interview date & time" required error={error ?? undefined}>
-          <Input
-            type="datetime-local"
-            value={at}
-            onChange={(e) => setAt(e.target.value)}
-          />
+          <Input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />
         </FormField>
         <FormField label="Location">
           <Input

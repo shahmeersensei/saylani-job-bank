@@ -137,7 +137,7 @@ export function companySubmittedEmail(input: {
 }) {
   const lines = [
     `Assalam-o-Alaikum ${input.name},`,
-    `Thank you — we received ${input.companyName}'s registration. A verification officer will review it, usually by ${input.dueDate}.`,
+    `Thank you — we received ${input.companyName}'s registration. Your branch admin will review it, usually by ${input.dueDate}.`,
     'We will email you if we need anything else. You can follow the progress on your company page.',
   ];
   return {
@@ -155,7 +155,7 @@ export function companyInfoRequestedEmail(input: {
 }) {
   const lines = [
     `Assalam-o-Alaikum ${input.name},`,
-    `Our verification officer needs more information before ${input.companyName} can be verified:`,
+    `Your branch admin needs more information before ${input.companyName} can be verified:`,
     input.request,
     'Please update your registration and press "Send for review" when done.',
   ];

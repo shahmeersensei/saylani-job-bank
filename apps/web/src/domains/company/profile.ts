@@ -399,7 +399,7 @@ export async function removeMySite(ctx: SignedIn, siteId: string): Promise<Compa
 
 // ─── Submission ────────────────────────────────────────────────────────
 
-/** Sends a DRAFT (or a corrected REJECTED) company to the verifier queue: a new round. */
+/** Sends a DRAFT (or a corrected REJECTED) company to Branch Admin review: a new round. */
 export async function submitMyCompany(ctx: SignedIn): Promise<CompanyView> {
   assertPermission(ctx.actor, 'company:register');
   const now = new Date();

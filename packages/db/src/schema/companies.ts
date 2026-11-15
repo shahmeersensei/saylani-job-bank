@@ -110,7 +110,10 @@ export const companies = pgTable(
  * on the `company.register` audit entry, which meant any audit retention/purge —
  * or the PII redaction the audit trail needs — silently destroyed the record and
  * broke re-print. The audit row remains as evidence; this table is the record.
- * `agreed` is always true here: the row only exists for companies that agreed.
+ * `agreed` is a legacy column, always true: the agreement checkbox was removed
+ * 2026-11-14, the column is kept (no migration) so existing rows stay valid,
+ * and new rows take the default. Nothing reads it except the verify paper-form
+ * gate in domains/company/verifier.ts.
  */
 export const companyOnboarding = pgTable(
   'company_onboarding',

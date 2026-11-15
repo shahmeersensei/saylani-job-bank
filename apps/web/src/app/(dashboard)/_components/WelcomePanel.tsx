@@ -16,7 +16,6 @@ import {
   Star,
   UserRound,
   Users,
-  Zap,
 } from 'lucide-react';
 import { InteractiveBarChart, CardActionMenu } from './InteractiveBarChart';
 import type { LucideIcon } from 'lucide-react';
@@ -25,15 +24,16 @@ import { ROLE_LABELS, type Role } from '@jobbank/shared';
 import { describeMe, requireRole } from '@/domains/auth';
 import { listBranches } from '@/domains/branch';
 import { listApplicants, getMyProfile, monthlyApplicantCounts } from '@/domains/applicant';
-import { countVerificationsDoneByMonth, listCompanies, listQueue } from '@/domains/company';
+import { countCompaniesOnboardedByMonth, listCompanies } from '@/domains/company';
 import { countEmployerCandidates, countHiresByMonth, listJobsForEmployer } from '@/domains/job';
 import { listMyNotifications } from '@/domains/notifications';
 import { listMyApplications } from '@/domains/placement';
 import { listStaff } from '@/domains/user';
 import { bucketByMonth, pktYearMonth } from './monthlySeries';
+import { formatDate } from '@/lib/format/date';
 
 /* ─── Monthly chart values are computed per role below, from live DB ────
-   counts (monthlyApplicantCounts, countVerificationsDoneByMonth,
+   counts (monthlyApplicantCounts, countCompaniesOnboardedByMonth,
    countHiresByMonth, or the applicant's own applications). No hardcoded
    series lives here any more. ─────────────────────────────────────────── */
 
@@ -59,8 +59,8 @@ const ROLE_ACTIONS: Record<
     action2: { label: 'Add Staff', href: '/branch-admin/staff' },
   },
   VERIFIER: {
-    action1: { label: 'Open Queue', href: '/verifier/queue' },
-    action2: { label: 'My Cases', href: '/verifier/queue?filter=mine' },
+    action1: { label: 'View Companies', href: '/verifier/companies' },
+    action2: { label: 'View Jobs', href: '/verifier/jobs' },
   },
   STAFF: {
     action1: { label: 'View Applicants', href: '/staff/applicants' },
@@ -90,7 +90,7 @@ function relativeDate(iso: string | Date): string {
   const diffD = Math.floor(diffH / 24);
   if (diffD === 1) return 'Yesterday';
   if (diffD < 7) return `${diffD} days ago`;
-  return new Date(iso).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' });
+  return formatDate(iso);
 }
 
 /* ─── Activity item type ────────────────────────────────────────── */
@@ -149,14 +149,6 @@ function latestActivity(entries: { at: string; item: ActivityItem }[]): Activity
     .slice(0, 5)
     .map((e) => e.item);
 }
-
-const VERIFIER_STATE_ACTIVITY: Record<string, { action: string; status: ActivityItem['status'] }> =
-  {
-    SUBMITTED: { action: 'Verification Submitted', status: 'pending' },
-    UNDER_VERIFICATION: { action: 'Case Under Review', status: 'info' },
-    INFO_REQUESTED: { action: 'Info Requested', status: 'warning' },
-    RESUBMITTED: { action: 'Resubmitted for Review', status: 'info' },
-  };
 
 const STATUS_PILL: Record<
   'success' | 'pending' | 'info' | 'warning',
@@ -431,106 +423,79 @@ export async function WelcomePanel({ role }: { role: Role }) {
     chartValues = await monthlyApplicantCounts(actor, year);
     chartLabel = 'Branch Registrations';
   } else if (role === 'VERIFIER') {
-    const { items: qItems, pagination: qPagination } = await listQueue(actor, {
-      page: 1,
-      pageSize: 100,
-      limit: 100,
-      offset: 0,
-      sort: { field: 'slaDueOn', direction: 'asc' },
-      q: undefined,
-      filters: {},
-    });
-    // Headline counts use the pagination total, not the 100-row fetch —
-    // a queue over 100 used to understate them. The breakdown slices
-    // below are still computed over the fetched 100 rows only.
-    const queueTotal = qPagination.total;
-    const unclaimed = qItems.filter((i) => !i.verifierId).length;
-    const inReview = qItems.filter((i) => !!i.verifierId).length;
-    const breached = qItems.filter((i) => i.sla === 'BREACHED').length;
-    const dueToday = qItems.filter((i) => i.sla === 'DUE_TODAY').length;
+    // 2026-11-14: verification moved to the Branch Admin, so the verifier
+    // dashboard no longer shows the queue (listQueue needs company:verify).
+    // It shows registration work instead: companies in their branch by
+    // status, and their own monthly field-visit registrations.
+    const [r_all, r_draft, r_verified, recentCompanies] = await Promise.all([
+      listCompanies(actor, minQ('createdAt')),
+      listCompanies(actor, minQ('createdAt', { status: 'DRAFT' })),
+      listCompanies(actor, minQ('createdAt', { status: 'VERIFIED' })),
+      listCompanies(actor, { ...minQ('createdAt'), pageSize: 5, limit: 5 }),
+    ]);
+    const total = r_all.pagination.total;
+    const draft = r_draft.pagination.total;
+    const verified = r_verified.pagination.total;
     main = {
-      icon: ShieldCheck,
-      label: 'Queue Status',
-      value: String(queueTotal),
+      icon: Building2,
+      label: 'Companies Registered',
+      value: fmt(total),
       trend: {
-        dir: breached > 0 ? 'down' : 'up',
-        text: breached > 0 ? `${breached} SLA breached` : 'All SLAs healthy',
+        dir: draft > 0 ? 'down' : 'up',
+        text: draft > 0 ? `${draft} awaiting Branch Admin review` : 'All reviewed',
       },
-      subTitle: 'Queue Breakdown',
+      subTitle: 'Registration Breakdown',
       subItems: [
-        { icon: Clock, label: 'Unclaimed', value: String(unclaimed), status: 'active' },
-        { icon: Zap, label: 'In Review', value: String(inReview), status: 'active' },
-        { icon: Calendar, label: 'Due Today', value: String(dueToday), status: 'active' },
-        {
-          icon: ShieldCheck,
-          label: 'SLA Breached',
-          value: String(breached),
-          status: breached > 0 ? 'inactive' : 'active',
-        },
+        { icon: Clock, label: 'Draft — awaiting review', value: fmt(draft), status: 'active' },
+        { icon: CheckCircle2, label: 'Verified', value: fmt(verified), status: 'active' },
+        { icon: Building2, label: 'Total', value: fmt(total), status: 'inactive' },
       ],
     };
     smallStats = [
       {
-        icon: CheckCircle2,
-        label: 'Items in Queue',
-        value: String(queueTotal),
-        sub: 'awaiting review',
-        color: '#0d7a3e',
+        icon: Clock,
+        label: 'Awaiting Review',
+        value: fmt(draft),
+        sub: 'with the Branch Admin',
+        color: '#b45309',
       },
       {
-        icon: Zap,
-        label: 'SLA Status',
-        value: breached > 0 ? 'At Risk' : 'Healthy',
-        sub: `${breached} breached`,
-        color: '#1a5fac',
+        icon: CheckCircle2,
+        label: 'Verified Companies',
+        value: fmt(verified),
+        sub: `of ${fmt(total)} total`,
+        color: '#0d7a3e',
       },
     ];
     pipeline = {
-      title: 'Daily Progress',
+      title: 'Registration Progress',
       items: [
         {
           icon: Clock,
-          label: 'Unclaimed Cases',
-          current: unclaimed,
-          total: Math.max(queueTotal, 1),
-          color: '#0d7a3e',
-        },
-        {
-          icon: Zap,
-          label: 'Cases In Review',
-          current: inReview,
-          total: Math.max(queueTotal, 1),
-          color: '#1a5fac',
+          label: 'Awaiting Review',
+          current: draft,
+          total: Math.max(total, 1),
+          color: '#b45309',
         },
         {
           icon: ShieldCheck,
-          label: 'SLA Breached',
-          current: breached,
-          total: Math.max(queueTotal, 1),
-          color: '#b45309',
+          label: 'Verified',
+          current: verified,
+          total: Math.max(total, 1),
+          color: '#0d7a3e',
         },
       ],
     };
-    activity = [...qItems]
-      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
-      .slice(0, 5)
-      .map((q): ActivityItem => {
-        const meta: { action: string; status: ActivityItem['status'] } = VERIFIER_STATE_ACTIVITY[
-          q.state
-        ] ?? { action: 'Verification Update', status: 'info' };
-        return {
-          icon: ShieldCheck,
-          action: meta.action,
-          detail: q.legalName,
-          when: relativeDate(q.submittedAt),
-          price: q.branchName,
-          status: meta.status,
-        };
-      });
-    chartValues = await countVerificationsDoneByMonth(actor, year);
-    // Personal again: verify/reject record decidedBy (H8), so this counts
-    // the signed-in verifier's own decisions, not the branch total.
-    chartLabel = 'Verifications Done';
+    activity = recentCompanies.items.map((c): ActivityItem => ({
+      icon: Building2,
+      action: 'Company Registered',
+      detail: c.legalName,
+      when: relativeDate(c.createdAt),
+      price: c.branchName ?? '',
+      status: c.status === 'VERIFIED' ? 'success' : c.status === 'DRAFT' ? 'pending' : 'info',
+    }));
+    chartValues = await countCompaniesOnboardedByMonth(actor, year);
+    chartLabel = 'Companies Registered';
   } else if (role === 'STAFF') {
     const [r_all, r_active, r_id_ver] = await Promise.all([
       listApplicants(actor, minQ('createdAt')),
@@ -823,12 +788,7 @@ export async function WelcomePanel({ role }: { role: Role }) {
 
   const firstName = user.name.split(' ')[0];
   const now = new Date();
-  const dateStr = now.toLocaleDateString('en-PK', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const dateStr = `${now.toLocaleDateString('en-PK', { weekday: 'short' })}, ${formatDate(now)}`;
   const scopeLabel =
     role === 'SUPER_ADMIN'
       ? actor.activeBranchId

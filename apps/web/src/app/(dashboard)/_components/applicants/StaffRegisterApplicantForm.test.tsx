@@ -242,6 +242,43 @@ describe('StaffRegisterApplicantForm token mode', () => {
 
   it('submits the token id with the registration and shows the token completed', async () => {
     const user = userEvent.setup();
+    // The address search resolves through the same mocked apiFetch: the
+    // picker picks the first suggestion, which sets the home location.
+    // (The document branches mirror the describe-level mock; this
+    // implementation replaces it for this test.)
+    apiFetchMock.mockImplementation(async (url: string) => {
+      if (typeof url === 'string' && url.startsWith('/api/v1/geocode/search')) {
+        return {
+          data: [
+            {
+              lat: 24.8607,
+              lng: 67.0011,
+              addressLine: 'Gulshan-e-Iqbal, Karachi',
+              cityCode: 'KARACHI',
+              cityLabel: 'Karachi',
+              display: 'Gulshan-e-Iqbal, Karachi',
+            },
+          ],
+        };
+      }
+      if (url.includes('/documents/') && url.includes('/confirm')) return { data: {} };
+      if (url.includes('/documents'))
+        return {
+          data: {
+            documentId: '55555555-5555-4555-8555-555555555555',
+            upload: { url: 'https://storage.test/photo', headers: {} },
+          },
+        };
+      return {
+        data: {
+          id: '44444444-4444-4444-8444-444444444444',
+          personal: { fullName: 'Ahmed Raza' },
+          registrationReference: 'SJB-2026-TEST',
+          branch: { name: 'Gulshan' },
+          status: 'ACTIVE',
+        },
+      };
+    });
     render(<StaffRegisterApplicantForm {...tokenOptions} token={issuedToken} />);
 
     await user.type(screen.getByLabelText(/Father's or husband's name/), 'Imran Raza');
@@ -250,8 +287,12 @@ describe('StaffRegisterApplicantForm token mode', () => {
     });
     await user.click(screen.getByRole('radio', { name: 'Male' }));
     await user.selectOptions(screen.getByLabelText(/City/), 'KARACHI');
-    await user.type(screen.getByLabelText(/Latitude/), '24.8607');
-    await user.type(screen.getByLabelText(/Longitude/), '67.0011');
+    await user.type(screen.getByLabelText(/Home location/), 'Gulshan-e-Iqbal');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Gulshan-e-Iqbal, Karachi' })).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Gulshan-e-Iqbal, Karachi' }));
+    expect(screen.getByText(/Location set: 24\.860700, 67\.001100/)).toBeInTheDocument();
 
     await user.upload(
       screen.getByLabelText('Upload a photo file'),
@@ -264,7 +305,8 @@ describe('StaffRegisterApplicantForm token mode', () => {
     await user.click(screen.getByRole('button', { name: 'Register job seeker' }));
 
     await waitFor(() => {
-      expect(apiFetchMock).toHaveBeenCalledTimes(3);
+      // Geocode search + create applicant + photo presign + photo confirm.
+      expect(apiFetchMock).toHaveBeenCalledTimes(4);
       expect(apiFetchMock).toHaveBeenCalledWith(
         '/api/v1/applicants',
         expect.objectContaining({

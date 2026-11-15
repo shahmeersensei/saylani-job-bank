@@ -31,7 +31,7 @@ describe('ApplicantTokenSlip', () => {
     expect(screen.getByText('Connecting Talent with Opportunity')).toBeInTheDocument();
     expect(screen.getByText('01')).toBeInTheDocument();
     expect(screen.getByText('KHI-GULSHAN-001')).toBeInTheDocument();
-    expect(screen.getByText('07/11/26 • 07:39 PM')).toBeInTheDocument();
+    expect(screen.getByText('07/11/2026 • 7:39 pm')).toBeInTheDocument();
     expect(screen.getByText('4240127739744')).toBeInTheDocument();
     expect(screen.getByText('Test Applicant')).toBeInTheDocument();
     expect(screen.getByText('+92 300 1234567')).toBeInTheDocument();

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 import type { RadiusValue } from '@jobbank/shared';
 import { Button, Input, Switch } from '@/components/atoms';
-import { FormField, LatLngFields, type LatLng, toast } from '@/components/molecules';
+import { FormField, GeocodeAddressPicker, toast } from '@/components/molecules';
 import type { BranchView } from '@/domains/branch';
 import { ApiClientError, apiFetch, friendlyApiError } from '@/lib/api/client';
 import { formatDistance } from '@/lib/format/distance';
@@ -30,7 +30,9 @@ export function BranchForm({ branch, globalRadius }: Props) {
   const hadOwnRadius = branch?.matchRadius.source === 'BRANCH';
   const [ownRadius, setOwnRadius] = useState(hadOwnRadius);
   const [radius, setRadius] = useState<RadiusKm>(toKm(branch?.matchRadius ?? globalRadius));
-  const [location, setLocation] = useState<LatLng | null>(branch?.location ?? null);
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
+    branch?.location ?? null,
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
 
@@ -40,7 +42,7 @@ export function BranchForm({ branch, globalRadius }: Props) {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!location) {
-      setErrors({ location: 'Enter the latitude and longitude' });
+      setErrors({ location: 'Search for the branch address and pick a match from the list' });
       return;
     }
     setPending(true);
@@ -140,23 +142,26 @@ export function BranchForm({ branch, globalRadius }: Props) {
           />
         )}
       </fieldset>
-      <div className="grid gap-2">
-        <p className="text-fg text-sm font-medium">
-          Location{' '}
-          <span className="text-danger" aria-hidden="true">
-            *
-          </span>
-        </p>
-        <LatLngFields value={location} onChange={setLocation} />
-        <p className="text-fg-muted text-sm">
-          Type the coordinates — matching uses this point to rank nearby applicants.
-        </p>
-        {errors.location && (
-          <p role="alert" className="text-danger text-sm">
-            {errors.location}
-          </p>
-        )}
-      </div>
+      <GeocodeAddressPicker
+        value={location}
+        onChange={setLocation}
+        onPick={(result) => {
+          // The branch address and city are free text: fill them from the
+          // picked place only when they are still empty, and never with a
+          // non-Latin city label (search results sometimes come back in Urdu).
+          if (result.addressLine && !values.address) {
+            setValues((v) => ({ ...v, address: result.addressLine }));
+          }
+          if (result.cityLabel && !values.city && /^[A-Za-z .'-]+$/.test(result.cityLabel)) {
+            setValues((v) => ({ ...v, city: result.cityLabel! }));
+          }
+        }}
+        label="Location"
+        hint="Matching uses this point to rank nearby applicants."
+        initialQuery={branch?.address ?? ''}
+        required
+        error={errors.location}
+      />
       <div className="flex gap-2">
         <Button type="submit" loading={pending}>
           {branch ? 'Save changes' : 'Create branch'}

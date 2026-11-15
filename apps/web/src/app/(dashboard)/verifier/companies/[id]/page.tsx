@@ -26,6 +26,7 @@ export default async function VerifierCompanyDetailPage({
       canSuspend={false}
       canManage={hasPermission(actor, 'company:manage')}
       canOnboard
+      canVerify={actor.permissions.has('company:verify')}
       jobs={jobs}
       canManageJobs={actor.permissions.has('job:manage')}
       categories={categories.map((item) => ({ code: item.code, label: item.label }))}

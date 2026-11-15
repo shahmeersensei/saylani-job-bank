@@ -20,8 +20,10 @@ import {
   count,
   desc,
   eq,
+  gte,
   ilike,
   inArray,
+  lt,
   max,
   ne,
   notInArray,
@@ -134,7 +136,9 @@ export interface CompanyListItem {
 /**
  * Branch Admin: all companies in their branch(es).
  * Super Admin: all companies, any status.
- * Verifiers have their own queue (listQueue) and do not use this endpoint.
+ * Verifier: all companies in their branch(es), any status — they register
+ * companies and follow them through review, but no longer verify them
+ * (2026-11-14: verification moved to the Branch Admin).
  */
 export async function listCompanies(
   actor: Actor,
@@ -164,7 +168,7 @@ export async function listCompanies(
 
   const conditions: (SQL | undefined)[] = [
     // Audit 2026-11-11 (L-25): city scope — the newer rule — like the
-    // verifier queue, the job list and the applicant list. Reads are
+    // Branch Admin review queue, the job list and the applicant list. Reads are
     // city-scoped; branch-bound writes (suspend, correct, onboard, …)
     // stay exact-branch below.
     cityScope(actor, c.branchId),
@@ -251,6 +255,39 @@ export async function getCompanyDetail(actor: Actor, companyId: string): Promise
     throw new ForbiddenError('This company is not yet verified');
   }
   return buildCompanyView(db, row);
+}
+
+/**
+ * Monthly companies onboarded by the signed-in staff member (field visits),
+ * current calendar year, bucketed by the outreach record's createdAt in PKT
+ * months — same windowing as countVerificationsDoneByMonth. Feeds the
+ * Verifier dashboard chart, which shows registrations, not verifications,
+ * since verification moved to the Branch Admin (2026-11-14).
+ */
+export async function countCompaniesOnboardedByMonth(
+  actor: Actor,
+  year: number,
+): Promise<number[]> {
+  assertPermission(actor, 'company:onboard');
+  const start = new Date(Date.UTC(year - 1, 11, 31, 19));
+  const end = new Date(Date.UTC(year, 11, 31, 19));
+  const monthExpr = sql<number>`extract(month from ${schema.companyOnboarding.createdAt} at time zone 'Asia/Karachi')`;
+  const rows = await db
+    .select({ month: monthExpr, value: count() })
+    .from(schema.companyOnboarding)
+    .where(
+      and(
+        eq(schema.companyOnboarding.onboardedBy, actor.userId),
+        gte(schema.companyOnboarding.createdAt, start),
+        lt(schema.companyOnboarding.createdAt, end),
+      ),
+    )
+    .groupBy(monthExpr);
+  const values = Array.from({ length: 12 }, () => 0);
+  for (const row of rows) {
+    if (row.month >= 1 && row.month <= 12) values[row.month - 1] = row.value;
+  }
+  return values;
 }
 
 // ─── Suspend / reinstate ───────────────────────────────────────────────
@@ -486,8 +523,6 @@ export interface CompanyOnboardingNotes {
 export interface CompanyOnboarding {
   onboardedBy: { name: string | null; roleLabel: string | null } | null;
   visitDate: string | null;
-  /** True when the company agreed to work with Saylani. */
-  agreed: boolean;
   notes: CompanyOnboardingNotes;
 }
 
@@ -497,7 +532,7 @@ const asText = (value: unknown): string | null =>
 /**
  * The outreach record for a company registered by staff after a field visit, read
  * from the `company_onboarding` table (migration 0026). Returns null for companies
- * the employer registered themselves — those carry no visit or agreement. The
+ * the employer registered themselves — those carry no visit record. The
  * `company.register` audit entry is evidence only and is no longer read back, so
  * audit retention/purge and PII redaction can no longer destroy this record.
  */
@@ -522,7 +557,7 @@ export async function getCompanyOnboarding(
     .from(schema.companyOnboarding)
     .where(eq(schema.companyOnboarding.companyId, row.id))
     .limit(1);
-  if (!onboarding || !onboarding.agreed) return null;
+  if (!onboarding) return null;
   // Name + current role of the staff member who onboarded the company (shown on
   // the paper form). Roles can change after the visit, so this is read live.
   const [[user], roles] = await Promise.all([
@@ -546,7 +581,6 @@ export async function getCompanyOnboarding(
       ? { name: user?.name ?? null, roleLabel: role ? ROLE_LABELS[role] : null }
       : null,
     visitDate: asText(onboarding.visitDate),
-    agreed: true,
     notes: {
       headOfficeAddress: asText(onboarding.headOfficeAddress),
       otherSites: asText(onboarding.otherSites),
@@ -565,7 +599,7 @@ export async function getCompanyOnboarding(
 /**
  * Staff, Branch Admin, Super Admin or Verifier registers a company they visited and onboarded.
  * Creates a DRAFT company plus its main contact; the outreach record (who visited,
- * when, the company's agreement, and the extra notes) is stored in the
+ * when, and the extra notes) is stored in the
  * `company_onboarding` table, in the same transaction as the company row.
  */
 export async function staffOnboardCompany(
@@ -589,7 +623,6 @@ export async function staffOnboardCompany(
     contactPhone,
     contactEmail,
     visitDate,
-    agreed,
     // Notes stay out of the company row; they go to `company_onboarding` below.
     headOfficeAddress,
     otherSites,
@@ -688,7 +721,6 @@ export async function staffOnboardCompany(
         companyId: row!.id,
         onboardedBy: ctx.actor.userId,
         visitDate,
-        agreed,
         headOfficeAddress,
         otherSites,
         workforceRoles,
@@ -709,7 +741,7 @@ export async function staffOnboardCompany(
         // (migration 0026). Keep PII — contact details, notes, NTN — out of the
         // audit trail; it is redacted there anyway (see lib/privacy/redact.ts).
         after: { legalName: companyInput.legalName, branchId },
-        metadata: { onboardedBy: ctx.actor.userId, visitDate, agreed },
+        metadata: { onboardedBy: ctx.actor.userId, visitDate },
       });
     });
   } catch (error) {
@@ -730,12 +762,12 @@ export async function staffOnboardCompany(
 
 /**
  * Records the first-counter paper review (company representative + staff signatures) and
- * sends the DRAFT company to the verifier queue in the same step. Staff submission needs
+ * sends the DRAFT company to Branch Admin review in the same step. Staff submission needs
  * what the field visit guarantees — a main contact, a branch, and at least one required
- * document uploaded (N15: a document-less company used to reach the verifier, who then
- * 409'd at VERIFY instead). The head office and full document acceptance are still the
- * verifier's checks: the VERIFY guard requires every required document accepted, and the
- * verifier can request anything missing.
+ * document uploaded (N15: a document-less company used to reach review, where VERIFY
+ * then 409'd instead). The head office and full document acceptance are still the
+ * Branch Admin's checks: the VERIFY guard requires every required document accepted, and
+ * the Branch Admin can request anything missing.
  * Verifiers onboard and submit companies the same way; the marker must be
  * someone other than the onboarder (M9 — no self-attestation).
  */
@@ -793,11 +825,11 @@ export async function markCompanyRegistrationVerifiedSigned(
       if (!contactRows.some((r) => r.isPrimary)) missing.push('a main contact person');
       if (!row.branchId) missing.push('a branch');
       // N15: require at least one required document before the company can
-      // enter the verifier queue. Same building blocks as the verifier's
+      // enter Branch Admin review. Same building blocks as the Branch Admin's
       // VERIFY completeness guard (requiredDocumentTypes /
       // currentDocuments, see submissionMissing / documentsNotAccepted in
       // repository.ts) — but only the ≥1 floor, not the full set: a
-      // confirmed upload is reviewStatus PENDING until the verifier
+      // confirmed upload is reviewStatus PENDING until the Branch Admin
       // reviews it, so ACCEPTED cannot be required here, and the VERIFY
       // guard still requires EVERY required document accepted. A
       // rejected-only upload does not count (same rule submissionMissing

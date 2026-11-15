@@ -23,7 +23,13 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 import { Button, Checkbox, Input, RadioGroup, Select, Textarea } from '@/components/atoms';
 import type { SelectOption } from '@/components/atoms';
-import { CNICInput, FormField, LatLngFields, PhoneInput, toast } from '@/components/molecules';
+import {
+  CNICInput,
+  FormField,
+  GeocodeAddressPicker,
+  PhoneInput,
+  toast,
+} from '@/components/molecules';
 import type { ApplicantStaffView, PresignedDocument } from '@/domains/applicant';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import { putWithProgress } from '@/lib/upload/put-with-progress';
@@ -222,7 +228,9 @@ export function StaffRegisterApplicantForm({
     // plain message instead of letting zod report "Expected object" on the
     // location field.
     if (form.lat == null || form.lng == null) {
-      setErrors({ 'address.location': 'Enter the applicant’s home latitude and longitude' });
+      setErrors({
+        'address.location': 'Search for the applicant’s home area and pick a match from the list',
+      });
       requestErrorFocus();
       return null;
     }
@@ -693,24 +701,30 @@ export function StaffRegisterApplicantForm({
               />
             </FormField>
             <div className="sm:col-span-2">
-              <FormField
+              <GeocodeAddressPicker
+                value={
+                  form.lat != null && form.lng != null ? { lat: form.lat, lng: form.lng } : null
+                }
+                onChange={(location) => set(location ?? { lat: null, lng: null })}
+                onPick={(result) => {
+                  // The city is a seeded-code select: only fill it when the
+                  // geocoder matched one of the seeded cities.
+                  if (result.cityCode && cities.some((c) => c.value === result.cityCode)) {
+                    set({ cityCode: result.cityCode });
+                  }
+                  if (result.addressLine && !form.addressLine) {
+                    set({ addressLine: result.addressLine });
+                  }
+                }}
+                cityCode={form.cityCode || null}
+                cityLabel={cities.find((c) => c.value === form.cityCode)?.label ?? null}
                 label="Home location"
+                hint="Search the applicant’s home area, street or a nearby landmark, then pick a match. It is required for matching and branch assignment."
+                initialQuery={form.addressLine}
                 required
                 error={errors['address.location']}
                 id={fieldControlId('address.location')}
-                hint={
-                  form.lat == null
-                    ? 'Type the latitude and longitude — it is required for matching and branch assignment.'
-                    : undefined
-                }
-              >
-                <LatLngFields
-                  value={
-                    form.lat != null && form.lng != null ? { lat: form.lat, lng: form.lng } : null
-                  }
-                  onChange={(location) => set(location ?? { lat: null, lng: null })}
-                />
-              </FormField>
+              />
             </div>
           </section>
           <section className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5">

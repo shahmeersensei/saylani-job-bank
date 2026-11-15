@@ -9,16 +9,7 @@ import {
   type CompanyStatus,
   type LegalStructure,
 } from '@jobbank/shared';
-import {
-  ArrowLeft,
-  ClipboardCheck,
-  ExternalLink,
-  Pause,
-  Pencil,
-  Play,
-  PlusCircle,
-  Printer,
-} from 'lucide-react';
+import { ArrowLeft, ExternalLink, Pause, Pencil, Play, PlusCircle, Printer } from 'lucide-react';
 import NextLink from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createPortal } from 'react-dom';
@@ -72,6 +63,7 @@ export function StaffCompanyPanel({
   canSuspend,
   canManage,
   canOnboard = false,
+  canVerify = false,
   jobs,
   canManageJobs,
   categories,
@@ -81,6 +73,8 @@ export function StaffCompanyPanel({
   canSuspend: boolean;
   canManage: boolean;
   canOnboard?: boolean;
+  /** Branch Admin review: verify, reject, request info, review documents. */
+  canVerify?: boolean;
   jobs: JobView[];
   canManageJobs: boolean;
   categories: { code: string; label: string }[];
@@ -106,17 +100,6 @@ export function StaffCompanyPanel({
           ? `/staff/jobs/new?companyId=${company.id}`
           : null
       : null;
-  // Self-verification entry point: a verifier may claim and verify a company
-  // they created themselves — no other verifier is needed — but the detail
-  // page itself has no verify action; the review flow lives on the queue
-  // page. Link there while the company is in an open verification round.
-  const reviewHref =
-    pathname.includes('/verifier/') &&
-    (
-      ['SUBMITTED', 'UNDER_VERIFICATION', 'INFO_REQUESTED', 'RESUBMITTED'] as CompanyStatus[]
-    ).includes(company.status)
-      ? `/verifier/queue/${company.id}`
-      : null;
   const [company_, setCompany_] = useState(company);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -136,7 +119,7 @@ export function StaffCompanyPanel({
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   // Onboard upload (F1): for an onboarded DRAFT that has not been marked
   // verified & signed yet — the same condition as the verified-signed button —
-  // and while the company is INFO_REQUESTED, when the verifier asked for
+  // and while the company is INFO_REQUESTED, when the Branch Admin asked for
   // more and the onboarder is supplying it.
   const canUploadDocs = Boolean(
     canOnboard &&
@@ -146,7 +129,7 @@ export function StaffCompanyPanel({
   const [industries, setIndustries] = useState<MasterDataOption[]>([]);
   const [cities, setCities] = useState<MasterDataOption[]>([]);
   // Head office form (H3): the onboard form only records the address as a
-  // note, so onboarded companies reach the verifier with no location row.
+  // note, so onboarded companies reach review with no location row.
   const [showHqForm, setShowHqForm] = useState(false);
   const [hqAddress, setHqAddress] = useState('');
   const [hqCity, setHqCity] = useState('');
@@ -264,6 +247,69 @@ export function StaffCompanyPanel({
       setError(friendlyApiError(err));
     } finally {
       setUploadingDoc(null);
+    }
+  }
+
+  // ─── Branch Admin review (2026-11-14: verification moved from Verifier
+  // to Branch Admin) ─────────────────────────────────────────────────
+  // Reviewable while the company still awaits a decision. The server
+  // re-checks permission, branch scope and the state machine; these buttons
+  // are only the visible half of the check.
+  const REVIEWABLE_STATUSES: CompanyStatus[] = [
+    'DRAFT',
+    'SUBMITTED',
+    'UNDER_VERIFICATION',
+    'RESUBMITTED',
+  ];
+  const canReview = canVerify && REVIEWABLE_STATUSES.includes(company_.status);
+  const [showInfoForm, setShowInfoForm] = useState(false);
+  const [showRejectForm, setShowRejectForm] = useState(false);
+  const [infoText, setInfoText] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectNote, setRejectNote] = useState('');
+  const [docRejectId, setDocRejectId] = useState<string | null>(null);
+  const [docRejectNote, setDocRejectNote] = useState('');
+
+  async function callReviewAction(action: string, body?: Record<string, unknown>) {
+    setPending(action);
+    setError(null);
+    try {
+      const { data: saved } = await apiFetch<CompanyView>(
+        `/api/v1/companies/${company_.id}/${action}`,
+        { method: 'POST', body, idempotencyKey: crypto.randomUUID() },
+      );
+      setCompany_(saved);
+      setShowInfoForm(false);
+      setShowRejectForm(false);
+      setInfoText('');
+      setRejectReason('');
+      setRejectNote('');
+    } catch (err) {
+      setError(friendlyApiError(err));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function reviewDoc(docId: string, decision: 'ACCEPTED' | 'REJECTED', note?: string) {
+    setPending(`doc-${docId}`);
+    setError(null);
+    try {
+      const { data: saved } = await apiFetch<CompanyView>(
+        `/api/v1/companies/${company_.id}/documents/${docId}/review`,
+        {
+          method: 'PATCH',
+          body: { decision, note: note ?? null },
+          idempotencyKey: crypto.randomUUID(),
+        },
+      );
+      setCompany_(saved);
+      setDocRejectId(null);
+      setDocRejectNote('');
+    } catch (err) {
+      setError(friendlyApiError(err));
+    } finally {
+      setPending(null);
     }
   }
 
@@ -469,14 +515,6 @@ export function StaffCompanyPanel({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {reviewHref && (
-              <Link href={reviewHref}>
-                <Button size="sm">
-                  <ClipboardCheck className="mr-1.5 size-4" />
-                  Review &amp; verify
-                </Button>
-              </Link>
-            )}
             {postJobHref && (
               <Link href={postJobHref}>
                 <Button size="sm">
@@ -510,7 +548,7 @@ export function StaffCompanyPanel({
               company_.status === 'INFO_REQUESTED' &&
               !showResubmitForm && (
                 <Button loading={pending === 'resubmit'} onClick={() => setShowResubmitForm(true)}>
-                  Send back to verifier
+                  Send back for review
                 </Button>
               )}
             {canManage && !showCorrectForm && (
@@ -549,8 +587,118 @@ export function StaffCompanyPanel({
 
       {verifiedSigned && (
         <div className="bg-success-soft text-success-soft-fg rounded-xl px-4 py-3 text-sm">
-          Verification and signature recorded. The company is now in the verifier queue (Submitted).
+          Verification and signature recorded. The company is now submitted for Branch Admin review.
         </div>
+      )}
+
+      {canReview && (
+        <section className="border-border bg-surface grid gap-4 rounded-xl border p-5">
+          <h2 className="text-fg font-semibold">Review &amp; verify</h2>
+          <p className="text-fg-muted text-sm">
+            {company_.status === 'DRAFT'
+              ? 'This company was registered by a Verification Officer and is waiting for your review. Verify it once the documents below are accepted and the details check out.'
+              : 'Review the documents below, then verify, ask for more information, or reject.'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              loading={pending === 'verify'}
+              onClick={() => void callReviewAction('verify', { note: null })}
+            >
+              Verify company
+            </Button>
+            {!showInfoForm && (
+              <Button variant="secondary" onClick={() => setShowInfoForm(true)}>
+                Request more info
+              </Button>
+            )}
+            {!showRejectForm && (
+              <Button variant="danger" onClick={() => setShowRejectForm(true)}>
+                Reject
+              </Button>
+            )}
+          </div>
+          {showInfoForm && (
+            <div className="grid gap-2">
+              <FormField label="What information do you need?" required>
+                <Textarea
+                  rows={3}
+                  value={infoText}
+                  onChange={(e) => setInfoText(e.target.value)}
+                  placeholder="Say what is missing, so the company can fix it…"
+                />
+              </FormField>
+              <div className="flex gap-2">
+                <Button
+                  loading={pending === 'request-info'}
+                  disabled={infoText.trim().length < 10}
+                  onClick={() => void callReviewAction('request-info', { note: infoText.trim() })}
+                >
+                  Send request
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowInfoForm(false);
+                    setInfoText('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+          {showRejectForm && (
+            <div className="grid gap-2">
+              <FormField label="Reason" required>
+                <Select
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  options={[
+                    { value: '', label: 'Choose a reason' },
+                    { value: 'INVALID_DOCUMENTS', label: 'Invalid or forged documents' },
+                    { value: 'NTN_MISMATCH', label: 'NTN does not match records' },
+                    { value: 'DUPLICATE_REGISTRATION', label: 'Duplicate company' },
+                    { value: 'INCOMPLETE_INFO', label: 'Incomplete information' },
+                    { value: 'OTHER', label: 'Other' },
+                  ]}
+                />
+              </FormField>
+              <FormField label="Note" required>
+                <Textarea
+                  rows={3}
+                  value={rejectNote}
+                  onChange={(e) => setRejectNote(e.target.value)}
+                  placeholder="Explain the decision (at least 10 characters)…"
+                />
+              </FormField>
+              <div className="flex gap-2">
+                <Button
+                  variant="danger"
+                  loading={pending === 'reject'}
+                  disabled={!rejectReason || rejectNote.trim().length < 10}
+                  onClick={() =>
+                    void callReviewAction('reject', {
+                      reasonCode: rejectReason,
+                      note: rejectNote.trim(),
+                    })
+                  }
+                >
+                  Reject company
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowRejectForm(false);
+                    setRejectReason('');
+                    setRejectNote('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
       )}
 
       {canOnboard &&
@@ -562,7 +710,7 @@ export function StaffCompanyPanel({
             {!showHqForm ? (
               <>
                 <p className="text-fg-muted text-sm">
-                  The verifier needs a head office location before this company can be verified.
+                  A head office location is needed before this company can be verified.
                   {onboarding.notes.headOfficeAddress
                     ? ` The visit notes record: ${onboarding.notes.headOfficeAddress}`
                     : ' No address was recorded at the visit.'}
@@ -693,13 +841,13 @@ export function StaffCompanyPanel({
 
       {showResubmitForm && (
         <div className="border-border bg-surface grid gap-3 rounded-xl border p-5">
-          <h2 className="text-fg font-semibold">Send back to verifier</h2>
+          <h2 className="text-fg font-semibold">Send back for review</h2>
           <p className="text-fg-muted text-sm">
-            The verifier asked for more information. If you already uploaded the document or edited
-            the details, you can send it back as-is — otherwise say what you changed or sent (at
-            least 10 characters).
+            The Branch Admin asked for more information. If you already uploaded the document or
+            edited the details, you can send it back as-is — otherwise say what you changed or sent
+            (at least 10 characters).
           </p>
-          <FormField label="Note for the verifier (optional — required when nothing changed)">
+          <FormField label="Note for the Branch Admin (optional — required when nothing changed)">
             <Textarea
               rows={2}
               value={resubmitNote}
@@ -876,10 +1024,6 @@ export function StaffCompanyPanel({
                   ? `Verified & signed ${formatDate(company_.registrationVerifiedSignedAt)}`
                   : 'Not yet verified & signed',
               },
-              {
-                label: 'Company agreed to work with us',
-                value: onboarding.agreed ? 'Yes' : 'No',
-              },
               { label: 'Head-office address', value: onboarding.notes.headOfficeAddress ?? '—' },
               { label: 'Other sites', value: onboarding.notes.otherSites ?? '—' },
               { label: 'Additional notes', value: onboarding.notes.additionalNotes ?? '—' },
@@ -915,7 +1059,7 @@ export function StaffCompanyPanel({
           {canUploadDocs && (
             <p className="text-fg-muted text-sm">
               {company_.status === 'INFO_REQUESTED'
-                ? 'The verifier asked for more — upload the missing documents here, then send the company back from the header.'
+                ? 'The Branch Admin asked for more — upload the missing documents here, then send the company back from the header.'
                 : 'Upload the required documents before marking the form verified & signed. PDF, JPG or PNG — the file size and type are checked on upload. Uploading a file of a type that already has one replaces it.'}
             </p>
           )}
@@ -951,6 +1095,28 @@ export function StaffCompanyPanel({
                           View
                         </Button>
                       )}
+                      {current && canReview && current.reviewStatus !== 'ACCEPTED' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          loading={pending === `doc-${current.id}`}
+                          onClick={() => void reviewDoc(current.id, 'ACCEPTED')}
+                        >
+                          Accept
+                        </Button>
+                      )}
+                      {current && canReview && current.reviewStatus !== 'REJECTED' && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => {
+                            setDocRejectId(current.id);
+                            setDocRejectNote('');
+                          }}
+                        >
+                          Reject
+                        </Button>
+                      )}
                       {uploadingDoc === code ? (
                         <span className="text-fg-muted text-sm">Uploading…</span>
                       ) : (
@@ -967,6 +1133,41 @@ export function StaffCompanyPanel({
                         />
                       )}
                     </div>
+                    {current && docRejectId === current.id && (
+                      <div className="grid w-full gap-2">
+                        <FormField label="Why is this document not accepted?" required>
+                          <Textarea
+                            rows={2}
+                            value={docRejectNote}
+                            onChange={(e) => setDocRejectNote(e.target.value)}
+                            placeholder="Say what is wrong, so the company can fix it…"
+                          />
+                        </FormField>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            loading={pending === `doc-${current.id}`}
+                            disabled={docRejectNote.trim().length < 5}
+                            onClick={() =>
+                              void reviewDoc(current.id, 'REJECTED', docRejectNote.trim())
+                            }
+                          >
+                            Send rejection
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDocRejectId(null);
+                              setDocRejectNote('');
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -978,7 +1179,7 @@ export function StaffCompanyPanel({
               {company_.documents
                 .filter((d) => !company_.requiredDocuments.includes(d.typeCode))
                 .map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between gap-3">
+                  <div key={doc.id} className="flex flex-wrap items-center justify-between gap-3">
                     <div className="grid gap-0.5">
                       <p className="text-fg text-sm font-medium">
                         {doc.typeCode.replace(/_/g, ' ')}
@@ -997,14 +1198,69 @@ export function StaffCompanyPanel({
                       >
                         View
                       </Button>
+                      {canReview && doc.reviewStatus !== 'ACCEPTED' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          loading={pending === `doc-${doc.id}`}
+                          onClick={() => void reviewDoc(doc.id, 'ACCEPTED')}
+                        >
+                          Accept
+                        </Button>
+                      )}
+                      {canReview && doc.reviewStatus !== 'REJECTED' && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => {
+                            setDocRejectId(doc.id);
+                            setDocRejectNote('');
+                          }}
+                        >
+                          Reject
+                        </Button>
+                      )}
                     </div>
+                    {docRejectId === doc.id && (
+                      <div className="grid w-full gap-2">
+                        <FormField label="Why is this document not accepted?" required>
+                          <Textarea
+                            rows={2}
+                            value={docRejectNote}
+                            onChange={(e) => setDocRejectNote(e.target.value)}
+                            placeholder="Say what is wrong, so the company can fix it…"
+                          />
+                        </FormField>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            loading={pending === `doc-${doc.id}`}
+                            disabled={docRejectNote.trim().length < 5}
+                            onClick={() => void reviewDoc(doc.id, 'REJECTED', docRejectNote.trim())}
+                          >
+                            Send rejection
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDocRejectId(null);
+                              setDocRejectNote('');
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
             </div>
           ) : (
             <div className="grid gap-3">
               {company_.documents.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between gap-3">
+                <div key={doc.id} className="flex flex-wrap items-center justify-between gap-3">
                   <div className="grid gap-0.5">
                     <p className="text-fg text-sm font-medium">{doc.typeCode.replace(/_/g, ' ')}</p>
                     <p className="text-fg-muted text-xs">{doc.fileName}</p>
@@ -1021,7 +1277,62 @@ export function StaffCompanyPanel({
                     >
                       View
                     </Button>
+                    {canReview && doc.reviewStatus !== 'ACCEPTED' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={pending === `doc-${doc.id}`}
+                        onClick={() => void reviewDoc(doc.id, 'ACCEPTED')}
+                      >
+                        Accept
+                      </Button>
+                    )}
+                    {canReview && doc.reviewStatus !== 'REJECTED' && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => {
+                          setDocRejectId(doc.id);
+                          setDocRejectNote('');
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    )}
                   </div>
+                  {docRejectId === doc.id && (
+                    <div className="grid w-full gap-2">
+                      <FormField label="Why is this document not accepted?" required>
+                        <Textarea
+                          rows={2}
+                          value={docRejectNote}
+                          onChange={(e) => setDocRejectNote(e.target.value)}
+                          placeholder="Say what is wrong, so the company can fix it…"
+                        />
+                      </FormField>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          loading={pending === `doc-${doc.id}`}
+                          disabled={docRejectNote.trim().length < 5}
+                          onClick={() => void reviewDoc(doc.id, 'REJECTED', docRejectNote.trim())}
+                        >
+                          Send rejection
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDocRejectId(null);
+                            setDocRejectNote('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

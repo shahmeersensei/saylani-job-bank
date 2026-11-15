@@ -3,7 +3,7 @@ import { releaseCompany } from '@/domains/company';
 import { apiHandler, ok } from '@/domains/shared/http';
 import { z } from 'zod';
 
-/** POST /api/v1/companies/{id}/release — verifier returns the company to the queue. */
+/** POST /api/v1/companies/{id}/release — legacy Verifier-queue step; verification moved to the Branch Admin (2026-11-14), so this is no longer part of the flow. */
 export const POST = apiHandler({
   permission: 'company:verify',
   params: z.object({ id: z.uuid() }),
