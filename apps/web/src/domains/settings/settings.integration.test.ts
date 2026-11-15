@@ -18,7 +18,7 @@ import { PUT as putSetting } from '@/app/api/v1/settings/[key]/route';
 import { GET as listSettingsRoute } from '@/app/api/v1/settings/route';
 import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import { db } from '@/lib/db';
-import { call, type Jar, owner, signIn, signInAdmin } from '@/test/api-client';
+import { call, type Jar, owner, signInWith2fa, signInAdmin } from '@/test/api-client';
 import { getWorkingCalendar, resolveMatchRadius, slaDueDate } from '.';
 
 const branchId = async (code: string) =>
@@ -51,7 +51,7 @@ let LHR: string;
 beforeAll(async () => {
   superAdmin = await signInAdmin('superadmin@jobbank.local');
   branchAdmin = await signInAdmin('branchadmin.khi@jobbank.local');
-  staff = await signIn('staff.khi@jobbank.local');
+  staff = await signInWith2fa('staff.khi@jobbank.local');
   KHI = await branchId('KHI-GULSHAN');
   LHR = await branchId('LHR-JOHAR');
 });

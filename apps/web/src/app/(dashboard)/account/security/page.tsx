@@ -1,3 +1,4 @@
+import { ROLE_LABELS } from '@jobbank/shared';
 import { LogOut, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { StatusPill } from '@/components/atoms';
 import { requireSignedIn, requiresTwoFactor } from '@/domains/auth';
@@ -32,8 +33,8 @@ export default async function SecurityPage({
         >
           <ShieldAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
           <p>
-            Your role ({actor.roles.includes('SUPER_ADMIN') ? 'Super Admin' : 'Branch Admin'})
-            requires two-factor authentication. Set it up below to continue using the Job Bank.
+            Your role ({actor.roles.map((r) => ROLE_LABELS[r]).join(', ')}) requires two-factor
+            authentication. Set it up below to continue using the Job Bank.
           </p>
         </div>
       )}

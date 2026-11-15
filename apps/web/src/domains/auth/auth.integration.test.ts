@@ -1,4 +1,4 @@
-import { ROLE_PERMISSIONS, type Role } from '@jobbank/shared';
+import { ROLE_PERMISSIONS, TWO_FACTOR_REQUIRED_ROLES, type Role } from '@jobbank/shared';
 import { schema } from '@jobbank/db';
 import { DEV_USERS, getSeedDevPassword } from '@jobbank/db/seed/dev-data';
 import { and, count, desc, eq } from 'drizzle-orm';
@@ -19,12 +19,12 @@ import { db } from '@/lib/db';
 import { devOutbox } from '@/lib/sms/sms';
 import { call, Jar, owner, signIn, signInAdmin } from '@/test/api-client';
 
-/** Admin roles must use two-factor; the helper enrols it on first sign-in in this file. */
+/** 2FA-required roles must enrol an authenticator; the helper enrols it on first sign-in in this file. */
 async function signInWithPassword(email: string) {
-  const admin = DEV_USERS.find((u) => u.email === email)?.roles.some(
-    (r) => r.role === 'SUPER_ADMIN' || r.role === 'BRANCH_ADMIN',
+  const needs2fa = DEV_USERS.find((u) => u.email === email)?.roles.some((r) =>
+    (TWO_FACTOR_REQUIRED_ROLES as readonly string[]).includes(r.role),
   );
-  return admin ? signInAdmin(email) : signIn(email);
+  return needs2fa ? signInAdmin(email) : signIn(email);
 }
 
 async function signInWithOtp(phone: string) {

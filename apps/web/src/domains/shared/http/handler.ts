@@ -52,8 +52,8 @@ export interface ApiHandlerOptions<
   /** Permission gate. Ownership + branch scope are still checked in domain services. */
   permission?: Permission;
   /**
-   * Allow actors who must still enrol two-factor authentication (Super Admin / Branch
-   * Admin before setup). Only for the endpoints needed to finish setup or sign out.
+   * Allow actors who must still enrol two-factor authentication (a 2FA-required
+   * role before setup). Only for the endpoints needed to finish setup or sign out.
    */
   allowTwoFactorPending?: boolean;
   body?: BS;

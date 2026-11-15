@@ -14,7 +14,12 @@ import { signupCodeEmail, signupExistingAccountEmail } from '@/lib/mail/template
 import { setCredentialPassword } from './account-tokens';
 import { generateOtpCode } from './otp';
 import { getAuthSecret } from './secret';
-import { loginWithPassword, RESEND_AFTER_SECONDS, type SignInResult } from './service';
+import {
+  loginWithPassword,
+  RESEND_AFTER_SECONDS,
+  type SignInResult,
+  type TwoFactorSetupRequired,
+} from './service';
 
 /**
  * Employer self-registration (M7, owner decision 1): the employer confirms their email with
@@ -152,7 +157,7 @@ export async function signUpEmployer(
   ctx: RequestContext,
   input: EmployerSignupInput,
   requestHeaders: Headers,
-): Promise<SignInResult> {
+): Promise<SignInResult | TwoFactorSetupRequired> {
   const email = normalize(input.email);
   // Audit 2026-11-11 (M-17): see requestEmployerSignupCode above.
   await enforceRateLimitByIp(ctx.ip, 'signup-ip', { limit: 20, windowSeconds: 900 });
@@ -189,7 +194,16 @@ export async function signUpEmployer(
     throw error;
   }
 
+  // A new employer has no authenticator yet, so — now that EMPLOYER is a
+  // 2FA-required role — this normally returns `two_factor_setup_required`
+  // with a setup token instead of a session; the signup form continues into
+  // enrolment with it. (Before 2026-11-15 this threw here, which would have
+  // failed every new employer signup once the role became 2FA-required.)
+  // A `two_factor_required` challenge is impossible for a fresh account —
+  // there is no authenticator to challenge with — so it stays a hard error.
   const result = await loginWithPassword(ctx, email, input.password, requestHeaders);
-  if (result.kind !== 'signed_in') throw new Error('A new employer account cannot have 2FA');
+  if (result.kind === 'two_factor_required') {
+    throw new Error('A new employer account cannot already have two-factor enabled');
+  }
   return result;
 }

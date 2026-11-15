@@ -74,6 +74,38 @@ describe('EmployerSignupForm — code resend (handwritten note 2)', () => {
   });
 });
 
+describe('EmployerSignupForm — two-factor enrolment after signup', () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset();
+    push.mockReset();
+  });
+
+  it('continues into authenticator setup instead of the dashboard when signup returns a setup token', async () => {
+    const user = userEvent.setup();
+    await goToCodeStep(user, 0);
+    apiFetchMock.mockImplementation(async (path: string) => {
+      if (path === '/api/v1/auth/signup/complete') {
+        return {
+          data: {
+            kind: 'two_factor_setup_required',
+            setupToken: 'v1.test-token',
+            expiresInSeconds: 900,
+          },
+        };
+      }
+      throw new Error(`unexpected call ${path}`);
+    });
+    await user.type(screen.getByLabelText(/6-digit code/), '123456');
+    await user.type(screen.getByLabelText(/Your full name/), 'Aisha Khan');
+    await user.type(screen.getByLabelText(/Password/), 'password123');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await waitFor(() => expect(screen.getByText(/Your account is created/)).toBeInTheDocument());
+    // The enrolment flow itself is showing (password-confirmation step).
+    expect(screen.getByLabelText(/Your password/)).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+});
+
 describe('EmployerSignupForm — per-field validation (handwritten note 1)', () => {
   beforeEach(() => {
     apiFetchMock.mockReset();

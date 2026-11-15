@@ -3,13 +3,11 @@ import { schema } from '@jobbank/db';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError } from 'better-auth/api';
-import { emailOTP, phoneNumber, twoFactor } from 'better-auth/plugins';
+import { phoneNumber, twoFactor } from 'better-auth/plugins';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/logger';
-import { sendMail } from '@/lib/mail/mailer';
-import { signInCodeEmail } from '@/lib/mail/templates';
 import { verifyOtpCode } from './otp';
 import { getAuthSecret } from './secret';
 
@@ -67,32 +65,18 @@ function createAuth() {
       maxPasswordLength: 128,
     },
     plugins: [
-      // Employers can sign in with a code emailed to them (existing accounts only).
-      emailOTP({
-        otpLength: 6,
-        expiresIn: 300,
-        allowedAttempts: 5,
-        storeOTP: 'hashed',
-        disableSignUp: true,
-        // Fallback only: requestEmailCode no longer routes through here, because
-        // Better Auth's runInBackgroundOrAwait swallows a failed send (logs it
-        // and still returns success), so a mail failure left the user waiting
-        // for a code that never arrived. That flow now creates the OTP with
-        // createVerificationOTP and sends it with a direct, awaited sendMail
-        // (see domains/auth/service.ts), exactly like the signup code.
-        sendVerificationOTP: async ({ email, otp, type }) => {
-          if (type !== 'sign-in') return;
-          await sendMail({ to: email, ...signInCodeEmail({ code: otp, expiresMinutes: 5 }) });
-        },
-      }),
-      // Authenticator-app 2FA: required for Super Admin / Branch Admin, optional for others.
+      // Authenticator-app 2FA: required for Super Admin, Branch Admin, Staff
+      // and Employer, optional for Verifier / Interviewer-Scheduler.
+      // (Employer email-code sign-in was retired with mandatory employer 2FA
+      // 2026-11-15: a passwordless emailed code would bypass the authenticator,
+      // so the emailOTP plugin was removed rather than left as a back door.)
       twoFactor({
         issuer: 'Saylani Job Bank',
         backupCodeOptions: { amount: 10, length: 10 },
         twoFactorCookieMaxAge: 600,
-        // 30 days — but only for roles that may skip 2FA. SUPER_ADMIN and
-        // BRANCH_ADMIN never get a trusted device: verifySecondFactor deletes
-        // the trust record in the same request, and LoginForm hides the option.
+        // 30 days — but only for roles that may skip 2FA. 2FA-required roles
+        // never get a trusted device: verifySecondFactor deletes the trust
+        // record in the same request, and LoginForm hides the option.
         trustDeviceMaxAge: 30 * 24 * 60 * 60,
       }),
       phoneNumber({

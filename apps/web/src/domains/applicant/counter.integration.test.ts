@@ -18,7 +18,7 @@ import { loadActor } from '@/domains/auth';
 import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import { db } from '@/lib/db';
 import { mailOutbox } from '@/lib/mail/mailer';
-import { call, type Jar, randomPhone, signIn, signInApplicant } from '@/test/api-client';
+import { call, type Jar, randomPhone, signInWith2fa, signInApplicant } from '@/test/api-client';
 
 const HEADER = 'x-jb-on-behalf-of';
 let staffKhi: Jar;
@@ -49,9 +49,9 @@ const register = (body: unknown, jar: Jar = staffKhi) =>
 const asCandidate = (id: string) => ({ [HEADER]: id });
 
 beforeAll(async () => {
-  staffKhi = await signIn('staff.khi@jobbank.local');
-  staffLhr = await signIn('staff.lhr@jobbank.local');
-  employer = await signIn('employer@jobbank.local');
+  staffKhi = await signInWith2fa('staff.khi@jobbank.local');
+  staffLhr = await signInWith2fa('staff.lhr@jobbank.local');
+  employer = await signInWith2fa('employer@jobbank.local');
   const [row] = await db
     .select({ id: schema.users.id })
     .from(schema.users)

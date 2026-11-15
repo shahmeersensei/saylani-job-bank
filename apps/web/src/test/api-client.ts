@@ -179,8 +179,8 @@ export async function enrollTwoFactor(
   return start.body.data.backupCodes;
 }
 
-/** Fresh admin session with two-factor enrolled (Super Admin / Branch Admin require it). */
-export async function signInAdmin(email: string): Promise<Jar> {
+/** Fresh session with two-factor enrolled (any 2FA-required role: Super Admin, Branch Admin, Staff, Employer). */
+export async function signInWith2fa(email: string): Promise<Jar> {
   if (!totpSecrets.has(email)) {
     await resetTwoFactor(email);
     const jar = await signIn(email);
@@ -188,6 +188,11 @@ export async function signInAdmin(email: string): Promise<Jar> {
     return jar;
   }
   return signIn(email);
+}
+
+/** Fresh admin session with two-factor enrolled (Super Admin / Branch Admin require it). */
+export async function signInAdmin(email: string): Promise<Jar> {
+  return signInWith2fa(email);
 }
 
 export const uniqueEmail = (prefix: string) =>

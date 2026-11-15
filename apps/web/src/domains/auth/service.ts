@@ -17,10 +17,7 @@ import { maskEmail, maskPhone } from '@/domains/shared/masking';
 import { enforceRateLimit, enforceRateLimitByIp } from '@/domains/shared/rate-limit';
 import type { Actor } from '@/domains/shared/scope';
 import { db } from '@/lib/db';
-import { env } from '@/lib/env';
 import { normalizePkMobile } from '@/lib/format/phone';
-import { sendMail } from '@/lib/mail/mailer';
-import { employerCodeNoAccountEmail, signInCodeEmail } from '@/lib/mail/templates';
 import { ACTIVE_BRANCH_COOKIE, loadActor, requiresTwoFactor, type SessionUser } from './actor';
 import { getAuth, isPlaceholderEmail, SESSION_TTL_SECONDS } from './auth';
 import { issueOtp, OTP_TTL_SECONDS } from './otp';
@@ -57,8 +54,8 @@ export interface TwoFactorChallenge {
   cookies: string[];
   /**
    * Whether the client may offer "trust this device". False for 2FA-required
-   * roles (SUPER_ADMIN / BRANCH_ADMIN): their TOTP is mandatory and a trusted
-   * device must never buy a bypass. Enforced server-side too (verifySecondFactor).
+   * roles: their TOTP is mandatory and a trusted device must never buy a
+   * bypass. Enforced server-side too (verifySecondFactor).
    */
   trustDeviceAllowed: boolean;
 }
@@ -505,116 +502,6 @@ export async function verifySecondFactor(
     cookies,
     actor,
   );
-}
-
-// ─── Employers: code emailed to them ───────────────────────────────────
-
-/** Only active employers without an authenticator app may use emailed codes. */
-async function emailCodeEligible(email: string): Promise<UserRow | null> {
-  const user = await findUserByEmail(email);
-  if (
-    !user ||
-    user.status !== 'ACTIVE' ||
-    user.twoFactorEnabled ||
-    isPlaceholderEmail(user.email)
-  ) {
-    return null;
-  }
-  const [role] = await db
-    .select({ role: schema.userRoles.roleCode })
-    .from(schema.userRoles)
-    .where(and(eq(schema.userRoles.userId, user.id), eq(schema.userRoles.roleCode, 'EMPLOYER')));
-  return role ? user : null;
-}
-
-/**
- * Always answers the same way, so it cannot be used to discover registered emails.
- *
- * Two defects fixed here (2026-11-13) — compare with the employer-signup flow,
- * which never had either:
- * 1. The code used to go out through Better Auth's `sendVerificationOTP`, whose
- *    `runInBackgroundOrAwait` catches a failed send and only logs it, so a mail
- *    failure returned 202 and the user waited for a code that was never sent.
- *    The OTP is now created with `createVerificationOTP` (same stored value
- *    `signInEmailOTP` verifies) and mailed with a direct, awaited `sendMail`,
- *    exactly like the signup code — a delivery failure now surfaces as an
- *    error instead of a silent dead end.
- * 2. When the email had no eligible employer account (staff address, typo, or
- *    an employer signup that never completed), nothing was sent at all, yet the
- *    client still showed the code screen. That address now gets an explanatory
- *    email pointing at registration, mirroring `signupExistingAccountEmail`.
- */
-export async function requestEmailCode(ctx: RequestContext, rawEmail: string) {
-  const email = rawEmail.trim().toLowerCase();
-  await enforceRateLimit(
-    'email-code-resend',
-    email,
-    { limit: 1, windowSeconds: RESEND_AFTER_SECONDS },
-    'Please wait a minute before requesting another code.',
-  );
-  await enforceRateLimit('email-code', email, { limit: 5, windowSeconds: 3600 });
-  await rateLimitByIp(ctx, 'email-code-ip', 20, 3600);
-
-  const user = await emailCodeEligible(email);
-  if (user) {
-    const otp = await getAuth().api.createVerificationOTP({
-      body: { email: user.email, type: 'sign-in' },
-    });
-    await sendMail({
-      to: user.email,
-      ...signInCodeEmail({ code: otp, expiresMinutes: 5 }),
-    });
-  } else {
-    await sendMail({
-      to: email,
-      ...employerCodeNoAccountEmail({
-        url: new URL('/register', env.NEXT_PUBLIC_APP_URL).toString(),
-      }),
-    });
-  }
-  await recordAudit(ctx, {
-    action: 'auth.email_code_requested',
-    entityType: 'user',
-    entityId: user?.id ?? null,
-    metadata: { emailMasked: maskEmail(email), sent: Boolean(user) },
-  });
-  return { expiresInSeconds: 300, resendAfterSeconds: RESEND_AFTER_SECONDS };
-}
-
-export async function verifyEmailCode(
-  ctx: RequestContext,
-  rawEmail: string,
-  code: string,
-  requestHeaders: Headers,
-): Promise<SignInResult> {
-  const email = rawEmail.trim().toLowerCase();
-  await rateLimitByIp(ctx, 'email-code-verify-ip', 30, 900);
-  const invalid = new UnauthenticatedError('The code is incorrect or has expired.');
-
-  const user = await emailCodeEligible(email);
-  if (!user) throw invalid;
-
-  let result;
-  try {
-    result = await getAuth().api.signInEmailOTP({
-      body: { email: user.email, otp: code },
-      headers: requestHeaders,
-      returnHeaders: true,
-    });
-  } catch (error) {
-    if (!isAuthApiError(error)) throw error;
-    await recordAudit(ctx, {
-      action: 'auth.login_failed',
-      entityType: 'user',
-      entityId: user.id,
-      metadata: { method: 'email_code', reason: apiErrorCode(error) ?? 'INVALID_OTP' },
-    });
-    if (apiErrorCode(error) === 'TOO_MANY_ATTEMPTS') {
-      throw new UnauthenticatedError('Too many incorrect attempts. Request a new code.');
-    }
-    throw invalid;
-  }
-  return signedIn(ctx, user.id, 'email_code', result.headers.getSetCookie());
 }
 
 // ─── Session ───────────────────────────────────────────────────────────

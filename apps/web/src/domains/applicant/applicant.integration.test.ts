@@ -28,7 +28,7 @@ import {
   call,
   owner,
   randomPhone,
-  signIn,
+  signInWith2fa,
   signInAdmin,
   signInApplicant,
   type Jar,
@@ -57,7 +57,7 @@ let staffUserId: string;
 beforeAll(async () => {
   khi = await branchId('KHI-GULSHAN');
   lhr = await branchId('LHR-JOHAR');
-  staffJar = await signIn('staff.khi@jobbank.local');
+  staffJar = await signInWith2fa('staff.khi@jobbank.local');
   staffUserId = (
     await db
       .select({ id: schema.users.id })
@@ -573,7 +573,7 @@ describe('documents and activation', () => {
 describe('staff access', () => {
   it('scopes search and profiles to the branch, and audits denied access', async () => {
     const { profile } = await activeApplicant();
-    const khiStaff = await signIn('staff.khi@jobbank.local');
+    const khiStaff = await signInWith2fa('staff.khi@jobbank.local');
     const found = await call(
       listApplicants,
       `/api/v1/applicants?q=${profile.personal.cnic.slice(0, 9)}&status=ACTIVE`,
@@ -588,7 +588,7 @@ describe('staff access', () => {
     expect(row.cnicMasked).toContain('•');
     expect(JSON.stringify(found.body)).not.toContain(profile.personal.cnic);
 
-    const lhrStaff = await signIn('staff.lhr@jobbank.local');
+    const lhrStaff = await signInWith2fa('staff.lhr@jobbank.local');
     const denied = await call(getApplicant, `/api/v1/applicants/${profile.id}`, {
       jar: lhrStaff,
       params: { id: profile.id },
@@ -605,7 +605,7 @@ describe('staff access', () => {
     });
     expect(lhrList.body.data).toEqual([]);
 
-    const employer = await signIn('employer@jobbank.local');
+    const employer = await signInWith2fa('employer@jobbank.local');
     expect((await call(listApplicants, '/api/v1/applicants', { jar: employer })).status).toBe(403);
     expect(
       (
@@ -618,7 +618,7 @@ describe('staff access', () => {
   });
 
   it('filters the staff list by city, area, area name and registration date', async () => {
-    const staff = await signIn('staff.khi@jobbank.local');
+    const staff = await signInWith2fa('staff.khi@jobbank.local');
     // Staff registration (no document upload, so this runs without the S3 dev stack);
     // the address row is inserted directly for the same reason.
     const created = await call(staffRegister, '/api/v1/applicants', {
@@ -680,7 +680,7 @@ describe('staff access', () => {
 
   it('verifies identity from the CNIC images, audits document views and locks identity fields', async () => {
     const { jar, profile } = await activeApplicant();
-    const staff = await signIn('staff.khi@jobbank.local');
+    const staff = await signInWith2fa('staff.khi@jobbank.local');
     const front = profile.documents.find((d: { typeCode: string }) => d.typeCode === 'CNIC_FRONT');
 
     const link = await call(
@@ -777,7 +777,7 @@ describe('staff access', () => {
 
   it('moves a profile to a new phone number and ends the old sessions', async () => {
     const { jar, profile } = await activeApplicant();
-    const staff = await signIn('staff.khi@jobbank.local');
+    const staff = await signInWith2fa('staff.khi@jobbank.local');
     const newPhone = randomPhone();
     // M-21: the new number must prove itself first — request the 6-digit
     // code texted to it, then spend it on the change.
@@ -808,7 +808,7 @@ describe('staff access', () => {
 
   it('deactivates with a reason, and lets a Super Admin transfer to another branch', async () => {
     const { profile } = await activeApplicant();
-    const staff = await signIn('staff.khi@jobbank.local');
+    const staff = await signInWith2fa('staff.khi@jobbank.local');
     const noReason = await call(staffStatus, `/api/v1/applicants/${profile.id}/status`, {
       method: 'PATCH',
       body: { status: 'INACTIVE' },
@@ -866,7 +866,7 @@ describe('staff access', () => {
         })
       ).status,
     ).toBe(403);
-    const lhrStaff = await signIn('staff.lhr@jobbank.local');
+    const lhrStaff = await signInWith2fa('staff.lhr@jobbank.local');
     expect(
       (
         await call(getApplicant, `/api/v1/applicants/${profile.id}`, {

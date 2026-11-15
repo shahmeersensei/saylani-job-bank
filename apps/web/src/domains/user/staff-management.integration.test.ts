@@ -1,15 +1,15 @@
 import { schema } from '@jobbank/db';
 import { getSeedDevPassword } from '@jobbank/db/seed/dev-data';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { POST as confirm2fa } from '@/app/api/v1/account/2fa/confirm/route';
 import { POST as disable2fa } from '@/app/api/v1/account/2fa/disable/route';
 import { POST as enroll2fa } from '@/app/api/v1/account/2fa/enroll/route';
 import { POST as verify2fa } from '@/app/api/v1/auth/2fa/verify/route';
-import { POST as emailCodeRequest } from '@/app/api/v1/auth/email-otp/request/route';
-import { POST as emailCodeVerify } from '@/app/api/v1/auth/email-otp/verify/route';
 import { POST as acceptInvite } from '@/app/api/v1/auth/invitations/accept/route';
 import { GET as lookupInvite } from '@/app/api/v1/auth/invitations/lookup/route';
+import { POST as signupCode } from '@/app/api/v1/auth/signup/code/route';
+import { POST as signupComplete } from '@/app/api/v1/auth/signup/complete/route';
 import { POST as login } from '@/app/api/v1/auth/login/route';
 import { GET as me } from '@/app/api/v1/auth/me/route';
 import { POST as forgot } from '@/app/api/v1/auth/password/forgot/route';
@@ -35,6 +35,7 @@ import {
   resetTwoFactor,
   signIn,
   signInAdmin,
+  signInWith2fa,
   totpCode,
   uniqueEmail,
 } from '@/test/api-client';
@@ -80,6 +81,13 @@ async function inviteAndActivate(adminJar: Jar, role: 'STAFF' | 'VERIFIER', bran
     jar,
   });
   expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
+  // Staff must enrol an authenticator before use, so activation returns a
+  // setup token instead of a session — enrol here so the caller gets a live
+  // session. Verifiers sign straight in (2FA is optional for them).
+  if (accepted.body.data.kind === 'two_factor_setup_required') {
+    jar.setupToken = accepted.body.data.setupToken as string;
+    await enrollTwoFactor(email, jar);
+  }
   return { id: invited.body.data.user.id as string, email, jar };
 }
 
@@ -692,7 +700,7 @@ describe('managing staff accounts', () => {
   });
 });
 
-// ─── Password reset & employer email codes ────────────────────────────
+// ─── Password reset ────────────────────────────────────────────────────
 
 describe('password reset', () => {
   it('emails a single-use link, changes the password and signs out other sessions', async () => {
@@ -736,54 +744,135 @@ describe('password reset', () => {
         .status,
     ).toBe(400);
   });
-});
 
-describe('employer email sign-in codes', () => {
-  it('signs an employer in with an emailed code, and never sends codes to non-employers', async () => {
+  it('works for an employer, and the authenticator still stands after the reset', async () => {
     const email = 'employer@jobbank.local';
-    await resetTwoFactor(email);
-    const req = await call(emailCodeRequest, '/x', { method: 'POST', body: { email } });
-    expect(req.status).toBe(202);
-    const code = lastMailTo(email).subject.match(/^(\d{6})/)?.[1];
-    expect(code).toMatch(/^\d{6}$/);
+    const jar = await signInWith2fa(email);
+    expect((await call(me, '/api/v1/auth/me', { jar })).status).toBe(200);
 
+    expect((await call(forgot, '/x', { method: 'POST', body: { email } })).status).toBe(202);
+    const token = tokenFrom(lastMailTo(email).text);
+    expect(token.length).toBeGreaterThan(20);
+
+    const done = await call(reset, '/x', {
+      method: 'POST',
+      body: { token, password: 'Employer-new-99' },
+    });
+    expect(done.status).toBe(200);
+
+    // The reset signs the employer out everywhere, and the old password is dead.
+    expect((await call(me, '/api/v1/auth/me', { jar })).status).toBe(401);
     expect(
       (
-        await call(emailCodeVerify, '/x', {
+        await call(login, '/x', {
           method: 'POST',
-          body: { email, code: code === '000000' ? '111111' : '000000' },
+          body: { email, password: getSeedDevPassword() },
         })
       ).status,
     ).toBe(401);
-    const jar = new Jar();
-    const ok = await call(emailCodeVerify, '/x', { method: 'POST', jar, body: { email, code } });
+
+    // The new password works — but only with the authenticator code: the
+    // reset changes the password, it does not clear the enrolment.
+    const step1 = new Jar();
+    const pw = await call(login, '/x', {
+      method: 'POST',
+      body: { email, password: 'Employer-new-99' },
+      jar: step1,
+    });
+    expect(pw.body.data).toMatchObject({ kind: 'two_factor_required', methods: ['totp'] });
+    expect((await call(me, '/api/v1/auth/me', { jar: step1 })).status).toBe(401);
+    const ok = await call(verify2fa, '/api/v1/auth/2fa/verify', {
+      method: 'POST',
+      jar: step1,
+      body: { code: totpCode(email) },
+    });
     expect(ok.status).toBe(200);
-    expect(ok.body.data).toMatchObject({ kind: 'signed_in', homePath: '/employer' });
+    expect((await call(me, '/api/v1/auth/me', { jar: step1 })).status).toBe(200);
 
-    const before = mailOutbox.length;
+    // The link is single-use.
     expect(
-      (
-        await call(emailCodeRequest, '/x', {
-          method: 'POST',
-          body: { email: 'staff.khi@jobbank.local' },
-        })
-      ).status,
-    ).toBe(202);
-    // No code for a non-employer — but the address still gets an email saying
-    // there is no employer account (mirrors the signup "already have an
-    // account" email), so nobody waits for a code that is never sent.
-    expect(mailOutbox.length).toBe(before + 1);
-    const noAccountMail = lastMailTo('staff.khi@jobbank.local');
-    expect(noAccountMail.subject).toBe('No employer account for this email address');
-    expect(noAccountMail.text).not.toMatch(/^\d{6} is your/);
-    expect(noAccountMail.text).toContain('/register');
+      (await call(reset, '/x', { method: 'POST', body: { token, password: 'Another-pass-99' } }))
+        .status,
+    ).toBe(400);
+  });
+});
 
-    const [auditRow] = await db
-      .select()
-      .from(schema.auditLogs)
-      .where(eq(schema.auditLogs.action, 'auth.email_code_requested'))
-      .orderBy(desc(schema.auditLogs.id))
-      .limit(1);
-    expect(auditRow?.metadata).toMatchObject({ sent: false });
+describe('two-factor for Staff and Employer (extended 2026-11-15)', () => {
+  it('Staff is blocked until enrolment, then needs a code at every sign-in, and cannot turn it off', async () => {
+    const email = 'staff.khi@jobbank.local';
+    await resetTwoFactor(email);
+    // H-02: a never-enrolled 2FA-required staff member gets no session at
+    // login — only a short-lived setup token.
+    const jar = await signIn(email);
+    expect(jar.setupToken?.startsWith('v1.')).toBe(true);
+    expect((await call(me, '/api/v1/auth/me', { jar })).status).toBe(401);
+
+    await enrollTwoFactor(email, jar);
+    expect((await call(me, '/api/v1/auth/me', { jar })).body.data.twoFactorPending).toBe(false);
+
+    // Next sign-in: password alone is not enough, and trust-this-device is
+    // never offered for a 2FA-required role.
+    const step1 = new Jar();
+    const pw = await call(login, '/x', {
+      method: 'POST',
+      body: { email, password: getSeedDevPassword() },
+      jar: step1,
+    });
+    expect(pw.body.data).toMatchObject({
+      kind: 'two_factor_required',
+      methods: ['totp'],
+      trustDeviceAllowed: false,
+    });
+    expect((await call(me, '/api/v1/auth/me', { jar: step1 })).status).toBe(401);
+    const ok = await call(verify2fa, '/api/v1/auth/2fa/verify', {
+      method: 'POST',
+      jar: step1,
+      body: { code: totpCode(email) },
+    });
+    expect(ok.status).toBe(200);
+
+    const refused = await call(disable2fa, '/api/v1/account/2fa/disable', {
+      method: 'POST',
+      jar: step1,
+      body: { password: getSeedDevPassword() },
+    });
+    expect(refused.status).toBe(403);
+  });
+
+  it('Employer is blocked until enrolment and cannot turn two-factor off', async () => {
+    const email = 'employer@jobbank.local';
+    await resetTwoFactor(email);
+    const jar = await signIn(email);
+    expect(jar.setupToken?.startsWith('v1.')).toBe(true);
+    expect((await call(me, '/api/v1/auth/me', { jar })).status).toBe(401);
+
+    await enrollTwoFactor(email, jar);
+    expect((await call(me, '/api/v1/auth/me', { jar })).body.data.twoFactorPending).toBe(false);
+
+    const refused = await call(disable2fa, '/api/v1/account/2fa/disable', {
+      method: 'POST',
+      jar,
+      body: { password: getSeedDevPassword() },
+    });
+    expect(refused.status).toBe(403);
+  });
+
+  it('Employer signup ends in authenticator enrolment, not a signed-in session', async () => {
+    // signUpEmployer signs the new account in through the normal path, so a
+    // brand-new employer — who has no authenticator yet — gets the setup
+    // token instead of a session. (Before the employer 2FA change this threw
+    // "A new employer account cannot have 2FA".)
+    const email = uniqueEmail('employer2fa');
+    const codeRes = await call(signupCode, '/x', { method: 'POST', body: { email } });
+    expect(codeRes.status).toBe(202);
+    const code = lastMailTo(email).subject.match(/^(\d{6})/)?.[1];
+    expect(code).toMatch(/^\d{6}$/);
+    const done = await call(signupComplete, '/x', {
+      method: 'POST',
+      body: { email, code, fullName: 'Two Factor Owner', password: getSeedDevPassword() },
+    });
+    expect(done.status).toBe(200);
+    expect(done.body.data.kind).toBe('two_factor_setup_required');
+    expect(done.body.data.setupToken?.startsWith('v1.')).toBe(true);
   });
 });

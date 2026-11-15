@@ -3,6 +3,7 @@
 import { Eye, EyeOff, Mail } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { TwoFactorSetup } from '@/app/(dashboard)/account/security/TwoFactorSetup';
 import { Button, Input } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
@@ -43,6 +44,8 @@ export function EmployerSignupForm() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [alert, setAlert] = useState<string | null>(null);
   const [resendIn, setResendIn] = useCountdown();
+  /** Set when signup ends in 2FA enrolment (every new employer must enrol). */
+  const [setupToken, setSetupToken] = useState<string | null>(null);
 
   async function requestCode(e?: React.FormEvent) {
     e?.preventDefault();
@@ -91,10 +94,19 @@ export function EmployerSignupForm() {
     setFieldErrors({});
     setAlert(null);
     try {
-      await apiFetch('/api/v1/auth/signup/complete', {
+      const { data } = await apiFetch<
+        | { kind: 'signed_in'; homePath: string }
+        | { kind: 'two_factor_setup_required'; setupToken: string; expiresInSeconds: number }
+      >('/api/v1/auth/signup/complete', {
         method: 'POST',
         body: { email, code, fullName, password },
       });
+      // Employers must enrol an authenticator before using the system, so a
+      // brand-new account always lands here: finish enrolment to sign in.
+      if (data.kind === 'two_factor_setup_required') {
+        setSetupToken(data.setupToken);
+        return;
+      }
       router.push('/employer');
     } catch (err) {
       // A wrong/expired code, a bad name or a weak password is reported on
@@ -140,6 +152,18 @@ export function EmployerSignupForm() {
           Send confirmation code
         </Button>
       </form>
+    );
+  }
+
+  if (setupToken) {
+    return (
+      <div className="grid gap-4">
+        <p className="text-fg-muted text-sm">
+          Your account is created. Employers must use two-factor authentication — set up your
+          authenticator app now to finish signing in. This setup link expires in 15 minutes.
+        </p>
+        <TwoFactorSetup required setupToken={setupToken} />
+      </div>
     );
   }
 

@@ -6,7 +6,7 @@ import { POST as cancelToken } from '@/app/api/v1/applicants/tokens/[id]/cancel/
 import { POST as staffRegister } from '@/app/api/v1/applicants/route';
 import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import { db } from '@/lib/db';
-import { call, owner, randomPhone, signIn, type Jar } from '@/test/api-client';
+import { call, owner, randomPhone, signInWith2fa, type Jar } from '@/test/api-client';
 
 const randomCnic = () => `42${String(Math.floor(Math.random() * 1e11)).padStart(11, '0')}`;
 
@@ -25,7 +25,7 @@ let staffJar: Jar;
 beforeAll(async () => {
   khi = await branchId('KHI-GULSHAN');
   lhr = await branchId('LHR-JOHAR');
-  staffJar = await signIn('staff.khi@jobbank.local');
+  staffJar = await signInWith2fa('staff.khi@jobbank.local');
 });
 beforeEach(() => resetMemoryRateLimits());
 

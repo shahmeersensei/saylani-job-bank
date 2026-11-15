@@ -180,7 +180,7 @@ export async function confirmTwoFactorEnrollment(
   }
 }
 
-/** Optional for most roles; Super Admin and Branch Admin must keep it on. */
+/** Optional for Verifier / Interviewer-Scheduler; 2FA-required roles must keep it on. */
 export async function disableTwoFactor(
   ctx: SignedIn,
   password: string,

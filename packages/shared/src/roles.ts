@@ -29,8 +29,13 @@ export const ROLE_LABELS: Record<Role, string> = {
   APPLICANT: 'Applicant',
 };
 
-/** Must enrol an authenticator app before using the system (decided in M4). */
-export const TWO_FACTOR_REQUIRED_ROLES: readonly Role[] = ['SUPER_ADMIN', 'BRANCH_ADMIN'];
+/** Must enrol an authenticator app before using the system (decided in M4, extended to Staff and Employer 2026-11-15: every password sign-in is now TOTP-protected, so the emailed employer sign-in code — which would bypass it — is retired). */
+export const TWO_FACTOR_REQUIRED_ROLES: readonly Role[] = [
+  'SUPER_ADMIN',
+  'BRANCH_ADMIN',
+  'STAFF',
+  'EMPLOYER',
+];
 
 /** Roles that manage staff accounts and can be invited (applicants/employers self-register). */
 export const INTERNAL_ROLES: readonly Role[] = [

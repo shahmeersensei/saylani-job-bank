@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GET as listJobs } from '@/app/api/v1/jobs/route';
 import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import { db } from '@/lib/db';
-import { call, signIn, type Jar } from '@/test/api-client';
+import { call, signInWith2fa, type Jar } from '@/test/api-client';
 
 const us = schema.users;
 const co = schema.companies;
@@ -49,7 +49,7 @@ beforeAll(async () => {
   )[0]!;
   const companyId = company.id;
 
-  staffJar = await signIn('staff.khi@jobbank.local');
+  staffJar = await signInWith2fa('staff.khi@jobbank.local');
 
   const [a] = await db
     .insert(j)

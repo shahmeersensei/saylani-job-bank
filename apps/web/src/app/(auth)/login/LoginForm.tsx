@@ -329,101 +329,9 @@ function AuthenticatorStep({
   );
 }
 
-function EmailCodeSignIn({ next, onBack }: { next: string | null; onBack: () => void }) {
-  const finish = useFinishSignIn(next);
-  const [email, setEmail] = useState('');
-  const [step, setStep] = useState<'email' | 'code'>('email');
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const [resendIn, setResendIn] = useCountdown();
-
-  const send = async () => {
-    setPending(true);
-    setError(null);
-    try {
-      const { data } = await apiFetch<{ resendAfterSeconds: number }>(
-        '/api/v1/auth/email-otp/request',
-        { method: 'POST', body: { email } },
-      );
-      setStep('code');
-      setResendIn(data.resendAfterSeconds);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const verify = async (code: string) => {
-    setPending(true);
-    setError(null);
-    try {
-      const { data } = await apiFetch<SignedIn>('/api/v1/auth/email-otp/verify', {
-        method: 'POST',
-        body: { email, code },
-      });
-      finish(data);
-    } catch (err) {
-      setError(err);
-      setPending(false);
-    }
-  };
-
-  if (step === 'code') {
-    return (
-      <CodeStep
-        destination={email}
-        onVerify={(code) => void verify(code)}
-        onResend={() => void send()}
-        onBack={() => setStep('email')}
-        resendIn={resendIn}
-        pending={pending}
-        error={error}
-      />
-    );
-  }
-  return (
-    <form
-      className="grid gap-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void send();
-      }}
-    >
-      <p className="text-fg-muted text-sm">
-        Employers can sign in with a one-time code sent to their email.
-      </p>
-      <FormField label="Work email" required error={fieldError(error, 'email')}>
-        <Input
-          type="email"
-          autoComplete="username"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          startAdornment={<Mail aria-hidden="true" />}
-          autoFocus
-        />
-      </FormField>
-      <ErrorBanner error={error ?? undefined} operation="Email sign-in" />
-      <Button type="submit" fullWidth loading={pending} disabled={!email.includes('@')}>
-        Email me a code
-      </Button>
-      <Button
-        variant="link"
-        leftIcon={<ArrowLeft />}
-        onClick={onBack}
-        className="justify-self-start"
-      >
-        Use my password instead
-      </Button>
-    </form>
-  );
-}
-
 function StaffSignIn({ next, onBack }: { next: string | null; onBack: () => void }) {
   const finish = useFinishSignIn(next);
-  const [mode, setMode] = useState<'password' | 'two_factor' | 'two_factor_setup' | 'email_code'>(
-    'password',
-  );
+  const [mode, setMode] = useState<'password' | 'two_factor' | 'two_factor_setup'>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -458,9 +366,6 @@ function StaffSignIn({ next, onBack }: { next: string | null; onBack: () => void
         </Button>
       </div>
     );
-  if (mode === 'email_code')
-    return <EmailCodeSignIn next={next} onBack={() => setMode('password')} />;
-
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setPending(true);
@@ -547,13 +452,6 @@ function StaffSignIn({ next, onBack }: { next: string | null; onBack: () => void
         <Alert error={error} />
         <Button type="submit" fullWidth loading={pending} disabled={!email || !password}>
           Sign in
-        </Button>
-        <Button
-          variant="link"
-          onClick={() => setMode('email_code')}
-          className="justify-self-center"
-        >
-          Employer? Email me a sign-in code instead
         </Button>
       </form>
     </div>

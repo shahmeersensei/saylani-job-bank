@@ -11,7 +11,7 @@ import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import type { Actor } from '@/domains/shared/scope';
 import { db } from '@/lib/db';
 import { mailOutbox } from '@/lib/mail/mailer';
-import { call, randomPhone, signIn, signInApplicant, Jar } from '@/test/api-client';
+import { call, randomPhone, signInWith2fa, signInApplicant, Jar } from '@/test/api-client';
 
 const us = schema.users;
 const ap = schema.applicants;
@@ -54,7 +54,7 @@ beforeAll(async () => {
   if (!membership) throw new Error('Seeded employer has no company membership');
   companyId = membership.companyId;
 
-  employerJar = await signIn('employer@jobbank.local');
+  employerJar = await signInWith2fa('employer@jobbank.local');
 });
 
 beforeEach(() => resetMemoryRateLimits());

@@ -54,18 +54,6 @@ export function passwordResetEmail(input: { name: string; url: string; expiresMi
   };
 }
 
-export function signInCodeEmail(input: { code: string; expiresMinutes: number }) {
-  const lines = [
-    `Your Saylani Job Bank sign-in code is ${input.code}.`,
-    `It expires in ${input.expiresMinutes} minutes. Never share this code with anyone — Job Bank staff will never ask for it.`,
-  ];
-  return {
-    subject: `${input.code} is your Saylani Job Bank sign-in code`,
-    text: lines.join('\n\n'),
-    html: layout('Your sign-in code', lines),
-  };
-}
-
 /** Audit 2026-11-11 (M-28): tell the user their authenticator was removed. */
 export function twoFactorResetEmail(input: { name: string; reason: string }) {
   const lines = [
@@ -104,28 +92,6 @@ export function signupExistingAccountEmail(input: { url: string }) {
     subject: 'You already have a Saylani Job Bank account',
     text: `${lines.join('\n\n')}\n\n${input.url}\n`,
     html: layout('You already have an account', lines, { label: 'Sign in', url: input.url }),
-  };
-}
-
-/**
- * Sent instead of a sign-in code when the email has no employer account
- * (no account discovery): the mirror of signupExistingAccountEmail. Without
- * this, requesting a code for a staff address, a typo, or an employer signup
- * that never completed answers 202 and shows the code screen, and the user
- * waits for a code that is never sent.
- */
-export function employerCodeNoAccountEmail(input: { url: string }) {
-  const lines = [
-    'Someone asked for a Saylani Job Bank employer sign-in code for this email address, but there is no employer account using it — so no code was sent.',
-    'If that was you, create an employer account first and then sign in. If not, you can ignore this email.',
-  ];
-  return {
-    subject: 'No employer account for this email address',
-    text: `${lines.join('\n\n')}\n\n${input.url}\n`,
-    html: layout('No employer account yet', lines, {
-      label: 'Register as an employer',
-      url: input.url,
-    }),
   };
 }
 
