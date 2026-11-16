@@ -37,6 +37,7 @@ const form: RegistrationFormData = {
   preferences: null,
   verificationQrDataUrl: 'data:image/png;base64,dGVzdA==',
   photoDataUrl: 'data:image/jpeg;base64,dGVzdA==',
+  photoUrl: '/api/v1/applicants/applicant-id/documents/doc-1/download',
   canRegenerate: false,
 };
 
@@ -80,10 +81,51 @@ describe('RegistrationPrintClient', () => {
   });
 
   it('shows a placeholder box when no photo is on file', async () => {
-    vi.mocked(apiFetch).mockResolvedValue({ data: { ...form, photoDataUrl: null } });
+    vi.mocked(apiFetch).mockResolvedValue({
+      data: { ...form, photoDataUrl: null, photoUrl: null },
+    });
     render(<RegistrationPrintClient applicantId="applicant-id" />);
 
     expect(await screen.findByText('No photo on file')).toBeInTheDocument();
+    expect(screen.queryByAltText('Applicant photo')).not.toBeInTheDocument();
+  });
+
+  it('uses the download link when the server could not embed the photo', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ data: { ...form, photoDataUrl: null } });
+    render(<RegistrationPrintClient applicantId="applicant-id" />);
+
+    const photo = await screen.findByAltText('Applicant photo');
+    // jsdom absolutises a relative src; the path is what matters.
+    expect(photo.getAttribute('src')).toContain(
+      '/api/v1/applicants/applicant-id/documents/doc-1/download',
+    );
+    expect(screen.queryByText('No photo on file')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the download link when the embedded photo fails to render', async () => {
+    render(<RegistrationPrintClient applicantId="applicant-id" />);
+
+    const photo = await screen.findByAltText('Applicant photo');
+    expect(photo).toHaveAttribute('src', 'data:image/jpeg;base64,dGVzdA==');
+    fireEvent.error(photo);
+
+    await waitFor(() => {
+      expect(screen.getByAltText('Applicant photo').getAttribute('src')).toContain(
+        '/api/v1/applicants/applicant-id/documents/doc-1/download',
+      );
+    });
+    expect(screen.queryByText('No photo on file')).not.toBeInTheDocument();
+    expect(screen.queryByText('Photo could not be loaded')).not.toBeInTheDocument();
+  });
+
+  it('says the photo could not be loaded when neither photo source renders', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ data: { ...form, photoDataUrl: null } });
+    render(<RegistrationPrintClient applicantId="applicant-id" />);
+
+    fireEvent.error(await screen.findByAltText('Applicant photo'));
+
+    expect(await screen.findByText('Photo could not be loaded')).toBeInTheDocument();
+    expect(screen.queryByText('No photo on file')).not.toBeInTheDocument();
     expect(screen.queryByAltText('Applicant photo')).not.toBeInTheDocument();
   });
 });

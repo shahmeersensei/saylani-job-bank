@@ -179,10 +179,10 @@ export async function createApplicantRegistrationForm(
     .where(eq(applicants.id, applicantId));
   if (!registration) throw new NotFoundError('Applicant');
 
-  const [labels, token, photoDataUrl] = await Promise.all([
+  const [labels, token, photo] = await Promise.all([
     masterDataLabels(['EDUCATION_LEVEL', 'SKILL', 'LANGUAGE', 'CITY', 'AREA', 'JOB_CATEGORY']),
     ensureApplicantVerificationToken(ctx, applicantId, false, 'city'),
-    applicantPhotoDataUrl(applicantId),
+    applicantPhoto(applicantId),
   ]);
   const label = (type: keyof typeof labels, code: string | null) =>
     code ? (labels[type]?.[code] ?? 'Not available') : null;
@@ -252,28 +252,59 @@ export async function createApplicantRegistrationForm(
         }
       : null,
     verificationQrDataUrl,
-    photoDataUrl,
+    photoDataUrl: photo.dataUrl,
+    photoUrl: photo.viewUrl,
     canRegenerate: profile.can.manage,
   };
 }
 
 /**
- * The applicant's passport photo for the printed form, embedded as a data
- * URL like the verification QR — the printout must be self-contained, and
- * a missing or unreadable photo must never block the form itself.
+ * The applicant's passport photo for the printed form. The primary copy is
+ * embedded as a data URL, like the verification QR — the printout must be
+ * self-contained. `viewUrl` is the same-origin download route the profile
+ * page views the photo through, kept as a fallback for the print client
+ * when the embedded copy cannot be read or rendered. A missing or
+ * unreadable photo must never block the form itself — but unlike before,
+ * a failed read is now logged (no photo on file stays silent, as expected),
+ * so a photo that exists yet never shows up can be traced from the server
+ * log instead of silently rendering "No photo on file".
  */
-async function applicantPhotoDataUrl(applicantId: string): Promise<string | null> {
+async function applicantPhoto(
+  applicantId: string,
+): Promise<{ dataUrl: string | null; viewUrl: string | null }> {
+  let photo: Awaited<ReturnType<typeof currentDocuments>>[number] | undefined;
   try {
     const documents = await currentDocuments(db, applicantId);
-    const photo = documents.find((doc) => doc.typeCode === 'PHOTO');
-    if (!photo) return null;
+    photo = documents.find((doc) => doc.typeCode === 'PHOTO');
+  } catch (error) {
+    console.warn(
+      `[registration-form] could not list documents for applicant ${applicantId}:`,
+      error instanceof Error ? error.message : 'unknown error',
+    );
+    return { dataUrl: null, viewUrl: null };
+  }
+  if (!photo) return { dataUrl: null, viewUrl: null };
+  const viewUrl = `/api/v1/applicants/${applicantId}/documents/${photo.id}/download`;
+  try {
     const stored = await downloadDocument(photo, PRESENT_DOCUMENT_STATUSES);
     const bytes = new Uint8Array(await new Response(stored.body).arrayBuffer());
-    if (bytes.length === 0) return null;
+    if (bytes.length === 0) {
+      console.warn(
+        `[registration-form] PHOTO document ${photo.id} for applicant ${applicantId} is empty; the print form will use the download link instead.`,
+      );
+      return { dataUrl: null, viewUrl };
+    }
     const contentType = photo.contentType || stored.contentType || 'image/jpeg';
-    return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
-  } catch {
-    return null;
+    return {
+      dataUrl: `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`,
+      viewUrl,
+    };
+  } catch (error) {
+    console.warn(
+      `[registration-form] could not embed PHOTO document ${photo.id} for applicant ${applicantId}; the print form will use the download link instead:`,
+      error instanceof Error ? error.message : 'unknown error',
+    );
+    return { dataUrl: null, viewUrl };
   }
 }
 

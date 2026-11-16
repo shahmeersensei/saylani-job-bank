@@ -69,6 +69,12 @@ export interface RegistrationFormData {
    * when no photo is on file or it could not be read.
    */
   photoDataUrl: string | null;
+  /**
+   * Same-origin download route for the PHOTO document — the same route the
+   * profile page views the photo through. The print client uses it when the
+   * embedded copy is missing or fails to render. Null when no photo is on file.
+   */
+  photoUrl: string | null;
   canRegenerate: boolean;
 }
 

@@ -55,6 +55,8 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
   const [qrLoaded, setQrLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
+  /** True once the embedded photo failed and the client fell back to the download link. */
+  const [photoUseDownload, setPhotoUseDownload] = useState(false);
   const logoRef = useRef<HTMLImageElement>(null);
   const qrRef = useRef<HTMLImageElement>(null);
 
@@ -66,6 +68,7 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
     setQrLoaded(false);
     setImageError(false);
     setPhotoFailed(false);
+    setPhotoUseDownload(false);
     try {
       const { data } = await apiFetch<RegistrationFormData>(
         `/api/v1/applicants/${applicantId}/registration-form`,
@@ -116,6 +119,13 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
     if (logo?.complete && logo.naturalWidth > 0) setLogoLoaded(true);
     if (qr?.complete && qr.naturalWidth > 0) setQrLoaded(true);
   }, [form]);
+
+  // A fresh form resets the photo state, so a retry after a failed load
+  // starts from the embedded copy again instead of a stale fallback.
+  useEffect(() => {
+    setPhotoFailed(false);
+    setPhotoUseDownload(false);
+  }, [form?.photoDataUrl, form?.photoUrl]);
 
   const replaceCode = async () => {
     if (
@@ -223,24 +233,44 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
                 <Field label="Date of birth" value={formatDate(form.personal.dateOfBirth)} />
                 <Field label="Gender" value={GENDER_LABELS[form.personal.gender]} />
               </dl>
-              {form.photoDataUrl && !photoFailed ? (
-                <Image
-                  src={form.photoDataUrl}
-                  width={140}
-                  height={180}
-                  alt="Applicant photo"
-                  unoptimized
-                  onError={() => setPhotoFailed(true)}
-                  className="registration-print-photo"
-                />
-              ) : (
-                <div
-                  className="registration-print-photo registration-print-photo--empty"
-                  aria-label="No applicant photo on file"
-                >
-                  No photo on file
-                </div>
-              )}
+              {(() => {
+                // Prefer the embedded copy (self-contained printout). When
+                // the server could not embed the photo, or the embedded copy
+                // fails to render, fall back to the download route — the same
+                // one the profile page views the photo through. Only when
+                // neither source works does the box say the photo could not
+                // be loaded, so that is never confused with "no photo on file".
+                const photoSrc =
+                  !photoUseDownload && form.photoDataUrl ? form.photoDataUrl : form.photoUrl;
+                return photoSrc && !photoFailed ? (
+                  <Image
+                    src={photoSrc}
+                    width={140}
+                    height={180}
+                    alt="Applicant photo"
+                    unoptimized
+                    onError={() => {
+                      if (!photoUseDownload && form.photoDataUrl && form.photoUrl) {
+                        setPhotoUseDownload(true);
+                      } else {
+                        setPhotoFailed(true);
+                      }
+                    }}
+                    className="registration-print-photo"
+                  />
+                ) : (
+                  <div
+                    className="registration-print-photo registration-print-photo--empty"
+                    aria-label={
+                      photoFailed
+                        ? 'Applicant photo could not be loaded'
+                        : 'No applicant photo on file'
+                    }
+                  >
+                    {photoFailed ? 'Photo could not be loaded' : 'No photo on file'}
+                  </div>
+                );
+              })()}
             </div>
           </Section>
 
