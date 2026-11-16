@@ -62,7 +62,9 @@ export function InteractiveBarChart({
   const yLabels = peakVal <= 1 ? [0, 1] : [...new Set([0, Math.round(peakVal * 0.5), peakVal])];
 
   return (
-    <div className="rounded-2xl border bg-white p-6" style={{ borderColor: '#e8eeed' }}>
+    // Theme surface, not hardcoded white: in dark mode the white card made
+    // the var(--fg) title and var(--fg-muted) legend unreadable.
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <BarChart3 className="size-4" style={{ color: '#0d7a3e' }} aria-hidden="true" />

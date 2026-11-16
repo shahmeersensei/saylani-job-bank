@@ -866,17 +866,22 @@ export async function WelcomePanel({ role }: { role: Role }) {
               </span>
             </div>
 
-            <div className="mb-6 flex gap-2">
+            {/* Action buttons: no-wrap + wrapping row. Three flex-1 links
+                share ~470px, so the longest label ("Browse Applicants")
+                wrapped onto two lines mid-button. Labels now stay on one
+                line; on narrow screens a button drops to its own row
+                instead of wrapping its text. */}
+            <div className="mb-6 flex flex-wrap gap-2">
               <NextLink
                 href={actions.action1.href}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold whitespace-nowrap text-white"
                 style={{ background: '#0d7a3e' }}
               >
                 {actions.action1.label}
               </NextLink>
               <NextLink
                 href={actions.action2.href}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold whitespace-nowrap"
                 style={{ borderColor: '#e8eeed', color: 'var(--fg)' }}
               >
                 {actions.action2.label}
@@ -884,7 +889,7 @@ export async function WelcomePanel({ role }: { role: Role }) {
               {actions.action3 && (
                 <NextLink
                   href={actions.action3.href}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold whitespace-nowrap"
                   style={{ borderColor: '#e8eeed', color: 'var(--fg)' }}
                 >
                   {actions.action3.label}
@@ -921,8 +926,11 @@ export async function WelcomePanel({ role }: { role: Role }) {
                         />
                       </span>
                       <div className="min-w-0">
+                        {/* No truncate: "Verified Companies" was cut to
+                            "Verified Co..." in the half-width card. The
+                            label wraps to a second line instead. */}
                         <p
-                          className="truncate text-xs font-semibold"
+                          className="text-xs leading-snug font-semibold"
                           style={{ color: 'var(--fg)' }}
                         >
                           {sub.label}
