@@ -7,8 +7,9 @@ import { cn } from '@/lib/utils/cn';
 import type { SearchableSelectProps } from './searchableSelect.types';
 
 /**
- * Type-to-filter select for long option lists (areas): staff type a few
- * letters, the list narrows to matches, and picking one stores its code.
+ * Type-to-filter select for long option lists (areas, skills): staff type
+ * a few letters, the list narrows to matches, and picking one stores its
+ * code.
  * Free text is never stored — clearing the text clears the value, and
  * leaving the field with unmatched text reverts to the selected label.
  * Focusing selects the current label, so typing replaces it.

@@ -17,7 +17,16 @@ import {
   type ApplicantTokenView,
   type Gender,
 } from '@jobbank/shared';
-import { ArrowLeft, Check, CheckCircle2, Plus, Printer, Trash2, UserPlus } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  Plus,
+  Printer,
+  Search,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
@@ -594,8 +603,10 @@ export function StaffRegisterApplicantForm({
                 { id: 'contact', step: 2, label: 'Contact & address' },
                 { id: 'education', step: 3, label: 'Education' },
                 { id: 'experience', step: 4, label: 'Experience' },
-                { id: 'skills', step: 5, label: 'Skills & languages' },
-                { id: 'preferences', step: 6, label: 'Certificates & preferences' },
+                { id: 'skills', step: 5, label: 'Skills' },
+                { id: 'languages', step: 6, label: 'Languages' },
+                { id: 'certificates', step: 7, label: 'Certificates' },
+                { id: 'preferences', step: 8, label: 'Job preferences' },
               ].map((item) => (
                 <a
                   key={item.id}
@@ -1148,32 +1159,29 @@ export function StaffRegisterApplicantForm({
               </Button>
             )}
           </section>
-          {/* Redesign 2026-11-16: the old "Skills and additional information"
-              card held five groups at once. Skills and languages keep this
-              card; certificates and job preferences get their own (step 6). */}
+          {/* Split 2026-11-16: skills and languages were one card; each
+              gets its own section now, so staff see them separately. */}
           <section
             id="section-skills"
             className="border-border bg-surface shadow-card grid scroll-mt-24 gap-4 rounded-xl border p-5"
           >
-            <SectionHeading
-              step={5}
-              title="Skills & languages"
-              description="What the applicant can do, and which languages they speak."
-            />
+            <SectionHeading step={5} title="Skills" description="What the applicant can do." />
             {skillsList.map((item, index) => (
               <div
                 key={index}
                 className="border-border bg-surface-muted grid gap-4 rounded-xl border p-3 sm:grid-cols-[2fr_1fr_1fr_auto]"
               >
-                <Select
+                {/* Fiverr-style search bar: staff type the skill, the list
+                    narrows to matches, and picking one stores its code.
+                    Free text is never stored — same as the Area field. */}
+                <SearchableSelect
                   value={item.skillCode}
                   options={skills}
-                  placeholder="Choose a skill"
-                  onChange={(event) =>
+                  placeholder="Search for a skill…"
+                  startAdornment={<Search aria-hidden="true" />}
+                  onChange={(skillCode) =>
                     setSkillsList((rows) =>
-                      rows.map((row, i) =>
-                        i === index ? { ...row, skillCode: event.target.value } : row,
-                      ),
+                      rows.map((row, i) => (i === index ? { ...row, skillCode } : row)),
                     )
                   }
                 />
@@ -1226,6 +1234,12 @@ export function StaffRegisterApplicantForm({
             >
               Add skill
             </Button>
+          </section>
+          <section
+            id="section-languages"
+            className="border-border bg-surface shadow-card grid scroll-mt-24 gap-4 rounded-xl border p-5"
+          >
+            <SectionHeading step={6} title="Languages" description="Which languages they speak." />
             {languagesList.map((item, index) => (
               <div
                 key={index}
@@ -1279,17 +1293,14 @@ export function StaffRegisterApplicantForm({
               Add language
             </Button>
           </section>
+          {/* Split 2026-11-16: certificates and job preferences were one
+              card; each gets its own section now. */}
           <section
-            id="section-preferences"
+            id="section-certificates"
             className="border-border bg-surface shadow-card grid scroll-mt-24 gap-4 rounded-xl border p-5"
           >
-            <SectionHeading
-              step={6}
-              title="Certificates & job preferences"
-              description="Courses and certificates, plus the kind of work the applicant wants."
-            />
+            <SectionHeading step={7} title="Certificates" description="Courses and certificates." />
             <div className="grid gap-4">
-              <h3 className="text-fg text-sm font-semibold">Certificates and courses</h3>
               {certifications.map((item, index) => (
                 <div key={index} className="grid gap-4 sm:grid-cols-2">
                   <FormField
@@ -1387,6 +1398,16 @@ export function StaffRegisterApplicantForm({
                 Add certificate
               </Button>
             </div>
+          </section>
+          <section
+            id="section-preferences"
+            className="border-border bg-surface shadow-card grid scroll-mt-24 gap-4 rounded-xl border p-5"
+          >
+            <SectionHeading
+              step={8}
+              title="Job preferences"
+              description="The kind of work the applicant wants."
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               {applicant ? (
                 <div className="grid gap-3">
