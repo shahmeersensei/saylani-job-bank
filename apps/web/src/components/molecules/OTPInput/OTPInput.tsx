@@ -74,6 +74,8 @@ export function OTPInput({
             inputs.current[index] = el;
           }}
           type="text"
+          id={`otp-digit-${index + 1}`}
+          name={`otp-digit-${index + 1}`}
           inputMode="numeric"
           autoComplete={index === 0 ? 'one-time-code' : 'off'}
           pattern="\d*"

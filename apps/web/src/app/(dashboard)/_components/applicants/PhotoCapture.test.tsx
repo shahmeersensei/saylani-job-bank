@@ -1,9 +1,15 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cameraErrorMessage, PhotoCapture, type CapturedPhoto } from './PhotoCapture';
+import {
+  cameraErrorMessage,
+  isIntegratedCameraLabel,
+  PhotoCapture,
+  type CapturedPhoto,
+} from './PhotoCapture';
 
 const getUserMediaMock = vi.fn();
+const enumerateDevicesMock = vi.fn();
 const mockStream = { getTracks: () => [] };
 const playMock = vi.fn().mockResolvedValue(undefined);
 const drawImageMock = vi.fn();
@@ -65,8 +71,11 @@ describe('PhotoCapture', () => {
   beforeEach(() => {
     getUserMediaMock.mockReset();
     getUserMediaMock.mockResolvedValue(mockStream);
+    enumerateDevicesMock.mockReset();
+    enumerateDevicesMock.mockResolvedValue([]);
+    window.localStorage.clear();
     Object.defineProperty(window.navigator, 'mediaDevices', {
-      value: { getUserMedia: getUserMediaMock },
+      value: { getUserMedia: getUserMediaMock, enumerateDevices: enumerateDevicesMock },
       configurable: true,
     });
     vi.spyOn(HTMLVideoElement.prototype, 'play').mockImplementation(playMock);
@@ -156,5 +165,90 @@ describe('PhotoCapture', () => {
     expect(screen.getByAltText('Captured applicant photo preview')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retake' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument();
+  });
+
+  it('gives the upload file input an id and name so browsers can autofill it', () => {
+    renderCapture();
+
+    const input = screen.getByLabelText('Upload a photo file');
+    expect(input).toHaveAttribute('id', 'applicant-photo-upload');
+    expect(input).toHaveAttribute('name', 'applicant-photo');
+  });
+
+  it('prefers the integrated webcam over the browser default camera', async () => {
+    const user = userEvent.setup();
+    const streamFor = (deviceId: string) => ({
+      getTracks: () => [{ stop: vi.fn() }],
+      getVideoTracks: () => [{ getSettings: () => ({ deviceId }) }],
+    });
+    getUserMediaMock.mockImplementation(async (constraints: MediaStreamConstraints) => {
+      const wanted = (constraints.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+      return wanted === 'int-1' ? streamFor('int-1') : streamFor('usb-1');
+    });
+    enumerateDevicesMock.mockResolvedValue([
+      { deviceId: 'usb-1', kind: 'videoinput', label: 'USB Webcam' },
+      { deviceId: 'int-1', kind: 'videoinput', label: 'Integrated Camera' },
+    ]);
+    expect(isIntegratedCameraLabel('Integrated Camera')).toBe(true);
+    expect(isIntegratedCameraLabel('USB Webcam')).toBe(false);
+    renderCapture();
+
+    await user.click(screen.getByRole('button', { name: 'Start camera' }));
+
+    // Switched to the integrated webcam once its label was visible.
+    await waitFor(() =>
+      expect(getUserMediaMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          video: expect.objectContaining({ deviceId: { exact: 'int-1' } }),
+        }),
+      ),
+    );
+    const select = await screen.findByLabelText('Choose camera');
+    expect(select).toHaveValue('int-1');
+    expect(window.localStorage.getItem('jobbank-camera-device-id')).toBe('int-1');
+  });
+
+  it('lets staff switch to another camera from the selector', async () => {
+    const user = userEvent.setup();
+    const streamFor = (deviceId: string) => ({
+      getTracks: () => [{ stop: vi.fn() }],
+      getVideoTracks: () => [{ getSettings: () => ({ deviceId }) }],
+    });
+    getUserMediaMock.mockImplementation(async (constraints: MediaStreamConstraints) => {
+      const wanted = (constraints.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+      return streamFor(wanted ?? 'usb-1');
+    });
+    enumerateDevicesMock.mockResolvedValue([
+      { deviceId: 'usb-1', kind: 'videoinput', label: 'USB Webcam' },
+      { deviceId: 'int-1', kind: 'videoinput', label: 'Integrated Camera' },
+    ]);
+    renderCapture();
+
+    await user.click(screen.getByRole('button', { name: 'Start camera' }));
+    const select = await screen.findByLabelText('Choose camera');
+    expect(select).toHaveValue('int-1');
+
+    await user.selectOptions(select, 'usb-1');
+
+    await waitFor(() =>
+      expect(getUserMediaMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          video: expect.objectContaining({ deviceId: { exact: 'usb-1' } }),
+        }),
+      ),
+    );
+  });
+
+  it('shows which camera is in use when there is only one', async () => {
+    const user = userEvent.setup();
+    enumerateDevicesMock.mockResolvedValue([
+      { deviceId: 'int-1', kind: 'videoinput', label: 'Integrated Camera' },
+    ]);
+    renderCapture();
+
+    await user.click(screen.getByRole('button', { name: 'Start camera' }));
+
+    await waitFor(() => expect(screen.getByText('Camera: Integrated Camera')).toBeInTheDocument());
+    expect(screen.queryByLabelText('Choose camera')).not.toBeInTheDocument();
   });
 });

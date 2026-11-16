@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import {
   formatPkMobileNational,
@@ -20,6 +20,10 @@ export function PhoneInput({
   ...props
 }: PhoneInputProps) {
   const [internal, setInternal] = useState(() => toNationalMobileDigits(value ?? ''));
+  // The segmented prefix <select> is a raw element (no FormField, no atom),
+  // so it needs its own id — Chrome flags form fields with neither id nor
+  // name. The subscriber <Input> gets one from the atom's generated id.
+  const prefixId = useId();
   const national = value !== undefined ? toNationalMobileDigits(value) : internal;
   const selectedPrefix = national.slice(0, 3);
   const subscriber = national.slice(3);
@@ -38,6 +42,8 @@ export function PhoneInput({
           +92
         </div>
         <select
+          id={prefixId}
+          name="phone-prefix"
           aria-label="Original network allocation"
           className="border-primary/25 bg-primary-soft text-primary-soft-fg h-10 min-w-0 rounded-lg border px-2 text-sm"
           value={selectedPrefix}

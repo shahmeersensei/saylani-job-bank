@@ -418,6 +418,8 @@ export function StaffPostJobForm({
                   <label key={code} className="flex cursor-pointer items-center gap-2">
                     <input
                       type="checkbox"
+                      id={`job-language-${code}`}
+                      name={`job-language-${code}`}
                       className="accent-primary size-4"
                       checked={languageCodes.includes(code)}
                       onChange={(e) =>
@@ -597,6 +599,8 @@ export function StaffPostJobForm({
                     <label key={label} className="flex cursor-pointer items-center gap-2">
                       <input
                         type="checkbox"
+                        id={`job-benefit-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                        name={`job-benefit-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
                         className="accent-primary size-4"
                         checked={val}
                         onChange={(e) => setter(e.target.checked)}

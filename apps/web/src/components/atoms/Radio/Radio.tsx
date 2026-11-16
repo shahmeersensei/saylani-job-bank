@@ -16,13 +16,19 @@ export function RadioGroup({
   'aria-describedby': ariaDescribedBy,
   ...props
 }: RadioGroupProps) {
-  const baseId = useId();
   const field = useFieldControl({
     invalid,
     required,
     disabled,
     'aria-describedby': ariaDescribedBy,
   });
+  // When a FormField wraps this group it renders <label htmlFor={field.id}>,
+  // but the items used their own useId base, so no element carried that id
+  // and Chrome flagged the label. The first option now carries the field id
+  // exactly (the standard label-points-at-first-radio pattern); the rest
+  // keep "{base}-{value}". Standalone groups (no FormField) are unchanged.
+  const generatedId = useId();
+  const baseId = field.id ?? generatedId;
 
   return (
     <RadixRadioGroup.Root
@@ -37,8 +43,8 @@ export function RadioGroup({
       )}
       {...props}
     >
-      {options.map((option) => {
-        const itemId = `${baseId}-${option.value}`;
+      {options.map((option, index) => {
+        const itemId = field.id && index === 0 ? field.id : `${baseId}-${option.value}`;
         return (
           <div key={option.value} className="flex items-start gap-3">
             <RadixRadioGroup.Item

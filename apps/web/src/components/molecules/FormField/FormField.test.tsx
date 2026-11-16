@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Checkbox } from '@/components/atoms/Checkbox';
 import { Input } from '@/components/atoms/Input';
+import { RadioGroup } from '@/components/atoms/Radio';
 import { Select } from '@/components/atoms/Select';
 import { Textarea } from '@/components/atoms/Textarea';
 import { expectNoA11yViolations } from '@/test/a11y';
@@ -45,6 +46,29 @@ describe('FormField', () => {
     );
     expect(screen.getByLabelText('Trade').tagName).toBe('SELECT');
     expect(screen.getByLabelText('Notes')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('points a radio group label at its first option', () => {
+    render(
+      <FormField label="Gender">
+        <RadioGroup
+          defaultValue="MALE"
+          options={[
+            { value: 'MALE', label: 'Male' },
+            { value: 'FEMALE', label: 'Female' },
+          ]}
+        />
+      </FormField>,
+    );
+    // Chrome flags a <label for> that matches no element: the group label
+    // must point at a real element, so the first option carries the field id.
+    // The FormField label now points at the first radio, so its accessible
+    // name is the composed "Gender Male" (group label + option label) — the
+    // label association is exactly what this test verifies.
+    const label = screen.getByText('Gender');
+    const firstRadio = screen.getByRole('radio', { name: 'Gender Male' });
+    expect(label.getAttribute('for')).toBe(firstRadio.getAttribute('id'));
+    expect(firstRadio.getAttribute('id')).toBeTruthy();
   });
 
   it('has no axe violations for a typical form', async () => {

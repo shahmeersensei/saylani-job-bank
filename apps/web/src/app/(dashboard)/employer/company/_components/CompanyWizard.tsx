@@ -1040,6 +1040,8 @@ function DocumentsStep({
         <label className="cursor-pointer">
           <input
             type="file"
+            id={`company-document-upload-${code}`}
+            name={`company-document-upload-${code}`}
             accept={
               code.startsWith('AUTHORISED_PERSON_CNIC') ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png'
             }

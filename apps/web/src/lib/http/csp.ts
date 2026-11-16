@@ -8,8 +8,10 @@
  * - script-src: 'self' + per-request nonce. No 'unsafe-inline': the only
  *   author-written inline script is the theme script (layout.tsx), which
  *   receives the nonce explicitly, and Next.js applies the same nonce to its
- *   own hydration scripts from the `x-nonce` request header. 'unsafe-eval'
- *   stays in non-production only — webpack dev needs it for HMR.
+ *   own hydration scripts from the `x-nonce` request header. No
+ *   'unsafe-eval' either, in any environment: the dev server runs Turbopack
+ *   (not webpack), whose runtime does not evaluate code, so HMR works with
+ *   a nonce-only script-src.
  * - style-src: 'self' + 'unsafe-inline' (KEPT, deliberately). A nonce cannot
  *   cover style *attributes*, and the app renders hundreds of React inline
  *   styles (`style={{...}}`) plus one inline <style> tag (landing page).
@@ -31,7 +33,7 @@ export function buildCsp(nonce: string): string {
   const storage = originOf(process.env.S3_ENDPOINT);
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}'${isProd ? '' : " 'unsafe-eval'"}`,
+    `script-src 'self' 'nonce-${nonce}'`,
     "style-src 'self' 'unsafe-inline'",
     // images.unsplash.com: landing-page photos. data:/blob:: leaflet markers and previews.
     ['img-src', "'self'", 'data:', 'blob:', 'https://images.unsplash.com', mapTiles, storage]

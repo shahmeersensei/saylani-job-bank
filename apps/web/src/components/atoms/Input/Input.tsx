@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useFieldControl } from '../FieldContext';
 import type { InputProps } from './input.types';
@@ -36,6 +37,12 @@ export function Input({
     disabled,
     'aria-describedby': ariaDescribedBy,
   });
+  // Standalone inputs (SearchBar, filter dates) have no FormField and no
+  // id prop, so they rendered with no id at all — Chrome flags form fields
+  // with neither an id nor a name. Generate one; inside a FormField the
+  // context id wins, so labelled fields are unaffected.
+  const generatedId = useId();
+  const controlId = field.id ?? generatedId;
 
   return (
     <div
@@ -47,7 +54,7 @@ export function Input({
         </span>
       )}
       <input
-        id={field.id}
+        id={controlId}
         required={field.required}
         disabled={field.disabled}
         aria-invalid={field['aria-invalid']}

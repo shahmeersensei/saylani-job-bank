@@ -14,6 +14,24 @@ export interface CapturedPhoto {
 /** Passport-size photo: 35 × 45 mm, JPEG/PNG, max 2 MB (the PHOTO document type). */
 export const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png'] as const;
+/** Remembered camera choice for this laptop, so the next applicant reuses it. */
+const CAMERA_DEVICE_STORAGE_KEY = 'jobbank-camera-device-id';
+
+/**
+ * Whether a camera label looks like the laptop's own built-in webcam
+ * ("Integrated Camera", "Built-in Camera", "FaceTime HD Camera", …) rather
+ * than a plugged-in USB webcam or a virtual camera. Vendor names vary, so
+ * this is only a preference — staff can always pick another camera below.
+ */
+export function isIntegratedCameraLabel(label: string): boolean {
+  return /integrat|built-?in|internal|facetime|true ?vision|easy ?camera/i.test(label);
+}
+
+type CameraDevice = Pick<MediaDeviceInfo, 'deviceId' | 'label'>;
+
+function cameraLabel(device: CameraDevice, index: number): string {
+  return device.label || `Camera ${index + 1}`;
+}
 
 /**
  * Plain-language camera errors. The browser's own messages name error codes
@@ -75,6 +93,44 @@ export function PhotoCapture({
   const [camera, setCamera] = useState<CameraState>('idle');
   const [videoReady, setVideoReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Cameras found on this device (labels only appear once permission is granted). */
+  const [devices, setDevices] = useState<CameraDevice[]>([]);
+  /** The camera the user picked (or the integrated one, auto-picked below). */
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(() => {
+    try {
+      return typeof window === 'undefined'
+        ? null
+        : window.localStorage.getItem(CAMERA_DEVICE_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+  /** deviceId of the track actually feeding the preview, if known. */
+  const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
+
+  const rememberDevice = (deviceId: string) => {
+    setSelectedDeviceId(deviceId);
+    try {
+      window.localStorage.setItem(CAMERA_DEVICE_STORAGE_KEY, deviceId);
+    } catch {
+      // Private mode / blocked storage: the choice just lasts this session.
+    }
+  };
+
+  const activeTrackDeviceId = (stream: MediaStream): string | undefined =>
+    stream.getVideoTracks?.()[0]?.getSettings?.().deviceId;
+
+  const listCameras = async (): Promise<CameraDevice[]> => {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      return all
+        .filter((device) => device.kind === 'videoinput' && Boolean(device.deviceId))
+        .map((device) => ({ deviceId: device.deviceId, label: device.label }));
+    } catch {
+      return [];
+    }
+  };
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -107,11 +163,32 @@ export function PhotoCapture({
 
   const cancelCamera = () => {
     stopCamera();
+    setActiveDeviceId(null);
     setCamera('idle');
   };
 
-  const startCamera = async () => {
+  const requestCamera = (deviceId: string | null) =>
+    navigator.mediaDevices.getUserMedia({
+      video: deviceId
+        ? {
+            deviceId: { exact: deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          }
+        : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    });
+
+  /**
+   * Starts the camera on `deviceId` when given, otherwise on the remembered
+   * choice. With no choice, the browser picks its default — then, once
+   * permission has made device labels visible, we switch to the laptop's
+   * integrated webcam when it is a different camera, so the applicant is
+   * photographed with the built-in camera instead of a USB/virtual one.
+   */
+  const startCamera = async (deviceId?: string | null) => {
     if (disabled) return;
+    stopCamera();
     onSkippedChange(false);
     setError(null);
     setCamera('starting');
@@ -119,20 +196,37 @@ export function PhotoCapture({
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new DOMException('Camera not supported', 'NotFoundError');
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      });
+      const explicit = deviceId !== undefined ? deviceId : selectedDeviceId;
+      let stream = await requestCamera(explicit);
       streamRef.current = stream;
+      setActiveDeviceId(activeTrackDeviceId(stream) ?? explicit ?? null);
+      const cameras = await listCameras();
+      if (cameras.length > 0) setDevices(cameras);
+      const integrated = cameras.find((device) => isIntegratedCameraLabel(device.label));
+      if (!explicit && integrated && integrated.deviceId !== activeTrackDeviceId(stream)) {
+        // The default was not the integrated webcam: restart on it.
+        stream.getTracks().forEach((track) => track.stop());
+        stream = await requestCamera(integrated.deviceId);
+        streamRef.current = stream;
+        setActiveDeviceId(activeTrackDeviceId(stream) ?? integrated.deviceId);
+        rememberDevice(integrated.deviceId);
+      } else if (explicit) {
+        rememberDevice(explicit);
+      }
       // The <video> mounts from this state change; the effect above
       // attaches the stream once it exists.
       setVideoReady(false);
       setCamera('live');
     } catch (caught) {
       stopCamera();
+      setActiveDeviceId(null);
       setError(cameraErrorMessage(caught));
       setCamera('error');
     }
+  };
+
+  const switchCamera = (deviceId: string) => {
+    void startCamera(deviceId);
   };
 
   const capturePhoto = async () => {
@@ -250,10 +344,14 @@ export function PhotoCapture({
       </div>
 
       {photo ? (
-        <div className="flex gap-2">
+        // Stacked, full-width: two side-by-side buttons are ~190px wide and
+        // overflow this 148px column, cutting "Remove" off at the card edge.
+        <div className="grid gap-2">
           <Button
             type="button"
             variant="secondary"
+            size="sm"
+            fullWidth
             leftIcon={<RotateCcw />}
             onClick={retakePhoto}
             disabled={disabled}
@@ -263,6 +361,8 @@ export function PhotoCapture({
           <Button
             type="button"
             variant="ghost"
+            size="sm"
+            fullWidth
             leftIcon={<Trash2 />}
             onClick={removePhoto}
             disabled={disabled}
@@ -271,16 +371,25 @@ export function PhotoCapture({
           </Button>
         </div>
       ) : camera === 'live' ? (
-        <div className="flex gap-2">
+        <div className="grid gap-2">
           <Button
             type="button"
+            size="sm"
+            fullWidth
             leftIcon={<Camera />}
             onClick={() => void capturePhoto()}
             disabled={disabled || !videoReady}
           >
             Capture photo
           </Button>
-          <Button type="button" variant="ghost" onClick={cancelCamera} disabled={disabled}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            fullWidth
+            onClick={cancelCamera}
+            disabled={disabled}
+          >
             Cancel
           </Button>
         </div>
@@ -288,6 +397,8 @@ export function PhotoCapture({
         <Button
           type="button"
           variant="secondary"
+          size="sm"
+          fullWidth
           leftIcon={<Camera />}
           onClick={() => void startCamera()}
           disabled={disabled || camera === 'starting'}
@@ -296,11 +407,44 @@ export function PhotoCapture({
         </Button>
       )}
 
+      {/* Camera choice: the browser only names cameras after permission is
+          granted, so this appears once Start camera has listed them. With
+          one camera, show which one it is — e.g. the integrated webcam. */}
+      {!photo && devices.length > 1 && (
+        <div className="grid gap-1">
+          <label htmlFor="applicant-camera-select" className="text-fg-muted text-xs font-medium">
+            Camera
+          </label>
+          <select
+            id="applicant-camera-select"
+            name="applicant-camera"
+            aria-label="Choose camera"
+            value={activeDeviceId ?? selectedDeviceId ?? ''}
+            onChange={(event) => switchCamera(event.target.value)}
+            disabled={disabled}
+            className="border-border bg-surface text-fg w-full truncate rounded-lg border px-2 py-1.5 text-xs"
+          >
+            {devices.map((device, index) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {cameraLabel(device, index)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {!photo && devices.length === 1 && devices[0]?.label && (
+        <p className="text-fg-muted truncate text-xs" title={devices[0].label}>
+          Camera: {devices[0].label}
+        </p>
+      )}
+
       {!photo && camera !== 'live' && (
         <>
           <input
             ref={fileInputRef}
             type="file"
+            id="applicant-photo-upload"
+            name="applicant-photo"
             accept="image/jpeg,image/png"
             className="hidden"
             aria-label="Upload a photo file"
@@ -313,11 +457,13 @@ export function PhotoCapture({
           <Button
             type="button"
             variant="ghost"
+            size="sm"
+            fullWidth
             leftIcon={<Upload />}
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
           >
-            Upload a photo instead
+            Upload a photo
           </Button>
         </>
       )}

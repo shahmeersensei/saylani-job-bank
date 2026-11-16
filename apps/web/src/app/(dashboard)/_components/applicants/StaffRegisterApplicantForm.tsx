@@ -522,10 +522,14 @@ export function StaffRegisterApplicantForm({
               </FormField>
             )}
           </section>
-          <section className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5 sm:grid-cols-2">
-            <div className="flex flex-wrap items-start justify-between gap-4 sm:col-span-2">
-              <h2 className="text-fg text-base font-semibold">Personal information</h2>
-              {!editing && (
+          {/* Photo in its own right-hand column: previously it sat in the
+              header row, so the whole row was ~260px tall and the fields
+              started below it, leaving a large empty void under the heading.
+              Fields now flow in the left column beside the photo; on mobile
+              the photo stays first in the DOM, so it still shows on top. */}
+          <section className="border-border bg-surface shadow-card grid items-start gap-4 rounded-xl border p-5 sm:grid-cols-[minmax(0,1fr)_148px]">
+            {!editing && (
+              <div className="sm:col-start-2 sm:row-start-1 sm:justify-self-end">
                 <PhotoCapture
                   photo={photo}
                   onPhotoChange={(next) => {
@@ -540,84 +544,95 @@ export function StaffRegisterApplicantForm({
                   validationError={photoError}
                   disabled={saving}
                 />
-              )}
+              </div>
+            )}
+            <div
+              className={
+                editing
+                  ? 'grid content-start gap-4 sm:col-span-2 sm:grid-cols-2'
+                  : 'grid content-start gap-4 sm:col-start-1 sm:row-start-1 sm:grid-cols-2'
+              }
+            >
+              <h2 className="text-fg text-base font-semibold sm:col-span-2">
+                Personal information
+              </h2>
+              <FormField
+                label="Full name"
+                required
+                error={errors.fullName}
+                id={fieldControlId('fullName')}
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={form.fullName}
+                  onChange={(event) => set({ fullName: event.target.value })}
+                />
+              </FormField>
+              <FormField
+                label="Father's or husband's name"
+                required
+                error={errors.fatherName}
+                id={fieldControlId('fatherName')}
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={form.fatherName}
+                  onChange={(event) => set({ fatherName: event.target.value })}
+                />
+              </FormField>
+              <FormField
+                label="CNIC"
+                required
+                error={errors.cnic}
+                id={fieldControlId('cnic')}
+                hint={
+                  token
+                    ? 'From the token, locked. If the CNIC is wrong, cancel this token and issue a new one at Counter 1.'
+                    : undefined
+                }
+              >
+                <CNICInput
+                  value={form.cnic}
+                  onChange={(value) => set({ cnic: value.digits })}
+                  disabled={Boolean(token)}
+                />
+              </FormField>
+              <FormField
+                label="Date of birth"
+                required
+                error={errors.dateOfBirth}
+                id={fieldControlId('dateOfBirth')}
+              >
+                <Input
+                  type="date"
+                  value={form.dateOfBirth}
+                  onChange={(event) => set({ dateOfBirth: event.target.value })}
+                />
+              </FormField>
+              <FormField
+                label="Gender"
+                required
+                error={errors.gender}
+                id={fieldControlId('gender')}
+                hint={
+                  form.gender === 'UNDISCLOSED'
+                    ? 'Gender is currently unspecified. Choose an option to change it, or leave it unchanged.'
+                    : undefined
+                }
+                className="sm:col-span-2"
+              >
+                <RadioGroup
+                  aria-label="Gender"
+                  orientation="horizontal"
+                  value={form.gender}
+                  onValueChange={(value) => set({ gender: value as Gender })}
+                  options={ASSISTED_REGISTRATION_GENDERS.map((gender) => ({
+                    value: gender,
+                    label: GENDER_LABELS[gender],
+                  }))}
+                />
+              </FormField>
             </div>
-            <FormField
-              label="Full name"
-              required
-              error={errors.fullName}
-              id={fieldControlId('fullName')}
-              className="sm:col-span-2"
-            >
-              <Input
-                value={form.fullName}
-                onChange={(event) => set({ fullName: event.target.value })}
-              />
-            </FormField>
-            <FormField
-              label="Father's or husband's name"
-              required
-              error={errors.fatherName}
-              id={fieldControlId('fatherName')}
-              className="sm:col-span-2"
-            >
-              <Input
-                value={form.fatherName}
-                onChange={(event) => set({ fatherName: event.target.value })}
-              />
-            </FormField>
-            <FormField
-              label="CNIC"
-              required
-              error={errors.cnic}
-              id={fieldControlId('cnic')}
-              hint={
-                token
-                  ? 'From the token, locked. If the CNIC is wrong, cancel this token and issue a new one at Counter 1.'
-                  : undefined
-              }
-            >
-              <CNICInput
-                value={form.cnic}
-                onChange={(value) => set({ cnic: value.digits })}
-                disabled={Boolean(token)}
-              />
-            </FormField>
-            <FormField
-              label="Date of birth"
-              required
-              error={errors.dateOfBirth}
-              id={fieldControlId('dateOfBirth')}
-            >
-              <Input
-                type="date"
-                value={form.dateOfBirth}
-                onChange={(event) => set({ dateOfBirth: event.target.value })}
-              />
-            </FormField>
-            <FormField
-              label="Gender"
-              required
-              error={errors.gender}
-              id={fieldControlId('gender')}
-              hint={
-                form.gender === 'UNDISCLOSED'
-                  ? 'Gender is currently unspecified. Choose an option to change it, or leave it unchanged.'
-                  : undefined
-              }
-              className="sm:col-span-2"
-            >
-              <RadioGroup
-                aria-label="Gender"
-                orientation="horizontal"
-                value={form.gender}
-                onValueChange={(value) => set({ gender: value as Gender })}
-                options={ASSISTED_REGISTRATION_GENDERS.map((gender) => ({
-                  value: gender,
-                  label: GENDER_LABELS[gender],
-                }))}
-              />
-            </FormField>
           </section>
           <section className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5 sm:grid-cols-2">
             <h2 className="text-fg text-base font-semibold sm:col-span-2">Contact information</h2>

@@ -1122,6 +1122,8 @@ export function StaffCompanyPanel({
                       ) : (
                         <input
                           type="file"
+                          id={`company-doc-upload-${code}`}
+                          name={`company-doc-upload-${code}`}
                           accept="application/pdf,image/jpeg,image/png"
                           disabled={uploadingDoc !== null}
                           onChange={(e) => {

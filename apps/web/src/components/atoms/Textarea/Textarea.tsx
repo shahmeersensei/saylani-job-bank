@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useFieldControl } from '../FieldContext';
 import { controlBase } from '../Input';
@@ -28,6 +28,10 @@ export function Textarea({
     disabled,
     'aria-describedby': ariaDescribedBy,
   });
+  // As in Input: a standalone Textarea with no id renders with no id at
+  // all, which Chrome flags. Generate one; a FormField id wins when present.
+  const generatedId = useId();
+  const controlId = field.id ?? generatedId;
   const [uncontrolledLength, setUncontrolledLength] = useState(String(defaultValue ?? '').length);
   const length = value !== undefined ? String(value).length : uncontrolledLength;
 
@@ -35,7 +39,7 @@ export function Textarea({
     <div className="w-full">
       <div className={cn(controlBase, 'px-3 py-2')}>
         <textarea
-          id={field.id}
+          id={controlId}
           rows={rows}
           required={field.required}
           disabled={field.disabled}

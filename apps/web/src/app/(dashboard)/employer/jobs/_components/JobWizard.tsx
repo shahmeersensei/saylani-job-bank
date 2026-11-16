@@ -628,6 +628,8 @@ export function JobWizard({ initialJob = null, basePath = '/employer' }: Props) 
                 <label key={code} className="flex cursor-pointer items-center gap-2">
                   <input
                     type="checkbox"
+                    id={`job-language-${code}`}
+                    name={`job-language-${code}`}
                     className="accent-primary size-4"
                     checked={languageCodes.includes(code)}
                     onChange={(e) =>
@@ -701,6 +703,9 @@ export function JobWizard({ initialJob = null, basePath = '/employer' }: Props) 
                   <span className="text-fg font-medium">{s.label}</span>
                   <span className="text-fg-muted">·</span>
                   <select
+                    id={`job-skill-level-${s.skillCode}`}
+                    name={`job-skill-level-${s.skillCode}`}
+                    aria-label={`Minimum level for ${s.label}`}
                     value={s.minLevel}
                     onChange={(e) => updateSkillLevel(s.skillCode, e.target.value as SkillLevel)}
                     className="text-fg-muted bg-transparent text-xs focus:outline-none disabled:cursor-not-allowed"
@@ -891,6 +896,8 @@ export function JobWizard({ initialJob = null, basePath = '/employer' }: Props) 
               <label key={label} className="flex cursor-pointer items-center gap-2.5">
                 <input
                   type="checkbox"
+                  id={`job-benefit-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                  name={`job-benefit-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
                   className="accent-primary size-4 rounded"
                   checked={val}
                   onChange={(e) => setter(e.target.checked)}

@@ -174,6 +174,9 @@ export function SkillsStep({ profile, lists, bindSave }: StepProps) {
                 <span className="text-fg font-medium">{s.label}</span>
                 <span className="text-fg-muted">·</span>
                 <select
+                  id={`skill-level-${s.skillCode}`}
+                  name={`skill-level-${s.skillCode}`}
+                  aria-label={`Level for ${s.label}`}
                   value={s.level}
                   onChange={(e) =>
                     setSkills((prev) =>

@@ -1637,14 +1637,23 @@ export default function LandingPage({
                 boxShadow: '0 8px 32px rgba(0,0,0,0.10)',
               }}
             >
-              {/* Background image */}
+              {/* Background image: explicit 900x700 (the Unsplash crop)
+                  instead of fill — a fill image renders no width/height
+                  attributes, which Chrome flags as a lazy-loaded image
+                  without dimensions. Absolutely positioned, so the card
+                  looks exactly as before. */}
               <Image
                 src={IMG_JOB_BG}
                 alt=""
                 aria-hidden
-                fill
+                width={900}
+                height={700}
                 sizes="(max-width: 768px) 100vw, 50vw"
                 style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
                   objectFit: 'cover',
                   objectPosition: 'center',
                 }}
@@ -1753,14 +1762,20 @@ export default function LandingPage({
                 boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
               }}
             >
-              {/* Background image */}
+              {/* Background image: explicit 900x700 (the Unsplash crop)
+                  instead of fill — see the note on the image above. */}
               <Image
                 src={IMG_HIRE_BG}
                 alt=""
                 aria-hidden
-                fill
+                width={900}
+                height={700}
                 sizes="(max-width: 768px) 100vw, 50vw"
                 style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
                   objectFit: 'cover',
                   objectPosition: 'center',
                 }}

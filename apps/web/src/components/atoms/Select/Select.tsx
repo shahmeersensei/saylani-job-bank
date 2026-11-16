@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronDown } from 'lucide-react';
+import { useId } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useFieldControl } from '../FieldContext';
 import type { SelectProps } from './select.types';
@@ -38,11 +39,15 @@ export function Select({
     disabled,
     'aria-describedby': ariaDescribedBy,
   });
+  // As in Input: a standalone Select with no id renders with no id at all,
+  // which Chrome flags. Generate one; a FormField id wins when present.
+  const generatedId = useId();
+  const controlId = field.id ?? generatedId;
 
   return (
     <div className={cn(selectShell, 'relative flex items-center', heights[size], wrapperClassName)}>
       <select
-        id={field.id}
+        id={controlId}
         required={field.required}
         disabled={field.disabled}
         aria-invalid={field['aria-invalid']}

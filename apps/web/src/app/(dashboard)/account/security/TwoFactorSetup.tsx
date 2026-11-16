@@ -196,6 +196,8 @@ export function TwoFactorSetup({
             <label className="text-fg flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
+                id="two-factor-saved-codes"
+                name="two-factor-saved-codes"
                 checked={savedCodes}
                 onChange={(e) => setSavedCodes(e.target.checked)}
                 className="size-4 accent-[var(--primary)]"

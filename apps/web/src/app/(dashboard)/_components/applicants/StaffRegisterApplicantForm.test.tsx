@@ -111,7 +111,9 @@ describe('StaffRegisterApplicantForm edit mode', () => {
     expect(screen.getByDisplayValue('Existing Applicant')).toBeInTheDocument();
     expect(screen.getByDisplayValue('applicant@example.test')).toBeInTheDocument();
     expect(screen.getByDisplayValue('+923001234567')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Male' })).not.toBeChecked();
+    // The Gender field label points at the first radio (FormField + RadioGroup),
+    // so its accessible name is the composed "Gender Male", not "Male".
+    expect(screen.getByRole('radio', { name: 'Gender Male' })).not.toBeChecked();
     expect(screen.getByRole('radio', { name: 'Female' })).toBeChecked();
     expect(screen.queryByRole('radio', { name: 'Prefer not to say' })).not.toBeInTheDocument();
 
@@ -139,7 +141,7 @@ describe('StaffRegisterApplicantForm edit mode', () => {
     );
 
     expect(screen.getByText(/Gender is currently unspecified/)).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Male' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Gender Male' })).not.toBeChecked();
     expect(screen.getByRole('radio', { name: 'Female' })).not.toBeChecked();
     expect(screen.queryByRole('radio', { name: 'Prefer not to say' })).not.toBeInTheDocument();
 
@@ -162,7 +164,7 @@ describe('StaffRegisterApplicantForm edit mode', () => {
       />,
     );
 
-    await user.click(screen.getByRole('radio', { name: 'Male' }));
+    await user.click(screen.getByRole('radio', { name: 'Gender Male' }));
     await user.click(screen.getByRole('button', { name: 'Review profile update' }));
     await user.click(screen.getByRole('button', { name: 'Update Profile' }));
     await waitFor(() =>
@@ -285,7 +287,7 @@ describe('StaffRegisterApplicantForm token mode', () => {
     fireEvent.change(screen.getByLabelText(/Date of birth/), {
       target: { value: '1998-04-12' },
     });
-    await user.click(screen.getByRole('radio', { name: 'Male' }));
+    await user.click(screen.getByRole('radio', { name: 'Gender Male' }));
     await user.selectOptions(screen.getByLabelText(/City/), 'KARACHI');
     await user.type(screen.getByLabelText(/Home location/), 'Gulshan-e-Iqbal');
     await waitFor(() =>
