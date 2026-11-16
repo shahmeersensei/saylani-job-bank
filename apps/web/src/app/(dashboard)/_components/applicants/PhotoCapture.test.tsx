@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cameraErrorMessage, PhotoCapture, type CapturedPhoto } from './PhotoCapture';
 
 const getUserMediaMock = vi.fn();
+const mockStream = { getTracks: () => [] };
 const playMock = vi.fn().mockResolvedValue(undefined);
 const drawImageMock = vi.fn();
 const toBlobMock = vi.fn((callback: (blob: Blob | null) => void) =>
@@ -63,7 +64,7 @@ describe('cameraErrorMessage', () => {
 describe('PhotoCapture', () => {
   beforeEach(() => {
     getUserMediaMock.mockReset();
-    getUserMediaMock.mockResolvedValue({ getTracks: () => [] });
+    getUserMediaMock.mockResolvedValue(mockStream);
     Object.defineProperty(window.navigator, 'mediaDevices', {
       value: { getUserMedia: getUserMediaMock },
       configurable: true,
@@ -79,6 +80,20 @@ describe('PhotoCapture', () => {
     globalThis.URL.revokeObjectURL = revokeObjectURLMock;
   });
 
+  it('attaches the camera stream to the preview video once it mounts', async () => {
+    const user = userEvent.setup();
+    renderCapture();
+
+    await user.click(screen.getByRole('button', { name: 'Start camera' }));
+
+    await waitFor(() => expect(screen.getByText('● LIVE')).toBeInTheDocument());
+    // Regression: the <video> only mounts once the camera is live, so a
+    // stream assigned during startCamera (before the mount) is lost and the
+    // preview stays black with videoWidth 0.
+    const video = document.querySelector('video')!;
+    await waitFor(() => expect(video.srcObject).toBe(mockStream));
+  });
+
   it('starts the camera and captures a passport photo for preview', async () => {
     const user = userEvent.setup();
     const { onPhotoChange } = renderCapture();
@@ -89,8 +104,11 @@ describe('PhotoCapture', () => {
     expect(getUserMediaMock).toHaveBeenCalledWith(expect.objectContaining({ audio: false }));
 
     const video = document.querySelector('video')!;
+    await waitFor(() => expect(video.srcObject).toBe(mockStream));
     Object.defineProperty(video, 'videoWidth', { value: 1280, configurable: true });
     Object.defineProperty(video, 'videoHeight', { value: 720, configurable: true });
+    Object.defineProperty(video, 'readyState', { value: 4, configurable: true });
+    fireEvent.loadedMetadata(video);
 
     await user.click(screen.getByRole('button', { name: 'Capture photo' }));
 

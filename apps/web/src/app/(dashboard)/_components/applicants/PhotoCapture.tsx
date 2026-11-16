@@ -73,15 +73,37 @@ export function PhotoCapture({
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [camera, setCamera] = useState<CameraState>('idle');
+  const [videoReady, setVideoReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    setVideoReady(false);
     if (videoRef.current) videoRef.current.srcObject = null;
   };
 
   useEffect(() => stopCamera, []);
+
+  /**
+   * The <video> element only mounts once camera is 'live', so the stream
+   * cannot be attached inside startCamera — at that point videoRef is still
+   * null and the assignment is silently skipped, leaving a black preview
+   * with videoWidth 0 ("preview is not ready"). Attach it here, once the
+   * element exists.
+   */
+  useEffect(() => {
+    if (camera !== 'live') return;
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    video.srcObject = stream;
+    video.play().catch((caught: unknown) => {
+      stopCamera();
+      setError(cameraErrorMessage(caught));
+      setCamera('error');
+    });
+  }, [camera]);
 
   const cancelCamera = () => {
     stopCamera();
@@ -102,10 +124,9 @@ export function PhotoCapture({
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      // The <video> mounts from this state change; the effect above
+      // attaches the stream once it exists.
+      setVideoReady(false);
       setCamera('live');
     } catch (caught) {
       stopCamera();
@@ -116,7 +137,7 @@ export function PhotoCapture({
 
   const capturePhoto = async () => {
     const video = videoRef.current;
-    if (!video || video.videoWidth === 0) {
+    if (!video || video.videoWidth === 0 || video.readyState < 2) {
       setError('The camera preview is not ready yet. Wait a moment and try again.');
       return;
     }
@@ -206,11 +227,18 @@ export function PhotoCapture({
               playsInline
               aria-label="Live camera preview"
               className="size-full object-cover"
+              onLoadedMetadata={() => setVideoReady(true)}
+              onCanPlay={() => setVideoReady(true)}
             />
             <span className="absolute top-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-white">
               ● LIVE
             </span>
             <span className="pointer-events-none absolute inset-x-6 top-4 bottom-10 rounded-[50%] border-2 border-dashed border-white/80" />
+            {!videoReady && (
+              <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/40 text-xs font-medium text-white">
+                Starting preview…
+              </span>
+            )}
           </>
         ) : (
           <div className="text-fg-muted grid size-full place-items-center gap-1 p-3 text-center">
@@ -248,7 +276,7 @@ export function PhotoCapture({
             type="button"
             leftIcon={<Camera />}
             onClick={() => void capturePhoto()}
-            disabled={disabled}
+            disabled={disabled || !videoReady}
           >
             Capture photo
           </Button>
