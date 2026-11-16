@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDateTime, formatTime, parseDdMmYyyy } from './date';
+import {
+  ddMmYyyyToIso,
+  formatDate,
+  formatDateTime,
+  formatTime,
+  isoToDdMmYyyy,
+  parseDdMmYyyy,
+} from './date';
 
 describe('date formatting (Asia/Karachi, UTC+5, DD/MM/YYYY)', () => {
   it('formats in Pakistan time regardless of the machine zone', () => {
@@ -29,5 +36,21 @@ describe('parseDdMmYyyy', () => {
     expect(parseDdMmYyyy('1/10/2026')).toBeNull();
     expect(parseDdMmYyyy('2026-10-01')).toBeNull();
     expect(parseDdMmYyyy('')).toBeNull();
+  });
+});
+
+describe('isoToDdMmYyyy / ddMmYyyyToIso', () => {
+  it('round-trips between ISO storage and DD/MM/YYYY display', () => {
+    expect(isoToDdMmYyyy('1998-04-12')).toBe('12/04/1998');
+    expect(ddMmYyyyToIso('12/04/1998')).toBe('1998-04-12');
+    expect(ddMmYyyyToIso(isoToDdMmYyyy('2026-01-05'))).toBe('2026-01-05');
+  });
+
+  it('returns empty/null for anything that is not a real date', () => {
+    expect(isoToDdMmYyyy('')).toBe('');
+    expect(isoToDdMmYyyy('12/04/1998')).toBe('');
+    expect(ddMmYyyyToIso('31/02/2026')).toBeNull();
+    expect(ddMmYyyyToIso('1998-04-12')).toBeNull();
+    expect(ddMmYyyyToIso('')).toBeNull();
   });
 });

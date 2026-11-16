@@ -33,6 +33,7 @@ import type { SelectOption } from '@/components/atoms';
 import {
   CNICInput,
   ConfirmDialog,
+  DateTimePicker,
   FormField,
   KeyValue,
   Modal,
@@ -271,10 +272,10 @@ function EditDetailsDialog({ applicant }: { applicant: ApplicantStaffView }) {
           <CNICInput value={form.cnic} onChange={(c) => set({ cnic: c.digits })} />
         </FormField>
         <FormField label="Date of birth" required error={errors.dateOfBirth}>
-          <Input
-            type="date"
+          <DateTimePicker
+            mode="date"
             value={form.dateOfBirth}
-            onChange={(e) => set({ dateOfBirth: e.target.value })}
+            onChange={(iso) => set({ dateOfBirth: iso })}
           />
         </FormField>
         <FormField label="Gender" required error={errors.gender}>

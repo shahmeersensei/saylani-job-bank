@@ -236,7 +236,10 @@ export function RegistrationFormPrint({
               label="Suitable job types"
               value={preferences?.jobTypes.map((type) => JOB_TYPE_LABELS[type]).join(', ')}
             />
-            <Field label="Available from" value={preferences?.availableFrom} />
+            <Field
+              label="Available from"
+              value={preferences?.availableFrom ? formatDate(preferences.availableFrom) : null}
+            />
             <Field label="Minimum salary (PKR)" value={preferences?.minSalaryPkr} />
             <Field label="Other suitable timings" />
           </div>

@@ -4,7 +4,7 @@ import { Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Button, Input, Select, Textarea } from '@/components/atoms';
-import { FormField, Modal, toast } from '@/components/molecules';
+import { FormField, DateTimePicker, Modal, toast } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import { errorMessage, toFieldErrors, type FieldErrors } from './form';
 
@@ -60,10 +60,9 @@ export function ScheduleInterviewDialog({ applicationId }: { applicationId: stri
     >
       <form className="grid gap-4" onSubmit={submit} noValidate>
         <FormField label="Date & time" required error={errors.interviewAt}>
-          <Input
-            type="datetime-local"
+          <DateTimePicker
             value={interviewAt}
-            onChange={(e) => setInterviewAt(e.target.value)}
+            onChange={setInterviewAt}
             min={new Date(Date.now() - 5 * 60_000).toISOString().slice(0, 16)}
           />
         </FormField>
@@ -157,10 +156,9 @@ export function UpdateInterviewDialog({ applicationId }: { applicationId: string
         </FormField>
         {status === 'INTERVIEW_SCHEDULED' && (
           <FormField label="New date & time" required error={errors.interviewAt}>
-            <Input
-              type="datetime-local"
+            <DateTimePicker
               value={interviewAt}
-              onChange={(e) => setInterviewAt(e.target.value)}
+              onChange={setInterviewAt}
               min={new Date(Date.now() - 5 * 60_000).toISOString().slice(0, 16)}
             />
           </FormField>

@@ -58,7 +58,7 @@ describe('PersonalStep', () => {
     await userEvent.type(screen.getByLabelText(/^Full name/), 'Ayesha Khan');
     await userEvent.type(screen.getByLabelText(/husband/), 'Imran Khan');
     await userEvent.type(screen.getByLabelText(/CNIC number/), '4210112345671');
-    await userEvent.type(screen.getByLabelText(/Date of birth/), '1998-04-12');
+    await userEvent.type(screen.getByLabelText(/Date of birth/), '12/04/1998');
     await userEvent.click(screen.getByRole('radio', { name: 'Female' }));
 
     expect(await save()).toBeNull();

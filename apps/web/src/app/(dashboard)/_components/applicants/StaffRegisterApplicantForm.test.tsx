@@ -285,7 +285,7 @@ describe('StaffRegisterApplicantForm token mode', () => {
 
     await user.type(screen.getByLabelText(/Father's or husband's name/), 'Imran Raza');
     fireEvent.change(screen.getByLabelText(/Date of birth/), {
-      target: { value: '1998-04-12' },
+      target: { value: '12/04/1998' },
     });
     await user.click(screen.getByRole('radio', { name: 'Gender Male' }));
     await user.selectOptions(screen.getByLabelText(/City/), 'KARACHI');

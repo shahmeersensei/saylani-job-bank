@@ -4,8 +4,8 @@ import { APPLICANT_STATUSES, IDENTITY_STATUSES, type PaginationMeta } from '@job
 import { Contact, SlidersHorizontal } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { Button, Input, StatusPill } from '@/components/atoms';
-import { EmptyState, SearchBar } from '@/components/molecules';
+import { Button, StatusPill } from '@/components/atoms';
+import { DateTimePicker, EmptyState, SearchBar } from '@/components/molecules';
 import { DataTable, type SortState } from '@/components/organisms';
 import type { SelectOption } from '@/components/atoms';
 import type { ApplicantListItem } from '@/domains/applicant';
@@ -112,9 +112,11 @@ export function ApplicantsTable({ rows, meta, sort, branches, skills, cities, ar
       label: `Area: ${labelFor(areas, v)}`,
     })),
     ...(createdFrom
-      ? [{ key: 'createdFrom', value: createdFrom, label: `From ${createdFrom}` }]
+      ? [{ key: 'createdFrom', value: createdFrom, label: `From ${formatDate(createdFrom)}` }]
       : []),
-    ...(createdTo ? [{ key: 'createdTo', value: createdTo, label: `To ${createdTo}` }] : []),
+    ...(createdTo
+      ? [{ key: 'createdTo', value: createdTo, label: `To ${formatDate(createdTo)}` }]
+      : []),
   ];
 
   const removeChip = (chip: ActiveFilterChip) => {
@@ -199,20 +201,20 @@ export function ApplicantsTable({ rows, meta, sort, branches, skills, cities, ar
         <div className="grid gap-2 px-1 py-1">
           <label className="grid gap-1 text-xs font-medium">
             From
-            <Input
-              type="date"
+            <DateTimePicker
+              mode="date"
               aria-label="Registered from"
               value={createdFrom ?? ''}
-              onChange={(e) => setValue('createdFrom', e.target.value || null)}
+              onChange={(iso) => setValue('createdFrom', iso || null)}
             />
           </label>
           <label className="grid gap-1 text-xs font-medium">
             To
-            <Input
-              type="date"
+            <DateTimePicker
+              mode="date"
               aria-label="Registered to"
               value={createdTo ?? ''}
-              onChange={(e) => setValue('createdTo', e.target.value || null)}
+              onChange={(iso) => setValue('createdTo', iso || null)}
             />
           </label>
         </div>

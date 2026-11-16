@@ -11,7 +11,7 @@ import {
 } from '@jobbank/shared';
 import { useState } from 'react';
 import { Checkbox, Input } from '@/components/atoms';
-import { FormField } from '@/components/molecules';
+import { DateTimePicker, FormField } from '@/components/molecules';
 import type { ApplicantProfile } from '@/domains/applicant';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import {
@@ -63,11 +63,7 @@ function CheckboxGroup<T extends string>({
   );
 }
 
-export function PreferencesStep({
-  profile,
-  lists,
-  bindSave,
-}: StepProps) {
+export function PreferencesStep({ profile, lists, bindSave }: StepProps) {
   const p = profile?.preferences;
   const [categories, setCategories] = useState<string[]>(p?.categoryCodes ?? []);
   const [shifts, setShifts] = useState<Shift[]>(p?.shifts ?? []);
@@ -136,10 +132,10 @@ export function PreferencesStep({
           />
         </FormField>
         <FormField label="Available from" error={errors.availableFrom} hint="Leave empty if now.">
-          <Input
-            type="date"
+          <DateTimePicker
+            mode="date"
             value={availableFrom}
-            onChange={(e) => setAvailableFrom(e.target.value)}
+            onChange={(iso) => setAvailableFrom(iso)}
           />
         </FormField>
       </div>

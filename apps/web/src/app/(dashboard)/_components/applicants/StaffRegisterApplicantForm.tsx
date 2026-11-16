@@ -25,6 +25,7 @@ import { Button, Checkbox, Input, RadioGroup, Select, Textarea } from '@/compone
 import type { SelectOption } from '@/components/atoms';
 import {
   CNICInput,
+  DateTimePicker,
   FormField,
   GeocodeAddressPicker,
   PhoneInput,
@@ -709,10 +710,10 @@ export function StaffRegisterApplicantForm({
                 error={errors.dateOfBirth}
                 id={fieldControlId('dateOfBirth')}
               >
-                <Input
-                  type="date"
+                <DateTimePicker
+                  mode="date"
                   value={form.dateOfBirth}
-                  onChange={(event) => set({ dateOfBirth: event.target.value })}
+                  onChange={(iso) => set({ dateOfBirth: iso })}
                 />
               </FormField>
               <FormField
@@ -1517,11 +1518,11 @@ export function StaffRegisterApplicantForm({
                 id={fieldControlId('preferences.availableFrom')}
                 error={errors['preferences.availableFrom']}
               >
-                <Input
-                  type="date"
+                <DateTimePicker
+                  mode="date"
                   value={preferences.availableFrom}
-                  onChange={(event) =>
-                    setPreferences((current) => ({ ...current, availableFrom: event.target.value }))
+                  onChange={(iso) =>
+                    setPreferences((current) => ({ ...current, availableFrom: iso }))
                   }
                 />
               </FormField>

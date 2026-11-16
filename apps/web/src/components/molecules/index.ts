@@ -1,4 +1,5 @@
 export * from './CNICInput';
+export * from './DateInput';
 export * from './ErrorBanner';
 export * from './StatCard';
 export * from './ConfirmDialog';

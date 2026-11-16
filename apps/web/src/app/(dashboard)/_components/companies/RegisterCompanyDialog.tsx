@@ -14,7 +14,7 @@ import type { FormEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Input, Select, Textarea } from '@/components/atoms';
 import type { SelectOption } from '@/components/atoms';
-import { FormField, Modal } from '@/components/molecules';
+import { DateTimePicker, FormField, Modal } from '@/components/molecules';
 import type { CompanyOnboarding, CompanyView } from '@/domains/company';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import { errorMessage, toFieldErrors, zodFieldErrors, type FieldErrors } from '../applicants/form';
@@ -620,11 +620,11 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
                   error={errors.visitDate}
                   id={fieldControlId('visitDate')}
                 >
-                  <Input
-                    type="date"
+                  <DateTimePicker
+                    mode="date"
                     max={todayIso()}
                     value={form.visitDate}
-                    onChange={(e) => updateForm({ visitDate: e.target.value })}
+                    onChange={(iso) => updateForm({ visitDate: iso })}
                   />
                 </FormField>
               </div>

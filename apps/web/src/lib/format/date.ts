@@ -35,6 +35,22 @@ export function formatDate(value: Date | string): string {
   return `${day}/${month}/${year}`;
 }
 
+/** ISO "2026-10-01" (or "") -> display "01/10/2026" (or ""). */
+export function isoToDdMmYyyy(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return '';
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+/**
+ * Display "DD/MM/YYYY" -> ISO "YYYY-MM-DD" (the storage format), or null
+ * when the text is not a real calendar date. Thin wrapper over parseDdMmYyyy.
+ */
+export function ddMmYyyyToIso(value: string): string | null {
+  const date = parseDdMmYyyy(value);
+  return date ? date.toISOString().slice(0, 10) : null;
+}
+
 /** "5:30 pm" */
 export function formatTime(value: Date | string): string {
   const { hour, minute, dayPeriod } = parts(value);

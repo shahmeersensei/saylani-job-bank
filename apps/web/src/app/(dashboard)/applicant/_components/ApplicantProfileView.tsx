@@ -28,6 +28,7 @@ import NextLink from 'next/link';
 import { Button, StatusPill } from '@/components/atoms';
 import type { ApplicantDocumentType, ApplicantProfile } from '@/domains/applicant';
 import { maskCnic } from '@/lib/format/cnic';
+import { formatDate } from '@/lib/format/date';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
 import {
   APPLICANT_STATUS_PILL,
@@ -62,7 +63,7 @@ function formatMonth(monthStr?: string | null): string {
   const [year, month] = monthStr.split('-');
   if (!year || !month) return monthStr;
   const date = new Date(Number(year), Number(month) - 1);
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  return date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 }
 
 export function ApplicantProfileView({
@@ -263,7 +264,7 @@ export function ApplicantProfileView({
             <div>
               <p className="text-fg-muted text-xs font-medium">Date of Birth & Age</p>
               <p className="text-fg mt-0.5 text-sm font-semibold">
-                {personal.dateOfBirth} ({age} years)
+                {formatDate(personal.dateOfBirth)} ({age} years)
               </p>
             </div>
             <div>
@@ -653,7 +654,6 @@ export function ApplicantProfileView({
                 )}
               </div>
             </div>
-
           </div>
         </section>
 

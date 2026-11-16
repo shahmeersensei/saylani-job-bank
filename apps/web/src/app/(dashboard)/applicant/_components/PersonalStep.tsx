@@ -10,7 +10,7 @@ import {
 import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { Input, RadioGroup } from '@/components/atoms';
-import { CNICInput, FormField } from '@/components/molecules';
+import { CNICInput, DateTimePicker, FormField } from '@/components/molecules';
 import type { ApplicantProfile } from '@/domains/applicant';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import {
@@ -127,12 +127,12 @@ export function PersonalStep({ profile, bindSave }: StepProps) {
         disabled={locked}
         hint={`You must be at least ${MIN_APPLICANT_AGE}.`}
       >
-        <Input
-          type="date"
+        <DateTimePicker
+          mode="date"
           max={latestBirthDate()}
           min="1940-01-01"
           value={form.dateOfBirth}
-          onChange={(e) => set({ dateOfBirth: e.target.value })}
+          onChange={(iso) => set({ dateOfBirth: iso })}
         />
       </FormField>
       <FormField label="Gender" required error={errors.gender}>

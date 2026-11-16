@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Input, Textarea } from '@/components/atoms';
-import { FormField, toast } from '@/components/molecules';
+import { DateTimePicker, FormField, toast } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import { formatDateTime } from '@/lib/format/date';
 import type { ApplicationView } from '@/domains/placement';
@@ -117,7 +117,7 @@ export function EmployerInterviewScheduler({
 
       <form className="grid gap-3" onSubmit={submit} noValidate>
         <FormField label="Interview date & time" required error={error ?? undefined}>
-          <Input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />
+          <DateTimePicker value={at} onChange={setAt} />
         </FormField>
         <FormField label="Location">
           <Input

@@ -4,7 +4,7 @@ import { counterRegisterSchema, GENDER_LABELS, GENDERS } from '@jobbank/shared';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Button, Checkbox, Input, Select } from '@/components/atoms';
-import { FormField, PhoneInput, toast } from '@/components/molecules';
+import { DateTimePicker, FormField, PhoneInput, toast } from '@/components/molecules';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import { zodFieldErrors, type FieldErrors } from '../applicants/form';
 
@@ -105,11 +105,11 @@ export function CounterRegisterForm({ basePath }: { basePath: string }) {
         />
       </FormField>
       <FormField label="Date of birth" required error={errors.dateOfBirth}>
-        <Input
+        <DateTimePicker
+          mode="date"
           size="lg"
-          type="date"
           value={form.dateOfBirth}
-          onChange={(e) => set('dateOfBirth')(e.target.value)}
+          onChange={(iso) => set('dateOfBirth')(iso)}
         />
       </FormField>
       <FormField label="Gender" required error={errors.gender}>
