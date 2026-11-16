@@ -27,7 +27,6 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import { Badge, Button, Input, RadioGroup, Select, Textarea } from '@/components/atoms';
 import type { SelectOption } from '@/components/atoms';
 import {
@@ -51,7 +50,7 @@ import { formatPkMobileDisplay } from '@/lib/format/phone';
 import { errorMessage, toFieldErrors, type FieldErrors } from './form';
 import { DOCUMENT_STATUS_PILL, IDENTITY_PILL } from './labels';
 import { openDocument } from './open-document';
-import { RegistrationFormPrint } from './RegistrationFormPrint';
+import { ApplicantPhoto } from './ApplicantPhoto';
 import type { ProfileLabels } from './lists';
 import { ScheduleInterviewDialog, UpdateInterviewDialog } from './InterviewDialogs';
 
@@ -990,19 +989,14 @@ export function ApplicantDetailView({
 }) {
   const router = useRouter();
   const p = applicant.personal;
+  // The passport photo (PHOTO document), if one is on file — shown beside
+  // the identity details instead of only as a row in the Documents list.
+  const photo = applicant.documents.find((d) => d.typeCode === 'PHOTO') ?? null;
   const label = (type: keyof ProfileLabels, code: string | null) =>
     code ? (labels[type][code] ?? code) : null;
   const pref = applicant.preferences;
   const canChangeStatus =
     applicant.can.manage && (applicant.status === 'ACTIVE' || applicant.status === 'INACTIVE');
-  // Re-print: the registration form is portal-mounted (hidden on screen,
-  // visible only in print) so its labels, QR code and logo load while the
-  // page is read. The button stays disabled until they have all settled.
-  const [printReady, setPrintReady] = useState(false);
-  const [printLabelsReady, setPrintLabelsReady] = useState(false);
-  useEffect(() => {
-    setPrintReady(true);
-  }, []);
 
   return (
     <div className="grid gap-6">
@@ -1036,21 +1030,9 @@ export function ApplicantDetailView({
         </p>
       )}
 
-      {(applicant.can.shortlist || applicant.can.manage) && (
+      {applicant.can.shortlist && (
         <div className="flex flex-wrap gap-2">
-          {applicant.can.shortlist && (
-            <ShortlistDialog applicant={applicant} openJobs={openJobs ?? []} />
-          )}
-          {applicant.can.manage && (
-            <Button
-              variant="secondary"
-              leftIcon={<Printer />}
-              onClick={() => window.print()}
-              disabled={!printLabelsReady}
-            >
-              {printLabelsReady ? 'Print registration form' : 'Preparing print…'}
-            </Button>
-          )}
+          <ShortlistDialog applicant={applicant} openJobs={openJobs ?? []} />
         </div>
       )}
 
@@ -1061,19 +1043,28 @@ export function ApplicantDetailView({
             applicant.can.verifyIdentity ? <IdentityCheckDialog applicant={applicant} /> : undefined
           }
         >
-          <KeyValue
-            items={[
-              { label: 'CNIC', value: <span className="numeric">{formatCnic(p.cnic)}</span> },
-              { label: "Father's / husband's name", value: p.fatherName },
-              {
-                label: 'Date of birth',
-                value: `${formatDate(p.dateOfBirth)} (age ${ageFrom(p.dateOfBirth)})`,
-              },
-              { label: 'Gender', value: GENDER_LABELS[p.gender] },
-              { label: 'Mobile', value: p.phone ? formatPkMobileDisplay(p.phone) : null },
-              { label: 'Email', value: p.email },
-            ]}
-          />
+          <div className="flex flex-wrap gap-4">
+            <ApplicantPhoto
+              applicantId={applicant.id}
+              photo={photo}
+              canManage={applicant.can.manage}
+            />
+            <div className="min-w-0 flex-1">
+              <KeyValue
+                items={[
+                  { label: 'CNIC', value: <span className="numeric">{formatCnic(p.cnic)}</span> },
+                  { label: "Father's / husband's name", value: p.fatherName },
+                  {
+                    label: 'Date of birth',
+                    value: `${formatDate(p.dateOfBirth)} (age ${ageFrom(p.dateOfBirth)})`,
+                  },
+                  { label: 'Gender', value: GENDER_LABELS[p.gender] },
+                  { label: 'Mobile', value: p.phone ? formatPkMobileDisplay(p.phone) : null },
+                  { label: 'Email', value: p.email },
+                ]}
+              />
+            </div>
+          </div>
           <div className="border-border grid gap-3 border-t pt-4">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-fg-muted">Identity check:</span>
@@ -1358,17 +1349,6 @@ export function ApplicantDetailView({
           </div>
         </Card>
       )}
-      {applicant.can.manage && printReady
-        ? createPortal(
-            <RegistrationFormPrint
-              key={applicant.id}
-              profile={applicant}
-              branchName={applicant.branch?.name ?? ''}
-              onReady={() => setPrintLabelsReady(true)}
-            />,
-            document.body,
-          )
-        : null}
     </div>
   );
 }
