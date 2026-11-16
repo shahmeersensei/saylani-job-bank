@@ -221,9 +221,8 @@ export function StaffCompanyPanel({
   }
 
   /**
-   * Staff document upload: presign → PUT straight to storage (with the signed
-   * headers) → confirm. Size and type are enforced server-side by the presign
-   * step; a rejected file surfaces the server's message in the panel error banner.
+   * Staff document upload: presign → PUT to the app's upload route → confirm.
+   * Size and type are enforced server-side by the presign step; a rejected file surfaces the server's message in the panel error banner.
    * Uploading a file of a type that already has one replaces it on confirm.
    */
   async function uploadDocument(typeCode: string, file: File) {

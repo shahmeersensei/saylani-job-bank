@@ -1,9 +1,11 @@
 /**
- * Shared document upload pipeline (presigned PUT → confirm → view link),
+ * Shared document upload pipeline (same-origin upload → confirm → view link),
  * used by the applicant and company document flows.
  */
 export {
   confirmDocumentUpload,
+  documentDownloadResponse,
+  downloadDocument,
   presignDocumentUpload,
   viewDocumentLink,
   VIEW_LINK_SECONDS,
@@ -15,3 +17,4 @@ export {
   type PresignDocumentOptions,
   type SignedIn,
 } from './confirm';
+export { readUploadBody, receiveDocumentUpload, type ReceivedUpload } from './upload';

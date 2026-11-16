@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { staffCompanyDocumentLink } from '@/domains/company';
 import { apiHandler, ok } from '@/domains/shared/http';
 
-/** GET /api/v1/companies/{id}/documents/{docId}/url — audited presigned GET for staff. */
+/** GET /api/v1/companies/{id}/documents/{docId}/url — audited download link for staff. */
 export const GET = apiHandler({
   permission: 'company:read',
   params: z.object({ id: z.uuid(), docId: z.uuid() }),

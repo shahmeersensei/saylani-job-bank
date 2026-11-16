@@ -6,7 +6,6 @@ import {
   NotFound,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3, S3_BUCKET } from './client';
 
 /**
@@ -73,73 +72,67 @@ export function buildObjectKey(input: {
   return `branch/${input.branchId}/${input.entity}/${input.entityId}/${crypto.randomUUID()}${ext}`;
 }
 
+/**
+ * Upload instruction returned with a PENDING_UPLOAD row. The browser PUTs the
+ * file to the app's own same-origin upload route — never straight to storage.
+ *
+ * A presigned storage URL used to be returned here, but it baked the server's
+ * internal storage address (e.g. http://seaweedfs:8333) into a browser-facing
+ * URL: on the live HTTPS site the browser blocked it as mixed content, and the
+ * hostname does not resolve outside the server's Docker network at all, so
+ * every upload and download failed there. The server now stores the bytes
+ * itself (see putObject); the URL below is the app route that does that.
+ */
 export interface PresignedUpload {
   key: string;
   url: string;
   method: 'PUT';
-  /** Headers the client MUST send unchanged (they are part of the signature). */
+  /** Headers the client MUST send unchanged (they must match the approved upload). */
   headers: Record<string, string>;
   expiresAt: string;
 }
 
 /**
- * Presigned PUT that locks content type and length, so the browser cannot upload
- * a different kind or size of file than the one the server approved.
+ * Store bytes under a key, from the server side only. Callers must have
+ * checked the caller may upload this document and that the bytes match the
+ * approved type and size (see receiveDocumentUpload) — the confirm step
+ * re-verifies what landed before the document counts as present.
  */
-export async function presignUpload(input: {
+export async function putObject(input: {
   key: string;
   contentType: string;
-  sizeBytes: number;
-  expiresInSeconds?: number;
-}): Promise<PresignedUpload> {
-  const expiresIn = input.expiresInSeconds ?? 300;
-  const command = new PutObjectCommand({
-    Bucket: S3_BUCKET,
-    Key: input.key,
-    ContentType: input.contentType,
-    ContentLength: input.sizeBytes,
-  });
-  const url = await getSignedUrl(s3, command, {
-    expiresIn,
-    signableHeaders: new Set(['content-type', 'content-length']),
-  });
-  return {
-    key: input.key,
-    url,
-    method: 'PUT',
-    headers: { 'Content-Type': input.contentType },
-    expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
-  };
+  body: Uint8Array;
+}): Promise<void> {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: input.key,
+      ContentType: input.contentType,
+      Body: input.body,
+    }),
+  );
 }
 
-/**
- * Short-lived download link. Callers must check permissions and audit the access first.
- *
- * Downloads are `attachment` by default: a stored file must never render inline from
- * the storage origin unless the caller explicitly asks for the in-app viewer
- * (`disposition: 'inline'`). When a filename is given it is sanitised and sent as
- * the download name; without one the response is a bare `attachment`.
- */
-export async function presignDownload(
-  key: string,
-  options: {
-    expiresInSeconds?: number;
-    downloadName?: string;
-    disposition?: 'attachment' | 'inline';
-  } = {},
-): Promise<string> {
-  const disposition =
-    options.disposition === 'inline'
-      ? 'inline'
-      : options.downloadName
-        ? `attachment; filename="${options.downloadName.replace(/["\\\r\n]/g, '')}"`
-        : 'attachment';
-  const command = new GetObjectCommand({
-    Bucket: S3_BUCKET,
-    Key: key,
-    ResponseContentDisposition: disposition,
-  });
-  return getSignedUrl(s3, command, { expiresIn: options.expiresInSeconds ?? 60 });
+export interface StoredObject {
+  body: ReadableStream<Uint8Array>;
+  contentType: string;
+  sizeBytes: number;
+}
+
+/** Stream a stored object back out, for the same-origin download routes. */
+export async function getObjectStream(key: string): Promise<StoredObject | null> {
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+    if (!res.Body) return null;
+    return {
+      body: res.Body.transformToWebStream(),
+      contentType: res.ContentType ?? 'application/octet-stream',
+      sizeBytes: res.ContentLength ?? 0,
+    };
+  } catch (error) {
+    if (error instanceof NotFound || (error as { name?: string }).name === 'NotFound') return null;
+    throw error;
+  }
 }
 
 /** What actually landed in storage — verify this after upload instead of trusting the client. */

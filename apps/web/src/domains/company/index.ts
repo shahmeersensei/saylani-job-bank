@@ -4,11 +4,15 @@ import './events';
 export {
   confirmMyCompanyDocument,
   confirmStaffCompanyDocument,
+  downloadMyCompanyDocument,
+  downloadStaffCompanyDocument,
   myCompanyDocumentLink,
   presignMyCompanyDocument,
   presignStaffCompanyDocument,
   removeMyCompanyDocument,
   staffCompanyDocumentLink,
+  uploadMyCompanyDocument,
+  uploadStaffCompanyDocument,
   type DocumentLink,
   type PresignedCompanyDocument,
 } from './documents';

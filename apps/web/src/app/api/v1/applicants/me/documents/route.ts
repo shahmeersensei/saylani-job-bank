@@ -10,8 +10,8 @@ export const GET = apiHandler({
 });
 
 /**
- * POST /api/v1/applicants/me/documents — step 1 of an upload: returns a presigned PUT for
- * the browser. Confirm with POST …/documents/{id}/confirm once the PUT succeeded.
+ * POST /api/v1/applicants/me/documents — step 1 of an upload: returns the same-origin
+ * upload route for the browser. Confirm with POST …/documents/{id}/confirm once the PUT succeeded.
  */
 export const POST = apiHandler({
   permission: 'applicant:self',

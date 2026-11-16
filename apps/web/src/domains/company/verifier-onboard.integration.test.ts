@@ -5,6 +5,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { POST as acceptInvite } from '@/app/api/v1/auth/invitations/accept/route';
 import { POST as claim } from '@/app/api/v1/companies/[id]/claim/route';
 import { PATCH as reviewDoc } from '@/app/api/v1/companies/[id]/documents/[docId]/review/route';
+import { PUT as uploadCompanyDoc } from '@/app/api/v1/companies/[id]/documents/[docId]/upload/route';
 import { POST as confirmCompanyDoc } from '@/app/api/v1/companies/[id]/documents/[docId]/confirm/route';
 import { POST as presignCompanyDoc } from '@/app/api/v1/companies/[id]/documents/route';
 import { POST as setHeadOffice } from '@/app/api/v1/companies/[id]/head-office/route';
@@ -16,7 +17,7 @@ import { POST as inviteRoute } from '@/app/api/v1/users/route';
 import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import { db } from '@/lib/db';
 import { mailOutbox } from '@/lib/mail/mailer';
-import { call, Jar, randomPhone, signIn, signInAdmin, uniqueEmail } from '@/test/api-client';
+import { BASE, call, Jar, randomPhone, signIn, signInAdmin, uniqueEmail } from '@/test/api-client';
 
 const randomNtn = () =>
   `${String(Math.floor(1000000 + Math.random() * 9000000))}-${Math.floor(Math.random() * 10)}`;
@@ -97,8 +98,17 @@ async function uploadCompanyDocument(companyId: string, jar: Jar) {
     jar,
   });
   expect(presigned.status, JSON.stringify(presigned.body)).toBe(201);
-  const { documentId, upload: put } = presigned.body.data;
-  const stored = await fetch(put.url, { method: 'PUT', headers: put.headers, body: PNG });
+  const { documentId } = presigned.body.data;
+  // Same-origin upload: the bytes go to the app's upload route, which stores
+  // them — the browser (and this test) never talks to storage directly.
+  const stored = await uploadCompanyDoc(
+    new Request(`${BASE}/api/v1/companies/${companyId}/documents/${documentId}/upload`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/png', cookie: jar.header() },
+      body: PNG,
+    }),
+    { params: Promise.resolve({ id: companyId, docId: documentId }) },
+  );
   expect(stored.status).toBe(200);
   const confirmed = await call(
     confirmCompanyDoc,

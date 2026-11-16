@@ -4,6 +4,8 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GET as getApplicant, PATCH as staffPatch } from '@/app/api/v1/applicants/[id]/route';
 import { POST as markVerifiedSigned } from '@/app/api/v1/applicants/[id]/registration-form/verified-signed/route';
 import { GET as staffDocUrl } from '@/app/api/v1/applicants/[id]/documents/[docId]/url/route';
+import { GET as staffDocDownload } from '@/app/api/v1/applicants/[id]/documents/[docId]/download/route';
+import { PUT as uploadDoc } from '@/app/api/v1/applicants/me/documents/[id]/upload/route';
 import { POST as verifyIdentity } from '@/app/api/v1/applicants/[id]/identity-verification/route';
 import { PUT as changePhone } from '@/app/api/v1/applicants/[id]/phone/route';
 import { POST as requestPhoneCode } from '@/app/api/v1/applicants/[id]/phone/code/route';
@@ -25,6 +27,7 @@ import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import { db } from '@/lib/db';
 import { devOutbox } from '@/lib/sms/sms';
 import {
+  BASE,
   call,
   owner,
   randomPhone,
@@ -224,8 +227,17 @@ async function upload(jar: Jar, typeCode: string, bytes = PNG, contentType = 'im
     jar,
   });
   expect(presigned.status, JSON.stringify(presigned.body)).toBe(201);
-  const { documentId, upload: put } = presigned.body.data;
-  const stored = await fetch(put.url, { method: 'PUT', headers: put.headers, body: bytes });
+  const { documentId } = presigned.body.data;
+  // Same-origin upload: the bytes go to the app's upload route, which stores
+  // them — the browser (and this test) never talks to storage directly.
+  const stored = await uploadDoc(
+    new Request(`${BASE}/api/v1/applicants/me/documents/${documentId}/upload`, {
+      method: 'PUT',
+      headers: { 'content-type': contentType, cookie: jar.header() },
+      body: bytes,
+    }),
+    { params: Promise.resolve({ id: documentId }) },
+  );
   expect(stored.status).toBe(200);
   const confirmed = await call(
     confirmDoc,
@@ -692,7 +704,13 @@ describe('staff access', () => {
       },
     );
     expect(link.status).toBe(200);
-    const image = await fetch(link.body.data.url);
+    const image = await staffDocDownload(
+      new Request(`${BASE}/api/v1/applicants/${profile.id}/documents/${front.id}/download`, {
+        headers: { cookie: staff.header() },
+      }),
+      { params: Promise.resolve({ id: profile.id, docId: front.id }) },
+    );
+    expect(image.status).toBe(200);
     expect(new Uint8Array(await image.arrayBuffer())).toEqual(PNG);
     expect(await latestAudit('applicant.document_view', profile.id)).toMatchObject({
       metadata: { documentId: front.id, typeCode: 'CNIC_FRONT' },

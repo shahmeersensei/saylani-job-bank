@@ -6,7 +6,7 @@ import { z } from 'zod';
 const params = z.object({ id: z.uuid() });
 
 /**
- * POST /api/v1/companies/{id}/documents — onboard step 1: get a presigned PUT URL.
+ * POST /api/v1/companies/{id}/documents — onboard step 1: get the same-origin upload route.
  * Onboarded DRAFT companies only (permission company:onboard); the employer
  * path (/companies/me/documents) is untouched. The VERIFY guard is unchanged —
  * this only lets the onboarder supply the documents the guard requires.

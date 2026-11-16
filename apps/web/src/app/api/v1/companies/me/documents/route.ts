@@ -8,7 +8,7 @@ export const GET = apiHandler({
   handler: async () => ok(await companyDocumentTypes()),
 });
 
-/** POST /api/v1/companies/me/documents — step 1: get a presigned PUT URL for upload. */
+/** POST /api/v1/companies/me/documents — step 1: get the same-origin upload route for upload. */
 export const POST = apiHandler({
   permission: 'company:register',
   body: companyPresignSchema,

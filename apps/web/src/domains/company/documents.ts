@@ -4,11 +4,14 @@ import { and, eq } from 'drizzle-orm';
 import { recordAudit, runCommand } from '@/domains/shared/audit';
 import {
   confirmDocumentUpload,
+  downloadDocument,
   presignDocumentUpload,
+  receiveDocumentUpload,
   viewDocumentLink,
   type DocumentLink,
   type DocumentTable,
   type PresignedDocument,
+  type ReceivedUpload,
 } from '@/domains/shared/documents';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/domains/shared/errors';
 import {
@@ -20,6 +23,7 @@ import {
   type Actor,
 } from '@/domains/shared/scope';
 import { db, type DbExecutor } from '@/lib/db';
+import type { StoredObject } from '@/lib/s3/storage';
 import { companyEditability } from './rules';
 import {
   buildCompanyView,
@@ -55,7 +59,8 @@ function assertDocumentEditable(row: CompanyRow): void {
 
 /**
  * Step 1 (shared): checks file against the document type's rules, creates a
- * PENDING_UPLOAD row, returns a presigned PUT the browser sends the file straight to.
+ * PENDING_UPLOAD row, returns the same-origin upload route for it. The file
+ * goes through the app, never straight from the browser to storage.
  * Used by the employer's own upload and by the onboard upload for onboarded companies —
  * the type allowlist, size limits, content-type locking and rate limit are identical.
  */
@@ -63,6 +68,7 @@ async function presignDocumentForCompany(
   ctx: SignedIn,
   row: CompanyRow,
   input: CompanyPresignInput,
+  uploadUrl: (documentId: string) => string,
 ): Promise<PresignedCompanyDocument> {
   return presignDocumentUpload({
     ctx,
@@ -74,6 +80,7 @@ async function presignDocumentForCompany(
     rateLimitName: 'company-upload',
     branchError: 'Set your head office location and branch before uploading documents',
     assertEditableBeforeType: () => assertDocumentEditable(row),
+    uploadUrl,
   });
 }
 
@@ -84,7 +91,25 @@ export async function presignMyCompanyDocument(
 ): Promise<PresignedCompanyDocument> {
   assertPermission(ctx.actor, 'company:register');
   const row = await requireOwnCompany(db, ctx.actor);
-  return presignDocumentForCompany(ctx, row, input);
+  return presignDocumentForCompany(
+    ctx,
+    row,
+    input,
+    (documentId) => `/api/v1/companies/me/documents/${documentId}/upload`,
+  );
+}
+
+/** Step 1½ for the employer: store the bytes for a presigned upload. */
+export async function uploadMyCompanyDocument(
+  ctx: SignedIn,
+  documentId: string,
+  contentType: string | null,
+  body: Uint8Array,
+): Promise<ReceivedUpload> {
+  assertPermission(ctx.actor, 'company:register');
+  const row = await requireOwnCompany(db, ctx.actor);
+  assertDocumentEditable(row);
+  return receiveDocumentUpload({ doc: await ownDocument(db, row, documentId), contentType, body });
 }
 
 async function ownDocument(executor: DbExecutor, row: CompanyRow, documentId: string) {
@@ -194,7 +219,24 @@ export async function presignStaffCompanyDocument(
   input: CompanyPresignInput,
 ): Promise<PresignedCompanyDocument> {
   const row = await loadStaffOnboardedCompany(ctx, companyId);
-  return presignDocumentForCompany(ctx, row, input);
+  return presignDocumentForCompany(
+    ctx,
+    row,
+    input,
+    (documentId) => `/api/v1/companies/${companyId}/documents/${documentId}/upload`,
+  );
+}
+
+/** Step 1½ (onboard): store the bytes for a presigned upload. Same gates as confirm. */
+export async function uploadStaffCompanyDocument(
+  ctx: SignedIn,
+  companyId: string,
+  documentId: string,
+  contentType: string | null,
+  body: Uint8Array,
+): Promise<ReceivedUpload> {
+  const row = await loadStaffOnboardedCompany(ctx, companyId);
+  return receiveDocumentUpload({ doc: await ownDocument(db, row, documentId), contentType, body });
 }
 
 /**
@@ -243,7 +285,21 @@ export async function myCompanyDocumentLink(
 ): Promise<DocumentLink> {
   assertPermission(actor, 'company:register');
   const row = await requireOwnCompany(db, actor);
-  return viewDocumentLink(await ownDocument(db, row, documentId), PRESENT_STATUSES);
+  return viewDocumentLink(
+    await ownDocument(db, row, documentId),
+    PRESENT_STATUSES,
+    `/api/v1/companies/me/documents/${documentId}/download`,
+  );
+}
+
+/** The employer downloading their own upload — same gates as the view link. */
+export async function downloadMyCompanyDocument(
+  actor: Actor,
+  documentId: string,
+): Promise<StoredObject> {
+  assertPermission(actor, 'company:register');
+  const row = await requireOwnCompany(db, actor);
+  return downloadDocument(await ownDocument(db, row, documentId), PRESENT_STATUSES);
 }
 
 /** Staff (verifier / Branch Admin) viewing a company document — audited. */
@@ -265,7 +321,11 @@ export async function staffCompanyDocumentLink(
     throw new ForbiddenError('This company is not yet verified');
   }
   const doc = await ownDocument(db, row, documentId);
-  const link = await viewDocumentLink(doc, PRESENT_STATUSES);
+  const link = await viewDocumentLink(
+    doc,
+    PRESENT_STATUSES,
+    `/api/v1/companies/${companyId}/documents/${documentId}/download`,
+  );
   await recordAudit(ctx, {
     action: 'company.document_view',
     entityType: 'company',
@@ -274,4 +334,20 @@ export async function staffCompanyDocumentLink(
     metadata: { documentId: doc.id, typeCode: doc.typeCode },
   });
   return link;
+}
+
+/** Staff downloading a company document — same gates as the view link. */
+export async function downloadStaffCompanyDocument(
+  ctx: SignedIn,
+  companyId: string,
+  documentId: string,
+): Promise<StoredObject> {
+  const canManage = hasPermission(ctx.actor, 'company:manage');
+  if (!canManage) assertPermission(ctx.actor, 'company:read');
+  const row = await loadCompany(db, companyId);
+  await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+  if (!canManage && !(PUBLIC_COMPANY_STATUSES as readonly string[]).includes(row.status)) {
+    throw new ForbiddenError('This company is not yet verified');
+  }
+  return downloadDocument(await ownDocument(db, row, documentId), PRESENT_STATUSES);
 }

@@ -968,13 +968,13 @@ function DocumentsStep({
       });
 
       // 2026-11-13 ("Failed to fetch" in this step): the old code did a
-      // bare fetch() PUT with none of the signed headers, while the
+      // bare fetch() PUT with none of the upload headers, while the
       // applicant and staff uploaders both use putWithProgress with
-      // presign.upload.headers — Content-Type is part of the signature,
-      // so the storage PUT could be rejected, and any network failure
-      // surfaced as the raw browser "Failed to fetch". Use the same
-      // helper as everywhere else: signed headers, and a readable
-      // "Network error during upload" / "Upload failed (HTTP …)" instead.
+      // presign.upload.headers — the server checks the Content-Type
+      // against the approved upload, so the PUT could be rejected, and
+      // any network failure surfaced as the raw browser "Failed to fetch".
+      // Use the same helper as everywhere else: the upload headers, and a
+      // readable "Network error during upload" / "Upload failed (HTTP …)" instead.
       await putWithProgress({
         url: presign.upload.url,
         file,

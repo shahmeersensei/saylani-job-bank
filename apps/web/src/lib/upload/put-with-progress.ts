@@ -7,8 +7,8 @@ export interface PutWithProgressOptions {
 }
 
 /**
- * Uploads a file straight to object storage with a presigned PUT URL.
- * Uses XHR (not fetch) because fetch has no upload-progress events.
+ * Uploads a file to the URL the API returned for it (the app's same-origin
+ * upload route). Uses XHR (not fetch) because fetch has no upload-progress events.
  */
 export function putWithProgress({
   url,

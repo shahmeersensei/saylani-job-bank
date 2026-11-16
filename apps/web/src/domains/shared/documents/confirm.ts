@@ -13,17 +13,17 @@ import {
   deleteObject,
   detectContentType,
   getObjectPrefix,
+  getObjectStream,
   headObject,
   malwareScanner,
-  presignDownload,
-  presignUpload,
   scansEnforced,
   UploadRejectedError,
   type PresignedUpload,
+  type StoredObject,
 } from '@/lib/s3/storage';
 
 /**
- * Shared document upload pipeline (presigned PUT → confirm), used by the
+ * Shared document upload pipeline (same-origin upload → confirm → view link), used by the
  * applicant and company document flows. The two flows were ~85% duplicated:
  * storage check, magic-byte verification, malware scan handling, supersede
  * and audit shapes are identical; only the table, the status values on
@@ -94,6 +94,12 @@ export interface PresignDocumentOptions {
   types: readonly { code: string; meta: MasterDataMeta<'DOCUMENT_TYPE'> }[];
   rateLimitName: string;
   branchError: string;
+  /**
+   * Same-origin upload route for the created row. The browser PUTs the file
+   * there (see receiveDocumentUpload); the URL must stay on the app's origin
+   * — a storage URL would be blocked as mixed content on the live HTTPS site.
+   */
+  uploadUrl: (documentId: string) => string;
   /** Editability check that runs before the type lookup (company: review lock). */
   assertEditableBeforeType?: () => void;
   /** Editability check that runs after the type lookup (applicant: identity lock). */
@@ -102,9 +108,9 @@ export interface PresignDocumentOptions {
 
 /**
  * Step 1 of an upload: checks the file against the document type's rules and
- * returns a presigned PUT. The file goes straight from the browser to storage,
- * never through the app. Audited: the row is created here, so the presign itself
- * is the audit entry (confirm records the upload separately).
+ * returns the same-origin upload route for it. The file goes through the app,
+ * never straight from the browser to storage. Audited: the row is created here,
+ * so the presign itself is the audit entry (confirm records the upload separately).
  */
 export async function presignDocumentUpload(
   options: PresignDocumentOptions,
@@ -170,11 +176,13 @@ export async function presignDocumentUpload(
     });
     return id;
   });
-  const upload = await presignUpload({
+  const upload: PresignedUpload = {
     key,
-    contentType: input.contentType,
-    sizeBytes: input.sizeBytes,
-  });
+    url: options.uploadUrl(documentId),
+    method: 'PUT',
+    headers: { 'Content-Type': input.contentType },
+    expiresAt: new Date(Date.now() + 300 * 1000).toISOString(),
+  };
   return { documentId, upload };
 }
 
@@ -363,10 +371,18 @@ export async function confirmDocumentUpload<Owner>(
 /**
  * Short-lived link to view a completed upload. An infected file is never
  * served, even if its status would otherwise allow a link.
+ *
+ * The link is the app's own download route for the document — the file is
+ * streamed through the app, never from storage directly (a presigned storage
+ * URL was blocked as mixed content on the live HTTPS site, and the storage
+ * hostname does not resolve outside the server). The route re-checks the
+ * caller's permission on every GET, so the link needs no expiry of its own;
+ * `expiresAt` is kept for the existing response shape.
  */
 export async function viewDocumentLink(
   doc: ConfirmableDocument,
   presentStatuses: readonly string[],
+  downloadUrl: string,
 ): Promise<DocumentLink> {
   if (doc.scanResult === 'infected') {
     throw new ConflictError('This upload failed a virus check');
@@ -375,10 +391,47 @@ export async function viewDocumentLink(
     throw new ConflictError('This upload was not completed');
   }
   return {
-    url: await presignDownload(doc.storageKey, {
-      expiresInSeconds: VIEW_LINK_SECONDS,
-      disposition: 'inline',
-    }),
+    url: downloadUrl,
     expiresAt: new Date(Date.now() + VIEW_LINK_SECONDS * 1000).toISOString(),
   };
+}
+
+/**
+ * Stream a completed upload back out, through the app. Same guards as the
+ * view link: an infected file is never served, and only a completed upload
+ * can be downloaded. Callers must have checked the caller may view this
+ * document (the same gates as the link) before calling this.
+ */
+export async function downloadDocument(
+  doc: ConfirmableDocument,
+  presentStatuses: readonly string[],
+): Promise<StoredObject> {
+  if (doc.scanResult === 'infected') {
+    throw new ConflictError('This upload failed a virus check');
+  }
+  if (!presentStatuses.includes(doc.status)) {
+    throw new ConflictError('This upload was not completed');
+  }
+  const stored = await getObjectStream(doc.storageKey);
+  if (!stored) {
+    throw new ConflictError('The file is no longer available. Please upload it again.');
+  }
+  return stored;
+}
+
+/**
+ * Download response for a stored object: rendered inline (the in-app viewer),
+ * with sniffing off. The stored bytes were verified against the declared type
+ * at confirm, so the Content-Type below is trustworthy.
+ */
+export function documentDownloadResponse(file: StoredObject): Response {
+  return new Response(file.body, {
+    headers: {
+      'content-type': file.contentType,
+      'content-length': String(file.sizeBytes),
+      'content-disposition': 'inline',
+      'x-content-type-options': 'nosniff',
+      'cache-control': 'private, max-age=120',
+    },
+  });
 }

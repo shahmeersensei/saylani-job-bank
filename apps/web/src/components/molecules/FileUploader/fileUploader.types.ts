@@ -7,7 +7,7 @@ export interface UploadResult {
 }
 
 /**
- * Performs one upload. Typically: ask the API for a presigned URL, then `putWithProgress`.
+ * Performs one upload. Typically: ask the API for the upload route, then `putWithProgress`.
  * Must call `onProgress` with 0..1 and honour `signal` for cancellation.
  */
 export type UploadFn = (

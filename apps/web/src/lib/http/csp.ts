@@ -17,8 +17,11 @@
  *   styles (`style={{...}}`) plus one inline <style> tag (landing page).
  *   Dropping 'unsafe-inline' here would break the UI with no nonce-based
  *   alternative. Revisit only if inline styles are ever removed.
- * - img-src / connect-src include the map-tile host and the S3 endpoint,
- *   which are build-time env (same values next.config.ts used before).
+ * - img-src / connect-src include the map-tile host, which is build-time env
+ *   (same value next.config.ts used before). Storage is NOT listed: document
+ *   uploads and downloads go through the app's own routes now, so the browser
+ *   never talks to storage directly (a storage origin in CSP would also leak
+ *   the server-internal storage address to every page).
  */
 
 function originOf(url: string | undefined): string | null {
@@ -30,19 +33,18 @@ export function buildCsp(nonce: string): string {
   const isProd = process.env.NODE_ENV === 'production';
   const mapTiles =
     originOf(process.env.NEXT_PUBLIC_MAP_TILE_URL) ?? 'https://tile.openstreetmap.org';
-  const storage = originOf(process.env.S3_ENDPOINT);
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'`,
     "style-src 'self' 'unsafe-inline'",
     // images.unsplash.com: landing-page photos. data:/blob:: leaflet markers and previews.
-    ['img-src', "'self'", 'data:', 'blob:', 'https://images.unsplash.com', mapTiles, storage]
+    ['img-src', "'self'", 'data:', 'blob:', 'https://images.unsplash.com', mapTiles]
       .filter(Boolean)
       .join(' '),
     // next/font/google bundles fonts at build time and serves them from 'self'.
     "font-src 'self' data:",
-    // connect-src must include storage: document uploads PUT directly to presigned URLs.
-    ['connect-src', "'self'", storage, isProd ? null : 'ws:'].filter(Boolean).join(' '),
+    // Uploads and downloads are same-origin now, so connect-src needs no storage origin.
+    ['connect-src', "'self'", isProd ? null : 'ws:'].filter(Boolean).join(' '),
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

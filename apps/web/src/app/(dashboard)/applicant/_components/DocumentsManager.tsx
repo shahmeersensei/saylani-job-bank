@@ -24,7 +24,7 @@ const FORMAT_LABELS: Record<string, string> = {
 };
 
 /**
- * Upload area per document type. Files go straight to storage with a presigned URL, then the
+ * Upload area per document type. Files go to the app's upload route, then the
  * server confirms what actually arrived. Used by the wizard's last step and the Documents page.
  */
 export function DocumentsManager({

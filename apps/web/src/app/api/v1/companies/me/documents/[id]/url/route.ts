@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { myCompanyDocumentLink } from '@/domains/company';
 import { apiHandler, ok } from '@/domains/shared/http';
 
-/** GET /api/v1/companies/me/documents/{id}/url — presigned GET link for own document. */
+/** GET /api/v1/companies/me/documents/{id}/url — download link for own document. */
 export const GET = apiHandler({
   permission: 'company:register',
   params: z.object({ id: z.uuid() }),

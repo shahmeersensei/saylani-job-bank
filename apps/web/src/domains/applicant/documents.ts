@@ -4,15 +4,19 @@ import { and, eq } from 'drizzle-orm';
 import { recordAudit, runCommand } from '@/domains/shared/audit';
 import {
   confirmDocumentUpload,
+  downloadDocument,
   presignDocumentUpload,
+  receiveDocumentUpload,
   viewDocumentLink,
   type DocumentLink,
   type DocumentTable,
   type PresignedDocument,
+  type ReceivedUpload,
 } from '@/domains/shared/documents';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/domains/shared/errors';
 import { assertCityAccess, assertPermission, type Actor } from '@/domains/shared/scope';
 import { db, type DbExecutor } from '@/lib/db';
+import type { StoredObject } from '@/lib/s3/storage';
 import {
   a,
   applicantDocumentTypes,
@@ -61,7 +65,7 @@ function assertIdentityDocumentEditable(row: ApplicantRow, typeCode: string): vo
 
 /**
  * Step 1 of an upload: checks the file against the document type's rules and returns a
- * presigned PUT. The file goes straight from the browser to storage, never through the app.
+ * same-origin upload route for it. The file goes through the app, never straight to storage.
  */
 export async function presignMyDocument(
   ctx: SignedIn,
@@ -79,7 +83,26 @@ export async function presignMyDocument(
     rateLimitName: 'applicant-upload',
     branchError: 'Set your home location and branch before uploading documents',
     assertEditableAfterType: (typeCode) => assertIdentityDocumentEditable(row, typeCode),
+    uploadUrl: (documentId) => `/api/v1/applicants/me/documents/${documentId}/upload`,
   });
+}
+
+/**
+ * Step 1½ (same-origin upload): store the bytes for a PENDING_UPLOAD row the
+ * applicant presigned. Same gates as confirm, so a locked identity document
+ * cannot gain a new file here either.
+ */
+export async function uploadMyDocument(
+  ctx: SignedIn,
+  documentId: string,
+  contentType: string | null,
+  body: Uint8Array,
+): Promise<ReceivedUpload> {
+  assertPermission(ctx.actor, 'applicant:self');
+  const row = await requireOwnApplicant(db, ctx.actor);
+  const doc = await ownDocument(db, row, documentId);
+  assertIdentityDocumentEditable(row, doc.typeCode);
+  return receiveDocumentUpload({ doc, contentType, body });
 }
 
 async function ownDocument(executor: DbExecutor, row: ApplicantRow, documentId: string) {
@@ -188,7 +211,18 @@ export async function removeMyDocument(
 export async function myDocumentLink(actor: Actor, documentId: string): Promise<DocumentLink> {
   assertPermission(actor, 'applicant:self');
   const row = await requireOwnApplicant(db, actor);
-  return viewDocumentLink(await ownDocument(db, row, documentId), PRESENT_DOCUMENT_STATUSES);
+  return viewDocumentLink(
+    await ownDocument(db, row, documentId),
+    PRESENT_DOCUMENT_STATUSES,
+    `/api/v1/applicants/me/documents/${documentId}/download`,
+  );
+}
+
+/** The applicant downloading their own upload — same gates as the view link. */
+export async function downloadMyDocument(actor: Actor, documentId: string): Promise<StoredObject> {
+  assertPermission(actor, 'applicant:self');
+  const row = await requireOwnApplicant(db, actor);
+  return downloadDocument(await ownDocument(db, row, documentId), PRESENT_DOCUMENT_STATUSES);
 }
 
 /** Staff viewing an applicant's document: city-scoped like the profile read (audit 2026-11-11, M-23), and always audited. */
@@ -201,7 +235,11 @@ export async function staffDocumentLink(
   const row = await loadApplicant(db, applicantId);
   await assertCityAccess(ctx.actor, row.branchId, { entityType: 'applicant', entityId: row.id });
   const doc = await ownDocument(db, row, documentId);
-  const link = await viewDocumentLink(doc, PRESENT_DOCUMENT_STATUSES);
+  const link = await viewDocumentLink(
+    doc,
+    PRESENT_DOCUMENT_STATUSES,
+    `/api/v1/applicants/${applicantId}/documents/${documentId}/download`,
+  );
   await recordAudit(ctx, {
     action: 'applicant.document_view',
     entityType: 'applicant',
@@ -212,11 +250,23 @@ export async function staffDocumentLink(
   return link;
 }
 
+/** Staff downloading an applicant's document — same gates as the view link. */
+export async function downloadStaffApplicantDocument(
+  ctx: SignedIn,
+  applicantId: string,
+  documentId: string,
+): Promise<StoredObject> {
+  assertPermission(ctx.actor, 'applicant:read');
+  const row = await loadApplicant(db, applicantId);
+  await assertCityAccess(ctx.actor, row.branchId, { entityType: 'applicant', entityId: row.id });
+  return downloadDocument(await ownDocument(db, row, documentId), PRESENT_DOCUMENT_STATUSES);
+}
+
 // ─── Staff photo capture (2026-11-13) ────────────────────────────────────
 // Live photo capture at registration runs before the applicant exists, so the
 // photo cannot go through the applicant's own upload path. Instead the form
 // holds the captured JPEG in memory, creates the applicant, then uploads it
-// here — the same presign → PUT straight to storage → confirm pipeline, with
+// here — the same presign → same-origin upload → confirm pipeline, with
 // the seeded PHOTO document type (Passport-size photo, JPEG/PNG, max 2 MB).
 // Only PHOTO is accepted on these endpoints: staff document uploads of any
 // other type stay on the applicant's own path.
@@ -251,7 +301,24 @@ export async function presignStaffApplicantPhoto(
     types: (await listApplicantDocumentTypes()).filter((t) => t.code === 'PHOTO'),
     rateLimitName: 'applicant-upload',
     branchError: 'Set your home location and branch before uploading documents',
+    uploadUrl: (documentId) => `/api/v1/applicants/${applicantId}/documents/${documentId}/upload`,
   });
+}
+
+/** Step 1½ (staff): store the bytes for a presigned PHOTO upload. */
+export async function uploadStaffApplicantPhoto(
+  ctx: SignedIn,
+  applicantId: string,
+  documentId: string,
+  contentType: string | null,
+  body: Uint8Array,
+): Promise<ReceivedUpload> {
+  const row = await loadStaffApplicantForPhoto(ctx, applicantId);
+  const doc = await ownDocument(db, row, documentId);
+  if (doc.typeCode !== 'PHOTO') {
+    throw new ForbiddenError('Only the passport-size photo can be uploaded here.');
+  }
+  return receiveDocumentUpload({ doc, contentType, body });
 }
 
 /** Step 2 (staff): confirm a PHOTO upload for a just-registered applicant. */

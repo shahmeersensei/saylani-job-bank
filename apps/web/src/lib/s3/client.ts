@@ -10,9 +10,8 @@ export const s3 = new S3Client({
     accessKeyId: env.S3_ACCESS_KEY_ID,
     secretAccessKey: env.S3_SECRET_ACCESS_KEY,
   },
-  // Newer SDKs bake a CRC32 of the (empty, at signing time) body into presigned PUT URLs,
-  // which then never matches the real upload. Only send checksums when an API requires
-  // them — also needed for Cloudflare R2 and other S3-compatible stores.
+  // Only send checksums when an API requires them — also needed for
+  // Cloudflare R2 and other S3-compatible stores.
   requestChecksumCalculation: 'WHEN_REQUIRED',
   responseChecksumValidation: 'WHEN_REQUIRED',
 });
