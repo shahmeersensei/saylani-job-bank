@@ -238,7 +238,8 @@ describe('StaffRegisterApplicantForm token mode', () => {
     expect(screen.getByDisplayValue('Ahmed Raza')).toBeInTheDocument();
     const cnic = screen.getByDisplayValue('42101-1234567-1');
     expect(cnic).toBeDisabled();
-    expect(screen.getByLabelText('Seven-digit subscriber number')).toHaveValue('1234567');
+    expect(screen.getByDisplayValue('300 1234567')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Original network allocation')).not.toBeInTheDocument();
     expect(screen.getByText(/From the token, locked. If the CNIC is wrong/)).toBeInTheDocument();
   });
 

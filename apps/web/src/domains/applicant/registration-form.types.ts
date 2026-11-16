@@ -63,6 +63,12 @@ export interface RegistrationFormData {
     availableFrom: string | null;
   } | null;
   verificationQrDataUrl: string;
+  /**
+   * The applicant's passport photo (PHOTO document) embedded as a data URL,
+   * like the verification QR — the printout must be self-contained. Null
+   * when no photo is on file or it could not be read.
+   */
+  photoDataUrl: string | null;
   canRegenerate: boolean;
 }
 

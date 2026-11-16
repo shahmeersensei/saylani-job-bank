@@ -11,7 +11,14 @@ import QRCode from 'qrcode';
 import { schema } from '@jobbank/db';
 import { and, eq } from 'drizzle-orm';
 import { getApplicantForStaff } from './staff';
-import { assertBranchAccess, assertCityAccess, assertPermission, type Actor } from '@/domains/shared/scope';
+import { currentDocuments, PRESENT_DOCUMENT_STATUSES } from './repository';
+import {
+  assertBranchAccess,
+  assertCityAccess,
+  assertPermission,
+  type Actor,
+} from '@/domains/shared/scope';
+import { downloadDocument } from '@/domains/shared/documents';
 import { runCommand, type RequestContext } from '@/domains/shared/audit';
 import { NotFoundError } from '@/domains/shared/errors';
 import { masterDataLabels } from '@/domains/settings';
@@ -172,9 +179,10 @@ export async function createApplicantRegistrationForm(
     .where(eq(applicants.id, applicantId));
   if (!registration) throw new NotFoundError('Applicant');
 
-  const [labels, token] = await Promise.all([
+  const [labels, token, photoDataUrl] = await Promise.all([
     masterDataLabels(['EDUCATION_LEVEL', 'SKILL', 'LANGUAGE', 'CITY', 'AREA', 'JOB_CATEGORY']),
     ensureApplicantVerificationToken(ctx, applicantId, false, 'city'),
+    applicantPhotoDataUrl(applicantId),
   ]);
   const label = (type: keyof typeof labels, code: string | null) =>
     code ? (labels[type]?.[code] ?? 'Not available') : null;
@@ -244,8 +252,29 @@ export async function createApplicantRegistrationForm(
         }
       : null,
     verificationQrDataUrl,
+    photoDataUrl,
     canRegenerate: profile.can.manage,
   };
+}
+
+/**
+ * The applicant's passport photo for the printed form, embedded as a data
+ * URL like the verification QR — the printout must be self-contained, and
+ * a missing or unreadable photo must never block the form itself.
+ */
+async function applicantPhotoDataUrl(applicantId: string): Promise<string | null> {
+  try {
+    const documents = await currentDocuments(db, applicantId);
+    const photo = documents.find((doc) => doc.typeCode === 'PHOTO');
+    if (!photo) return null;
+    const stored = await downloadDocument(photo, PRESENT_DOCUMENT_STATUSES);
+    const bytes = new Uint8Array(await new Response(stored.body).arrayBuffer());
+    if (bytes.length === 0) return null;
+    const contentType = photo.contentType || stored.contentType || 'image/jpeg';
+    return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
+  } catch {
+    return null;
+  }
 }
 
 export async function resolveApplicantVerification(

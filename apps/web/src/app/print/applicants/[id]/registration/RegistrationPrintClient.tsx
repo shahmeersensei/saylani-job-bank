@@ -54,6 +54,7 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [qrLoaded, setQrLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [photoFailed, setPhotoFailed] = useState(false);
   const logoRef = useRef<HTMLImageElement>(null);
   const qrRef = useRef<HTMLImageElement>(null);
 
@@ -64,6 +65,7 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
     setLogoLoaded(false);
     setQrLoaded(false);
     setImageError(false);
+    setPhotoFailed(false);
     try {
       const { data } = await apiFetch<RegistrationFormData>(
         `/api/v1/applicants/${applicantId}/registration-form`,
@@ -213,13 +215,33 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
           </dl>
 
           <Section title="Personal information">
-            <dl className="registration-print-grid">
-              <Field label="Full name" value={form.personal.fullName} />
-              <Field label="Father's / husband's name" value={form.personal.fatherName} />
-              <Field label="CNIC" value={formatCnic(form.personal.cnic)} />
-              <Field label="Date of birth" value={formatDate(form.personal.dateOfBirth)} />
-              <Field label="Gender" value={GENDER_LABELS[form.personal.gender]} />
-            </dl>
+            <div className="registration-print-personal">
+              <dl className="registration-print-grid">
+                <Field label="Full name" value={form.personal.fullName} />
+                <Field label="Father's / husband's name" value={form.personal.fatherName} />
+                <Field label="CNIC" value={formatCnic(form.personal.cnic)} />
+                <Field label="Date of birth" value={formatDate(form.personal.dateOfBirth)} />
+                <Field label="Gender" value={GENDER_LABELS[form.personal.gender]} />
+              </dl>
+              {form.photoDataUrl && !photoFailed ? (
+                <Image
+                  src={form.photoDataUrl}
+                  width={140}
+                  height={180}
+                  alt="Applicant photo"
+                  unoptimized
+                  onError={() => setPhotoFailed(true)}
+                  className="registration-print-photo"
+                />
+              ) : (
+                <div
+                  className="registration-print-photo registration-print-photo--empty"
+                  aria-label="No applicant photo on file"
+                >
+                  No photo on file
+                </div>
+              )}
+            </div>
           </Section>
 
           <Section title="Contact information">

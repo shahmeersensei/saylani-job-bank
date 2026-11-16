@@ -36,6 +36,7 @@ const form: RegistrationFormData = {
   certifications: [],
   preferences: null,
   verificationQrDataUrl: 'data:image/png;base64,dGVzdA==',
+  photoDataUrl: 'data:image/jpeg;base64,dGVzdA==',
   canRegenerate: false,
 };
 
@@ -68,5 +69,21 @@ describe('RegistrationPrintClient', () => {
     Object.defineProperty(window, 'print', { configurable: true, value: print });
     fireEvent.click(screen.getByRole('button', { name: 'Print Registration Form' }));
     expect(print).toHaveBeenCalledOnce();
+  });
+
+  it('shows the applicant photo beside the personal details', async () => {
+    render(<RegistrationPrintClient applicantId="applicant-id" />);
+
+    const photo = await screen.findByAltText('Applicant photo');
+    expect(photo).toHaveAttribute('src', 'data:image/jpeg;base64,dGVzdA==');
+    expect(screen.queryByText('No photo on file')).not.toBeInTheDocument();
+  });
+
+  it('shows a placeholder box when no photo is on file', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ data: { ...form, photoDataUrl: null } });
+    render(<RegistrationPrintClient applicantId="applicant-id" />);
+
+    expect(await screen.findByText('No photo on file')).toBeInTheDocument();
+    expect(screen.queryByAltText('Applicant photo')).not.toBeInTheDocument();
   });
 });

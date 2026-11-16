@@ -29,6 +29,7 @@ import {
   FormField,
   GeocodeAddressPicker,
   PhoneInput,
+  SearchableSelect,
   toast,
 } from '@/components/molecules';
 import type { ApplicantStaffView, PresignedDocument } from '@/domains/applicant';
@@ -769,7 +770,6 @@ export function StaffRegisterApplicantForm({
                 <Input value={form.phone} disabled />
               ) : (
                 <PhoneInput
-                  segmented
                   value={form.phone}
                   onChange={(value) => set({ phone: value.e164 ?? '' })}
                 />
@@ -824,11 +824,11 @@ export function StaffRegisterApplicantForm({
                 error={errors['address.areaCode']}
                 id={fieldControlId('address.areaCode')}
               >
-                <Select
+                <SearchableSelect
                   value={form.areaCode}
-                  onChange={(event) => set({ areaCode: event.target.value })}
+                  onChange={(areaCode) => set({ areaCode })}
                   options={areas}
-                  placeholder="Choose an area"
+                  placeholder="Type to search an area"
                 />
               </FormField>
               <div className="sm:col-span-2">

@@ -27,11 +27,13 @@ describe('PhoneInput', () => {
     );
   });
 
-  it('supports segmented prefix and subscriber entry', async () => {
+  it('has no prefix dropdown — the full number is typed in one field', async () => {
     const onChange = vi.fn();
-    render(<PhoneInput segmented onChange={onChange} />);
-    await userEvent.selectOptions(screen.getByLabelText('Original network allocation'), '344');
-    await userEvent.type(screen.getByLabelText('Seven-digit subscriber number'), '1234567');
+    render(<PhoneInput aria-label="Mobile" onChange={onChange} />);
+    expect(screen.queryByLabelText('Original network allocation')).not.toBeInTheDocument();
+    const input = screen.getByLabelText('Mobile');
+    await userEvent.type(input, '03441234567');
+    expect(input).toHaveValue('344 1234567');
     expect(onChange).toHaveBeenLastCalledWith({
       e164: '+923441234567',
       national: '3441234567',

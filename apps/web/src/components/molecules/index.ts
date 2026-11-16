@@ -14,6 +14,7 @@ export * from './Modal';
 export * from './OTPInput';
 export * from './Pagination';
 export * from './PhoneInput';
+export * from './SearchableSelect';
 export * from './SearchBar';
 export * from './Tabs';
 export * from './ThemeToggle';
