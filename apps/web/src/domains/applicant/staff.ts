@@ -380,7 +380,9 @@ export async function registerApplicantForStaff(
         addressLine: input.address.addressLine ?? '',
         cityCode: input.address.cityCode,
         areaCode: input.address.areaCode ?? null,
-        location: toGeography(input.address.location),
+        // Home location pin is optional (2026-11-16): the staff form no
+        // longer collects one, so a new registration stores null.
+        location: input.address.location ? toGeography(input.address.location) : null,
       });
       await assertActiveMasterData(
         tx,
@@ -589,7 +591,10 @@ export async function staffUpdateApplicantProfile(
           addressLine: input.address.addressLine ?? '',
           cityCode: input.address.cityCode,
           areaCode: input.address.areaCode ?? null,
-          location: toGeography(input.address.location),
+          // Home location pin is optional (2026-11-16): a null location on
+          // an update leaves a stored pin alone instead of wiping it —
+          // the staff form no longer sends one at all.
+          location: input.address.location ? toGeography(input.address.location) : null,
         })
         .onConflictDoUpdate({
           target: addr.applicantId,
@@ -597,7 +602,7 @@ export async function staffUpdateApplicantProfile(
             addressLine: input.address.addressLine ?? '',
             cityCode: input.address.cityCode,
             areaCode: input.address.areaCode ?? null,
-            location: toGeography(input.address.location),
+            ...(input.address.location ? { location: toGeography(input.address.location) } : {}),
             updatedAt: new Date(),
           },
         });

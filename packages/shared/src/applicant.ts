@@ -302,6 +302,18 @@ export const applicantLocationSchema = z.object({
 });
 export type ApplicantLocationInput = z.infer<typeof applicantLocationSchema>;
 
+/**
+ * Assisted (staff) address: the counter no longer collects a map pin
+ * (2026-11-16, Home location field removed from the staff form), so new
+ * registrations carry `location: null` and matching has no distance for
+ * them. The applicant's own location step keeps the pin required — only
+ * the staff paths use this variant.
+ */
+export const assistedAddressSchema = applicantLocationSchema.extend({
+  location: pakistanPointSchema.nullable(),
+});
+export type AssistedAddressInput = z.infer<typeof assistedAddressSchema>;
+
 export const branchOptionsQuery = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
@@ -463,7 +475,7 @@ export const staffRegisterApplicantSchema = registerApplicantSchema.extend({
    * a token and a completed token always has its applicant.
    */
   tokenId: z.uuid().optional(),
-  address: applicantLocationSchema.optional(),
+  address: assistedAddressSchema.optional(),
   /** Permanent home address (section 5). Same fields as the current address, no map pin. */
   permanentAddress: z
     .object({
@@ -608,11 +620,13 @@ export const assistedApplicantRegistrationSchema = z.object({
   // Audit 2026-11-11 (M-02): same validator as the dialog path
   // (pkMobileSchema) — the old min/max length check accepted landlines
   // and short numbers the server domain then had to reject, with
-  // different error text. Address stays required here: the assisted
-  // form collects it at the counter and matching/branch logic needs the
-  // home location; the dialog (token-completion) path keeps it optional.
+  // different error text. The address keeps its line/city/area, but the
+  // map pin is gone (2026-11-16): the staff form no longer collects a
+  // home location, so `address.location` is null for new registrations
+  // and the profile-update path preserves an existing pin instead of
+  // wiping it.
   phone: pkMobileSchema,
-  address: applicantLocationSchema,
+  address: assistedAddressSchema,
   education: educationSchema.optional().default({ items: [] }),
   experience: experienceSchema.optional().default({ hasNoExperience: false, items: [] }),
   skills: skillsSchema.optional().default({ items: [] }),
@@ -648,7 +662,7 @@ export const staffApplicantProfileUpdateSchema = assistedApplicantRegistrationSc
   .omit({ branchId: true, phone: true })
   .extend({
     gender: z.enum(GENDERS, 'Choose an option'),
-    address: applicantLocationSchema,
+    address: assistedAddressSchema,
     preferences: preferencesSchema.nullable().optional(),
     recordIds: profileRecordIdsSchema,
   })

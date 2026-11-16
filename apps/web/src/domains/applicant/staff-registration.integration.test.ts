@@ -112,6 +112,36 @@ describe('staff-assisted applicant registration', () => {
     });
   });
 
+  it('registers without a home pin and stores a null location', async () => {
+    // Home location removed from the staff form (2026-11-16): a
+    // registration with no pin must succeed instead of failing validation.
+    const admin = await signInAdmin('superadmin@jobbank.local');
+    const input = registration(khi, {
+      address: {
+        addressLine: 'House 12, Block 13-D',
+        cityCode: 'KARACHI',
+        areaCode: 'KARACHI_GULSHAN_E_IQBAL',
+        branchId: khi,
+        location: null,
+      },
+    });
+
+    const response = await call(registerForStaff, '/api/v1/applicants/staff-register', {
+      method: 'POST',
+      body: input,
+      jar: admin,
+      headers: { 'idempotency-key': idempotencyKey() },
+    });
+
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
+    const applicantId = response.body.data.id as string;
+    const [address] = await db
+      .select({ location: schema.applicantAddresses.location })
+      .from(schema.applicantAddresses)
+      .where(eq(schema.applicantAddresses.applicantId, applicantId));
+    expect(address?.location).toBeNull();
+  });
+
   // Round 2: a Branch Admin holds applicant:create (permissions.test.ts:
   // "Branch Admin is NOT read-only") — own-branch registration is 201,
   // and only the cross-branch attempt is refused.

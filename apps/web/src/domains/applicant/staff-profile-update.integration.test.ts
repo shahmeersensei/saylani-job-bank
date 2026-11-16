@@ -451,4 +451,36 @@ describe('staff applicant profile update', () => {
     });
     expect(deniedApplicant.status).toBe(403);
   });
+
+  it('keeps a stored home pin when the profile update sends no location', async () => {
+    // The staff form no longer sends a pin at all (2026-11-16): editing
+    // a profile must not wipe the one already stored.
+    const created = await createApplicant(khi);
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const applicantId = created.body.data.id as string;
+    const cnic = created.body.data.personal.cnic as string;
+
+    const admin = await signInAdmin('superadmin@jobbank.local');
+    const update = await call(updateProfile, `/api/v1/applicants/${applicantId}/profile`, {
+      method: 'PATCH',
+      body: {
+        ...emptyProfileUpdate(cnic, 'Profile Update Applicant'),
+        address: {
+          addressLine: 'House 12, Block 13-D',
+          cityCode: 'KARACHI',
+          areaCode: 'KARACHI_GULSHAN_E_IQBAL',
+          location: null,
+        },
+      },
+      jar: admin,
+      params: { id: applicantId },
+    });
+    expect(update.status, JSON.stringify(update.body)).toBe(200);
+
+    const [address] = await db
+      .select({ location: schema.applicantAddresses.location })
+      .from(schema.applicantAddresses)
+      .where(eq(schema.applicantAddresses.applicantId, applicantId));
+    expect(address?.location).toEqual(KARACHI_HOME);
+  });
 });

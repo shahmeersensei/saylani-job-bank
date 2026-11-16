@@ -92,7 +92,8 @@ export interface ApplicantProfile {
     addressLine: string;
     cityCode: string;
     areaCode: string | null;
-    location: GeoPoint;
+    /** Map pin; null when none was collected (staff registrations since 2026-11-16). */
+    location: GeoPoint | null;
   } | null;
   /** Permanent home address (section 5); null when not collected. */
   permanentAddress: {

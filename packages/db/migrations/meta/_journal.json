@@ -344,6 +344,13 @@
       "when": 1794558842685,
       "tag": "0048_company_documents_optional",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1794846188839,
+      "tag": "0049_applicant_address_location_optional",
+      "breakpoints": true
     }
   ]
 }

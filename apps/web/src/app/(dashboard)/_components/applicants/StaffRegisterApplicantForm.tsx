@@ -27,7 +27,6 @@ import {
   CNICInput,
   DateTimePicker,
   FormField,
-  GeocodeAddressPicker,
   PhoneInput,
   SearchableSelect,
   toast,
@@ -238,12 +237,9 @@ export function StaffRegisterApplicantForm({
     addressLine: applicant?.address?.addressLine ?? '',
     cityCode: applicant?.address?.cityCode ?? '',
     areaCode: applicant?.address?.areaCode ?? '',
-    // Audit 2026-11-11 (M-01): no pin until the user places one. The old
-    // Karachi-centre default was submitted as the applicant's home
-    // location even when nobody touched the map, which poisoned
-    // nearest-branch and match ranking for anyone outside central Karachi.
-    lat: applicant?.address?.location.lat ?? null,
-    lng: applicant?.address?.location.lng ?? null,
+    // Home location removed 2026-11-16: the staff form no longer collects
+    // a map pin, so there is no lat/lng state any more. The server stores
+    // null for new registrations and keeps a stored pin on profile edits.
   });
 
   const set = (changes: Partial<typeof form>) => setForm((current) => ({ ...current, ...changes }));
@@ -256,16 +252,6 @@ export function StaffRegisterApplicantForm({
     });
 
   const parse = () => {
-    // Audit 2026-11-11 (M-01): no pin, no registration — fail here with a
-    // plain message instead of letting zod report "Expected object" on the
-    // location field.
-    if (form.lat == null || form.lng == null) {
-      setErrors({
-        'address.location': 'Search for the applicant’s home area and pick a match from the list',
-      });
-      requestErrorFocus();
-      return null;
-    }
     const raw = {
       branchId: form.branchId,
       // Token mode: the registration names the first-counter token, and the
@@ -283,7 +269,9 @@ export function StaffRegisterApplicantForm({
         cityCode: form.cityCode,
         areaCode: form.areaCode || null,
         branchId: form.branchId,
-        location: form.lat != null && form.lng != null ? { lat: form.lat, lng: form.lng } : null,
+        // No home location any more (2026-11-16): the field is gone, so
+        // the form sends null and the server stores / preserves accordingly.
+        location: null,
       },
       education: {
         items: education.map((item) => ({
@@ -831,32 +819,6 @@ export function StaffRegisterApplicantForm({
                   placeholder="Type to search an area"
                 />
               </FormField>
-              <div className="sm:col-span-2">
-                <GeocodeAddressPicker
-                  value={
-                    form.lat != null && form.lng != null ? { lat: form.lat, lng: form.lng } : null
-                  }
-                  onChange={(location) => set(location ?? { lat: null, lng: null })}
-                  onPick={(result) => {
-                    // The city is a seeded-code select: only fill it when the
-                    // geocoder matched one of the seeded cities.
-                    if (result.cityCode && cities.some((c) => c.value === result.cityCode)) {
-                      set({ cityCode: result.cityCode });
-                    }
-                    if (result.addressLine && !form.addressLine) {
-                      set({ addressLine: result.addressLine });
-                    }
-                  }}
-                  cityCode={form.cityCode || null}
-                  cityLabel={cities.find((c) => c.value === form.cityCode)?.label ?? null}
-                  label="Home location"
-                  hint="Search the applicant’s home area, street or a nearby landmark, then pick a match. It is required for matching and branch assignment."
-                  initialQuery={form.addressLine}
-                  required
-                  error={errors['address.location']}
-                  id={fieldControlId('address.location')}
-                />
-              </div>
             </div>
           </section>
           <section

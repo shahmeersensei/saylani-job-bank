@@ -114,7 +114,7 @@ export const applicants = pgTable(
   ],
 );
 
-/** The applicant's current home pin (one per applicant; changes are kept in the audit log). */
+/** The applicant's current home address (one per applicant; changes are kept in the audit log). The map pin is optional since 2026-11-16: the staff registration form no longer collects a home location, so new registrations have no pin. */
 export const applicantAddresses = pgTable('applicant_addresses', {
   applicantId: uuid()
     .primaryKey()
@@ -122,7 +122,7 @@ export const applicantAddresses = pgTable('applicant_addresses', {
   addressLine: text().notNull(),
   cityCode: text().notNull(),
   areaCode: text(),
-  location: geographyPoint().notNull(),
+  location: geographyPoint(),
   ...timestamps,
 });
 

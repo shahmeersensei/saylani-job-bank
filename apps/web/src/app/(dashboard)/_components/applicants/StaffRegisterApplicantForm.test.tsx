@@ -245,25 +245,9 @@ describe('StaffRegisterApplicantForm token mode', () => {
 
   it('submits the token id with the registration and shows the token completed', async () => {
     const user = userEvent.setup();
-    // The address search resolves through the same mocked apiFetch: the
-    // picker picks the first suggestion, which sets the home location.
     // (The document branches mirror the describe-level mock; this
     // implementation replaces it for this test.)
     apiFetchMock.mockImplementation(async (url: string) => {
-      if (typeof url === 'string' && url.startsWith('/api/v1/geocode/search')) {
-        return {
-          data: [
-            {
-              lat: 24.8607,
-              lng: 67.0011,
-              addressLine: 'Gulshan-e-Iqbal, Karachi',
-              cityCode: 'KARACHI',
-              cityLabel: 'Karachi',
-              display: 'Gulshan-e-Iqbal, Karachi',
-            },
-          ],
-        };
-      }
       if (url.includes('/documents/') && url.includes('/confirm')) return { data: {} };
       if (url.includes('/documents'))
         return {
@@ -290,12 +274,6 @@ describe('StaffRegisterApplicantForm token mode', () => {
     });
     await user.click(screen.getByRole('radio', { name: 'Gender Male' }));
     await user.selectOptions(screen.getByLabelText(/City/), 'KARACHI');
-    await user.type(screen.getByLabelText(/Home location/), 'Gulshan-e-Iqbal');
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Gulshan-e-Iqbal, Karachi' })).toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: 'Gulshan-e-Iqbal, Karachi' }));
-    expect(screen.getByText(/Location set: 24\.860700, 67\.001100/)).toBeInTheDocument();
 
     await user.upload(
       screen.getByLabelText('Upload a photo file'),
@@ -308,8 +286,8 @@ describe('StaffRegisterApplicantForm token mode', () => {
     await user.click(screen.getByRole('button', { name: 'Register job seeker' }));
 
     await waitFor(() => {
-      // Geocode search + create applicant + photo presign + photo confirm.
-      expect(apiFetchMock).toHaveBeenCalledTimes(4);
+      // Create applicant + photo presign + photo confirm.
+      expect(apiFetchMock).toHaveBeenCalledTimes(3);
       expect(apiFetchMock).toHaveBeenCalledWith(
         '/api/v1/applicants',
         expect.objectContaining({
@@ -318,6 +296,8 @@ describe('StaffRegisterApplicantForm token mode', () => {
             tokenId: issuedToken.id,
             cnic: '4210112345671',
             fullName: 'Ahmed Raza',
+            // No home location any more: the form sends a null pin.
+            address: expect.objectContaining({ cityCode: 'KARACHI', location: null }),
           }),
         }),
       );
