@@ -32,6 +32,7 @@ import {
   enrollTwoFactor,
   Jar,
   owner,
+  rememberTotp,
   resetTwoFactor,
   signIn,
   signInAdmin,
@@ -176,6 +177,57 @@ describe('two-factor authentication', () => {
     };
     expect((await viaBackup()).status).toBe(200);
     expect((await viaBackup()).status).toBe(401);
+  });
+
+  it('an invitee enrols with their setup token even when an admin session is live', async () => {
+    // Regression 2026-11-16: the enrol route used to prefer the session
+    // cookie over the setupToken, so an admin testing an invite in the same
+    // browser had the invitee's password checked against the admin's account
+    // and a correct password failed with "Incorrect password".
+    const adminJar = await signInAdmin('superadmin@jobbank.local');
+    const email = uniqueEmail('staff');
+    const invited = await call(inviteRoute, '/api/v1/users', {
+      method: 'POST',
+      jar: adminJar,
+      headers: { 'idempotency-key': crypto.randomUUID() },
+      body: { name: 'Test Staff', email, title: 'Placement Officer', role: 'STAFF', branchId: KHI },
+    });
+    expect(invited.status, JSON.stringify(invited.body)).toBe(201);
+    const token = tokenFrom(lastMailTo(email).text);
+    // The invitee chooses a password unlike any seeded account's, so a check
+    // against the wrong account cannot pass by accident.
+    const staffPassword = 'Invitee-only-99';
+    const jar = new Jar();
+    const accepted = await call(acceptInvite, '/api/v1/auth/invitations/accept', {
+      method: 'POST',
+      body: { token, password: staffPassword },
+      jar,
+    });
+    expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
+    expect(accepted.body.data.kind).toBe('two_factor_setup_required');
+    const setupToken = accepted.body.data.setupToken as string;
+
+    // The admin session is still live in this browser — enrolment must still
+    // run against the invitee's account, via the setup token.
+    const start = await call(enroll2fa, '/api/v1/account/2fa/enroll', {
+      method: 'POST',
+      jar: adminJar,
+      body: { password: staffPassword, setupToken },
+    });
+    expect(start.status, JSON.stringify(start.body)).toBe(200);
+    expect(start.body.data.qrSvg).toMatch(/^<svg/);
+    expect(start.body.data.backupCodes).toHaveLength(10);
+
+    // The enrolment belongs to the invitee: confirming it signs the invitee
+    // in, not the admin whose session was on the request.
+    rememberTotp(email, start.body.data.manualKey);
+    const done = await call(confirm2fa, '/api/v1/account/2fa/confirm', {
+      method: 'POST',
+      jar: adminJar,
+      body: { code: totpCode(email) },
+    });
+    expect(done.status, JSON.stringify(done.body)).toBe(200);
+    expect((await call(me, '/api/v1/auth/me', { jar: adminJar })).body.data.user.email).toBe(email);
   });
 
   it('admins cannot turn two-factor off; other staff can opt in and out', async () => {

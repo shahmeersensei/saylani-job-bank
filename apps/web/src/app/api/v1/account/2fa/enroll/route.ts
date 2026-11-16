@@ -9,28 +9,33 @@ import { apiHandler, ok } from '@/domains/shared/http';
  * 2FA-required account that has never enrolled and therefore holds no session
  * (audit H-02) — the short-lived `setupToken` login issued, together with the
  * password, which buys exactly the pending session enrolment needs.
+ *
+ * A setupToken wins over any session cookie on the request: the token proves
+ * its holder just passed the password check for that account. Otherwise an
+ * admin testing an invite in the same browser (their session is still live)
+ * has the invitee's password checked against the admin's account, and a
+ * correct password fails with "Incorrect password".
  */
 export const POST = apiHandler({
   auth: 'public',
   allowTwoFactorPending: true,
-  body: z.object({ password: z.string().min(1).max(128), setupToken: z.string().max(512).optional() }),
+  body: z.object({
+    password: z.string().min(1).max(128),
+    setupToken: z.string().max(512).optional(),
+  }),
   handler: async ({ ctx, actor, body, request }) => {
-    if (actor) {
-      return ok(
-        await startTwoFactorEnrollment({ ...ctx, actor }, body.password, request.headers),
+    if (body.setupToken) {
+      const { enrollment, cookies } = await startTwoFactorEnrollmentWithSetupToken(
+        ctx,
+        body.setupToken,
+        body.password,
+        request.headers,
       );
+      return { status: 200, data: enrollment, cookies };
     }
-    if (!body.setupToken) {
-      throw new UnauthenticatedError(
-        'Sign in again to set up two-factor authentication.',
-      );
+    if (!actor) {
+      throw new UnauthenticatedError('Sign in again to set up two-factor authentication.');
     }
-    const { enrollment, cookies } = await startTwoFactorEnrollmentWithSetupToken(
-      ctx,
-      body.setupToken,
-      body.password,
-      request.headers,
-    );
-    return { status: 200, data: enrollment, cookies };
+    return ok(await startTwoFactorEnrollment({ ...ctx, actor }, body.password, request.headers));
   },
 });
