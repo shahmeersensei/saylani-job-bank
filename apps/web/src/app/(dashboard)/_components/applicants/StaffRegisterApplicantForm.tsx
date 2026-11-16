@@ -17,7 +17,7 @@ import {
   type ApplicantTokenView,
   type Gender,
 } from '@jobbank/shared';
-import { ArrowLeft, Check, Plus, Printer, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Check, CheckCircle2, Plus, Printer, Trash2, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
@@ -89,6 +89,36 @@ interface Props {
    * token whose CNIC matches the registration.
    */
   token?: ApplicantTokenView;
+}
+
+/**
+ * Redesign 2026-11-16: numbered section heading shared by every card, so
+ * staff can tell where they are in the long form at a glance. The number
+ * badge is decorative; the heading text stays the accessible name.
+ */
+function SectionHeading({
+  step,
+  title,
+  description,
+}: {
+  step: number;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 sm:col-span-2">
+      <span
+        aria-hidden="true"
+        className="bg-primary-soft text-primary-soft-fg flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+      >
+        {step}
+      </span>
+      <div className="grid gap-0.5">
+        <h2 className="text-fg text-base font-semibold">{title}</h2>
+        {description ? <p className="text-fg-muted text-sm">{description}</p> : null}
+      </div>
+    </div>
+  );
 }
 
 export function StaffRegisterApplicantForm({
@@ -328,8 +358,8 @@ export function StaffRegisterApplicantForm({
   };
 
   /**
-   * Photo upload after the applicant exists: presign → PUT straight to storage
-   * → confirm, through the staff photo endpoints. Never throws: a failed photo
+   * Photo upload after the applicant exists: presign → PUT to the app's upload
+   * route → confirm, through the staff photo endpoints. Never throws: a failed photo
    * must not undo a completed registration — the success screen says so and
    * staff retry from the applicant's Documents page.
    */
@@ -435,6 +465,12 @@ export function StaffRegisterApplicantForm({
         className="border-border bg-surface shadow-card grid gap-5 rounded-xl border p-6"
         role="status"
       >
+        <div
+          aria-hidden="true"
+          className="bg-success-soft text-success-soft-fg flex h-12 w-12 items-center justify-center rounded-full"
+        >
+          <CheckCircle2 className="h-6 w-6" />
+        </div>
         <div className="grid gap-2">
           <h2 className="text-fg text-xl font-semibold">Job seeker registered successfully</h2>
           <p className="text-fg-muted text-sm">{registered.fullName}</p>
@@ -495,8 +531,46 @@ export function StaffRegisterApplicantForm({
       <FormErrorSummary errors={errors} labelFor={humanizeFieldKey} />
       {!review ? (
         <>
-          <section className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5">
-            <h2 className="text-fg text-base font-semibold">Branch assignment</h2>
+          {/* Redesign 2026-11-16: the old "Branch assignment" card held a
+              single field. It is now a header strip — title, branch/token
+              chips, the branch picker when it applies, and a step nav so
+              staff can jump between the six sections of this long form. */}
+          <section
+            className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5"
+            aria-label="Registration summary"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className="bg-primary-soft text-primary-soft-fg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                >
+                  <UserPlus className="h-5 w-5" />
+                </span>
+                <div className="grid gap-0.5">
+                  <h2 className="text-fg text-base font-semibold">
+                    {editing
+                      ? (applicant?.personal.fullName ?? 'Edit job seeker profile')
+                      : 'Applicant registration'}
+                  </h2>
+                  <p className="text-fg-muted text-sm">
+                    {editing
+                      ? 'Update the applicant’s details below. Fields marked * are required.'
+                      : 'Complete the form on the applicant’s behalf. Fields marked * are required.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="bg-surface-muted text-fg-muted rounded-full px-3 py-1 text-xs font-medium">
+                  {branchName}
+                </span>
+                {token ? (
+                  <span className="bg-primary-soft text-primary-soft-fg rounded-full px-3 py-1 text-xs font-medium">
+                    Token {token.tokenCode}
+                  </span>
+                ) : null}
+              </div>
+            </div>
             {applicant ? (
               <p className="text-fg-muted text-sm">
                 Assigned branch: {branchName}. Profile editing does not change branch assignment.
@@ -521,13 +595,43 @@ export function StaffRegisterApplicantForm({
                 />
               </FormField>
             )}
+            <nav
+              aria-label="Form sections"
+              className="border-border flex flex-wrap gap-2 border-t pt-4"
+            >
+              {[
+                { id: 'personal', step: 1, label: 'Personal' },
+                { id: 'contact', step: 2, label: 'Contact & address' },
+                { id: 'education', step: 3, label: 'Education' },
+                { id: 'experience', step: 4, label: 'Experience' },
+                { id: 'skills', step: 5, label: 'Skills & languages' },
+                { id: 'preferences', step: 6, label: 'Certificates & preferences' },
+              ].map((item) => (
+                <a
+                  key={item.id}
+                  href={`#section-${item.id}`}
+                  className="border-border text-fg-muted hover:border-primary hover:text-fg flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="bg-primary-soft text-primary-soft-fg flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold"
+                  >
+                    {item.step}
+                  </span>
+                  {item.label}
+                </a>
+              ))}
+            </nav>
           </section>
           {/* Photo in its own right-hand column: previously it sat in the
               header row, so the whole row was ~260px tall and the fields
               started below it, leaving a large empty void under the heading.
               Fields now flow in the left column beside the photo; on mobile
               the photo stays first in the DOM, so it still shows on top. */}
-          <section className="border-border bg-surface shadow-card grid items-start gap-4 rounded-xl border p-5 sm:grid-cols-[minmax(0,1fr)_148px]">
+          <section
+            id="section-personal"
+            className="border-border bg-surface shadow-card grid scroll-mt-24 items-start gap-4 rounded-xl border p-5 sm:grid-cols-[minmax(0,1fr)_148px]"
+          >
             {!editing && (
               <div className="sm:col-start-2 sm:row-start-1 sm:justify-self-end">
                 <PhotoCapture
@@ -553,9 +657,11 @@ export function StaffRegisterApplicantForm({
                   : 'grid content-start gap-4 sm:col-start-1 sm:row-start-1 sm:grid-cols-2'
               }
             >
-              <h2 className="text-fg text-base font-semibold sm:col-span-2">
-                Personal information
-              </h2>
+              <SectionHeading
+                step={1}
+                title="Personal information"
+                description="Name, CNIC, date of birth and photo — checked against the CNIC card."
+              />
               <FormField
                 label="Full name"
                 required
@@ -634,8 +740,18 @@ export function StaffRegisterApplicantForm({
               </FormField>
             </div>
           </section>
-          <section className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5 sm:grid-cols-2">
-            <h2 className="text-fg text-base font-semibold sm:col-span-2">Contact information</h2>
+          {/* Redesign 2026-11-16: contact and address were two near-empty
+              cards. They are one card now, split by a divider, so the form
+              reads as six sections instead of seven. */}
+          <section
+            id="section-contact"
+            className="border-border bg-surface shadow-card grid scroll-mt-24 gap-4 rounded-xl border p-5 sm:grid-cols-2"
+          >
+            <SectionHeading
+              step={2}
+              title="Contact & address"
+              description="How to reach the applicant, and where they live."
+            />
             <FormField
               label="Mobile number"
               required
@@ -675,85 +791,90 @@ export function StaffRegisterApplicantForm({
                 onChange={(event) => set({ email: event.target.value })}
               />
             </FormField>
-          </section>
-          <section className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5 sm:grid-cols-2">
-            <h2 className="text-fg text-base font-semibold sm:col-span-2">Residential address</h2>
-            <FormField
-              label="Address"
-              required
-              error={errors['address.addressLine']}
-              id={fieldControlId('address.addressLine')}
-              className="sm:col-span-2"
-            >
-              <Input
-                value={form.addressLine}
-                onChange={(event) => set({ addressLine: event.target.value })}
-              />
-            </FormField>
-            <FormField
-              label="City"
-              required
-              error={errors['address.cityCode']}
-              id={fieldControlId('address.cityCode')}
-            >
-              <Select
-                value={form.cityCode}
-                onChange={(event) => set({ cityCode: event.target.value })}
-                options={cities}
-                placeholder="Choose a city"
-              />
-            </FormField>
-            <FormField
-              label="Area"
-              error={errors['address.areaCode']}
-              id={fieldControlId('address.areaCode')}
-            >
-              <Select
-                value={form.areaCode}
-                onChange={(event) => set({ areaCode: event.target.value })}
-                options={areas}
-                placeholder="Choose an area"
-              />
-            </FormField>
-            <div className="sm:col-span-2">
-              <GeocodeAddressPicker
-                value={
-                  form.lat != null && form.lng != null ? { lat: form.lat, lng: form.lng } : null
-                }
-                onChange={(location) => set(location ?? { lat: null, lng: null })}
-                onPick={(result) => {
-                  // The city is a seeded-code select: only fill it when the
-                  // geocoder matched one of the seeded cities.
-                  if (result.cityCode && cities.some((c) => c.value === result.cityCode)) {
-                    set({ cityCode: result.cityCode });
-                  }
-                  if (result.addressLine && !form.addressLine) {
-                    set({ addressLine: result.addressLine });
-                  }
-                }}
-                cityCode={form.cityCode || null}
-                cityLabel={cities.find((c) => c.value === form.cityCode)?.label ?? null}
-                label="Home location"
-                hint="Search the applicant’s home area, street or a nearby landmark, then pick a match. It is required for matching and branch assignment."
-                initialQuery={form.addressLine}
+            <div className="border-border grid gap-4 border-t pt-4 sm:col-span-2 sm:grid-cols-2">
+              <h3 className="text-fg text-sm font-semibold sm:col-span-2">Residential address</h3>
+              <FormField
+                label="Address"
                 required
-                error={errors['address.location']}
-                id={fieldControlId('address.location')}
-              />
+                error={errors['address.addressLine']}
+                id={fieldControlId('address.addressLine')}
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={form.addressLine}
+                  onChange={(event) => set({ addressLine: event.target.value })}
+                />
+              </FormField>
+              <FormField
+                label="City"
+                required
+                error={errors['address.cityCode']}
+                id={fieldControlId('address.cityCode')}
+              >
+                <Select
+                  value={form.cityCode}
+                  onChange={(event) => set({ cityCode: event.target.value })}
+                  options={cities}
+                  placeholder="Choose a city"
+                />
+              </FormField>
+              <FormField
+                label="Area"
+                error={errors['address.areaCode']}
+                id={fieldControlId('address.areaCode')}
+              >
+                <Select
+                  value={form.areaCode}
+                  onChange={(event) => set({ areaCode: event.target.value })}
+                  options={areas}
+                  placeholder="Choose an area"
+                />
+              </FormField>
+              <div className="sm:col-span-2">
+                <GeocodeAddressPicker
+                  value={
+                    form.lat != null && form.lng != null ? { lat: form.lat, lng: form.lng } : null
+                  }
+                  onChange={(location) => set(location ?? { lat: null, lng: null })}
+                  onPick={(result) => {
+                    // The city is a seeded-code select: only fill it when the
+                    // geocoder matched one of the seeded cities.
+                    if (result.cityCode && cities.some((c) => c.value === result.cityCode)) {
+                      set({ cityCode: result.cityCode });
+                    }
+                    if (result.addressLine && !form.addressLine) {
+                      set({ addressLine: result.addressLine });
+                    }
+                  }}
+                  cityCode={form.cityCode || null}
+                  cityLabel={cities.find((c) => c.value === form.cityCode)?.label ?? null}
+                  label="Home location"
+                  hint="Search the applicant’s home area, street or a nearby landmark, then pick a match. It is required for matching and branch assignment."
+                  initialQuery={form.addressLine}
+                  required
+                  error={errors['address.location']}
+                  id={fieldControlId('address.location')}
+                />
+              </div>
             </div>
           </section>
-          <section className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5">
-            <div>
-              <h2 className="text-fg text-base font-semibold">Education</h2>
-              <p className="text-fg-muted text-sm">
-                Add schooling, college, university, or vocational education.
-              </p>
-            </div>
+          <section
+            id="section-education"
+            className="border-border bg-surface shadow-card grid scroll-mt-24 gap-4 rounded-xl border p-5"
+          >
+            <SectionHeading
+              step={3}
+              title="Education"
+              description="Add schooling, college, university, or vocational education."
+            />
             {education.map((item, index) => (
               <div
                 key={index}
-                className="border-border grid gap-4 rounded-lg border p-4 sm:grid-cols-2"
+                className="border-border bg-surface-muted grid gap-4 rounded-xl border p-4 sm:grid-cols-2"
               >
+                <h3 className="text-fg text-sm font-semibold sm:col-span-2">
+                  Education {index + 1}
+                </h3>
                 <FormField
                   label="Education level"
                   required
@@ -883,13 +1004,15 @@ export function StaffRegisterApplicantForm({
               Add education
             </Button>
           </section>
-          <section className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5">
-            <div>
-              <h2 className="text-fg text-base font-semibold">Work experience</h2>
-              <p className="text-fg-muted text-sm">
-                Informal and formal work experience can be included.
-              </p>
-            </div>
+          <section
+            id="section-experience"
+            className="border-border bg-surface shadow-card grid scroll-mt-24 gap-4 rounded-xl border p-5"
+          >
+            <SectionHeading
+              step={4}
+              title="Work experience"
+              description="Informal and formal work experience can be included."
+            />
             <Checkbox
               label="No work experience yet"
               checked={hasNoExperience}
@@ -899,8 +1022,11 @@ export function StaffRegisterApplicantForm({
               experience.map((item, index) => (
                 <div
                   key={index}
-                  className="border-border grid gap-4 rounded-lg border p-4 sm:grid-cols-2"
+                  className="border-border bg-surface-muted grid gap-4 rounded-xl border p-4 sm:grid-cols-2"
                 >
+                  <h3 className="text-fg text-sm font-semibold sm:col-span-2">
+                    Experience {index + 1}
+                  </h3>
                   <FormField
                     label="Employer"
                     required
@@ -1059,15 +1185,23 @@ export function StaffRegisterApplicantForm({
               </Button>
             )}
           </section>
-          <section className="border-border bg-surface shadow-card grid gap-4 rounded-xl border p-5">
-            <div>
-              <h2 className="text-fg text-base font-semibold">Skills and additional information</h2>
-              <p className="text-fg-muted text-sm">
-                Capture skills, languages, and job preferences during registration.
-              </p>
-            </div>
+          {/* Redesign 2026-11-16: the old "Skills and additional information"
+              card held five groups at once. Skills and languages keep this
+              card; certificates and job preferences get their own (step 6). */}
+          <section
+            id="section-skills"
+            className="border-border bg-surface shadow-card grid scroll-mt-24 gap-4 rounded-xl border p-5"
+          >
+            <SectionHeading
+              step={5}
+              title="Skills & languages"
+              description="What the applicant can do, and which languages they speak."
+            />
             {skillsList.map((item, index) => (
-              <div key={index} className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr_auto]">
+              <div
+                key={index}
+                className="border-border bg-surface-muted grid gap-4 rounded-xl border p-3 sm:grid-cols-[2fr_1fr_1fr_auto]"
+              >
                 <Select
                   value={item.skillCode}
                   options={skills}
@@ -1130,7 +1264,10 @@ export function StaffRegisterApplicantForm({
               Add skill
             </Button>
             {languagesList.map((item, index) => (
-              <div key={index} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
+              <div
+                key={index}
+                className="border-border bg-surface-muted grid gap-4 rounded-xl border p-3 sm:grid-cols-[1fr_1fr_auto]"
+              >
                 <Select
                   value={item.languageCode}
                   options={languages}
@@ -1178,7 +1315,17 @@ export function StaffRegisterApplicantForm({
             >
               Add language
             </Button>
-            <div className="border-border grid gap-4 border-t pt-4">
+          </section>
+          <section
+            id="section-preferences"
+            className="border-border bg-surface shadow-card grid scroll-mt-24 gap-4 rounded-xl border p-5"
+          >
+            <SectionHeading
+              step={6}
+              title="Certificates & job preferences"
+              description="Courses and certificates, plus the kind of work the applicant wants."
+            />
+            <div className="grid gap-4">
               <h3 className="text-fg text-sm font-semibold">Certificates and courses</h3>
               {certifications.map((item, index) => (
                 <div key={index} className="grid gap-4 sm:grid-cols-2">
@@ -1420,7 +1567,20 @@ export function StaffRegisterApplicantForm({
               </fieldset>
             </div>
           </section>
-          <div className="flex justify-end">
+          {/* Redesign 2026-11-16: the Review button used to sit at the very
+              bottom of a long form. It now lives in a sticky bar, so staff
+              can review without scrolling back up — this is the only button
+              with this name, so existing tests still find exactly one. */}
+          <div className="border-border bg-surface shadow-card sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3">
+            <p className="text-fg-muted text-sm">
+              {editing
+                ? 'Check the details, then review the update.'
+                : photo
+                  ? 'Photo captured — review the registration when ready.'
+                  : photoSkipped
+                    ? 'Continuing without a photo — review the registration when ready.'
+                    : 'Capture a photo, upload one, or continue without one, then review.'}
+            </p>
             <Button
               type="button"
               onClick={() => {
@@ -1444,64 +1604,77 @@ export function StaffRegisterApplicantForm({
           <h2 className="text-fg text-base font-semibold">
             {editing ? 'Review profile update' : 'Review registration'}
           </h2>
-          <dl className="grid gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-fg-muted">Name</dt>
-              <dd>{form.fullName}</dd>
+          <p className="text-fg-muted text-sm">
+            Check everything below before {editing ? 'updating the profile' : 'registering'}.
+          </p>
+          <div className="grid gap-5">
+            <div className="grid gap-2">
+              <h3 className="text-fg text-sm font-semibold">Personal & contact</h3>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-fg-muted">Name</dt>
+                  <dd>{form.fullName}</dd>
+                </div>
+                <div>
+                  <dt className="text-fg-muted">CNIC</dt>
+                  <dd>{form.cnic}</dd>
+                </div>
+                <div>
+                  <dt className="text-fg-muted">Mobile</dt>
+                  <dd>{form.phone}</dd>
+                </div>
+                <div>
+                  <dt className="text-fg-muted">Email</dt>
+                  <dd>{form.email || 'Not provided'}</dd>
+                </div>
+              </dl>
             </div>
-            <div>
-              <dt className="text-fg-muted">CNIC</dt>
-              <dd>{form.cnic}</dd>
+            <div className="border-border grid gap-2 border-t pt-4">
+              <h3 className="text-fg text-sm font-semibold">Branch, photo & address</h3>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-fg-muted">Branch</dt>
+                  <dd>{branchName}</dd>
+                </div>
+                {!editing && (
+                  <div>
+                    <dt className="text-fg-muted">Photo</dt>
+                    <dd>
+                      {photo ? (
+                        <span className="flex items-center gap-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.previewUrl}
+                            alt="Applicant photo preview"
+                            className="h-[90px] w-[70px] rounded border object-cover"
+                          />
+                          Passport photo captured
+                        </span>
+                      ) : photoSkipped ? (
+                        'No photo — continued without one'
+                      ) : (
+                        'No photo'
+                      )}
+                    </dd>
+                  </div>
+                )}
+                {token && (
+                  <div>
+                    <dt className="text-fg-muted">Token</dt>
+                    <dd>{token.tokenCode}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-fg-muted">Location</dt>
+                  <dd>{[selectedArea, selectedCity].filter(Boolean).join(', ')}</dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-fg-muted">Address</dt>
+                  <dd>{form.addressLine}</dd>
+                </div>
+              </dl>
             </div>
-            <div>
-              <dt className="text-fg-muted">Mobile</dt>
-              <dd>{form.phone}</dd>
-            </div>
-            <div>
-              <dt className="text-fg-muted">Email</dt>
-              <dd>{form.email || 'Not provided'}</dd>
-            </div>
-            <div>
-              <dt className="text-fg-muted">Branch</dt>
-              <dd>{branchName}</dd>
-            </div>
-            {!editing && (
-              <div>
-                <dt className="text-fg-muted">Photo</dt>
-                <dd>
-                  {photo ? (
-                    <span className="flex items-center gap-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={photo.previewUrl}
-                        alt="Applicant photo preview"
-                        className="h-[90px] w-[70px] rounded border object-cover"
-                      />
-                      Passport photo captured
-                    </span>
-                  ) : photoSkipped ? (
-                    'No photo — continued without one'
-                  ) : (
-                    'No photo'
-                  )}
-                </dd>
-              </div>
-            )}
-            {token && (
-              <div>
-                <dt className="text-fg-muted">Token</dt>
-                <dd>{token.tokenCode}</dd>
-              </div>
-            )}
-            <div>
-              <dt className="text-fg-muted">Location</dt>
-              <dd>{[selectedArea, selectedCity].filter(Boolean).join(', ')}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-fg-muted">Address</dt>
-              <dd>{form.addressLine}</dd>
-            </div>
-          </dl>
+          </div>
           <p className="bg-info-soft text-info-soft-fg rounded-lg px-4 py-3 text-sm">
             {applicant
               ? 'Profile editing does not change sign-in credentials, linked accounts, or first-login OTP verification.'
