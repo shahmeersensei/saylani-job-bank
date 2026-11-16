@@ -33,7 +33,20 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     // suppressHydrationWarning: the theme script sets data-theme before React hydrates.
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/*
+          suppressHydrationWarning on the script itself: the browser hides
+          a script's nonce attribute value once it is in the document, so
+          at hydration React reads nonce="" from the DOM while its own
+          render carries the real per-request nonce — a dev-only warning
+          about an attribute that is already correct, not a content
+          difference. The flag on <html> does not cover a child's
+          attributes, so the script needs its own.
+        */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
       </head>
       <body className="min-h-dvh">
         <ThemeProvider>
