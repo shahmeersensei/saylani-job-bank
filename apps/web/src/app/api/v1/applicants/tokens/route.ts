@@ -24,9 +24,10 @@ export const GET = apiHandler({
 /**
  * POST /api/v1/applicants/tokens — first counter issues a numbered token for
  * the day from a CNIC + name + phone (2026-11-07 token-only first step).
- * Same CNIC, same branch, same day returns the token already issued — with
- * 200, not 201 (N7). Idempotent (N7/N22): the caller must send an
- * Idempotency-Key; a replay returns the stored response. Rate-limited per
+ * Fresh number per visit (2026-11-17): every issue is a new token (201) —
+ * a previous live token for the same CNIC + branch is cancelled in the same
+ * transaction, never handed back. Idempotent (N7/N22): the caller must send
+ * an Idempotency-Key; a replay returns the stored response. Rate-limited per
  * staff account + branch and per IP (N22).
  */
 export const POST = apiHandler({
@@ -40,7 +41,10 @@ export const POST = apiHandler({
       limit: 60,
       windowSeconds: 60,
     });
-    const { view, reissued } = await issueApplicantToken({ ...ctx, actor: actor! }, body);
-    return reissued ? ok(view) : created(view);
+    const { view, supersededTokenCodes } = await issueApplicantToken(
+      { ...ctx, actor: actor! },
+      body,
+    );
+    return created({ ...view, supersededTokenCodes });
   },
 });

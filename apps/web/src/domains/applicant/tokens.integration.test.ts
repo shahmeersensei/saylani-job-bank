@@ -77,14 +77,24 @@ describe('first-counter applicant tokens', () => {
     ).toBe(24 * 60 * 60 * 1000);
   });
 
-  it('returns the same token with 200 (not 201) when the same CNIC is issued twice in a day', async () => {
+  it('issues a fresh token number with 201 when the same CNIC visits again', async () => {
     const cnic = randomCnic();
     const first = await issue(khi, cnic);
     expect(first.status).toBe(201);
     const again = await issue(khi, cnic);
-    expect(again.status).toBe(200);
-    expect(again.body.data.id).toBe(first.body.data.id);
-    expect(again.body.data.tokenNumber).toBe(first.body.data.tokenNumber);
+    expect(again.status, JSON.stringify(again.body)).toBe(201);
+    expect(again.body.data.id).not.toBe(first.body.data.id);
+    expect(again.body.data.tokenNumber).toBe(first.body.data.tokenNumber + 1);
+    expect(again.body.data.supersededTokenCodes).toEqual([first.body.data.tokenCode]);
+
+    // The morning token is cancelled: looking it up by code shows CANCELLED.
+    const byCode = await lookup(
+      `/api/v1/applicants/tokens?tokenCode=${first.body.data.tokenCode as string}`,
+    );
+    const oldOne = (byCode.body.data as Array<{ id: string; status: string }>).find(
+      (candidate) => candidate.id === (first.body.data.id as string),
+    );
+    expect(oldOne?.status).toBe('CANCELLED');
   });
 
   it('refuses a token for a CNIC that already has a profile', async () => {

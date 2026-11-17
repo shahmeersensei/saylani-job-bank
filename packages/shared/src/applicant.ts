@@ -664,6 +664,12 @@ export const applicantTokenSchema = z.object({
   expired: z.boolean(),
   status: z.enum(APPLICANT_TOKEN_STATUSES),
   applicantId: z.string().nullable(),
+  /**
+   * Token codes cancelled when this token was issued (a previous live token
+   * for the same CNIC + branch, superseded by this visit — 2026-11-17
+   * fresh-number-per-visit rule). Only set on a freshly issued token.
+   */
+  supersededTokenCodes: z.array(z.string()).optional(),
 });
 export type ApplicantTokenView = z.infer<typeof applicantTokenSchema>;
 

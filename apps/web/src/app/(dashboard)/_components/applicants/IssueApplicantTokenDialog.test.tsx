@@ -43,12 +43,9 @@ async function open() {
   return screen.getByRole('dialog');
 }
 
-/** Route fetch by call: the CNIC lookup GET, then the issue POST. */
-function mockLookupThenIssue(lookup: unknown[], postStatus = 201, postBody: unknown = token) {
-  fetchMock.mockImplementation(async (url: string, init?: { method?: string }) => {
-    if (init?.method === 'POST') return json(postStatus, { data: postBody });
-    return json(200, { data: lookup });
-  });
+/** Every submit is a single POST: no lookup runs before issuing (2026-11-17). */
+function mockPost(postStatus = 201, postBody: unknown = token) {
+  fetchMock.mockResolvedValue(json(postStatus, { data: postBody }));
 }
 
 async function fillValid(cnic = '4210112345671', name = 'Ahmed Raza', phone = '3001234567') {
@@ -67,7 +64,7 @@ describe('IssueApplicantTokenDialog', () => {
   });
 
   it('collects CNIC, name and phone, then shows only a Print button', async () => {
-    mockLookupThenIssue([]);
+    mockPost();
     await open();
 
     await fillValid();
@@ -95,23 +92,20 @@ describe('IssueApplicantTokenDialog', () => {
     expect(postCall![1].headers['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('checks for an existing token before issuing (GET lookup, then POST)', async () => {
-    mockLookupThenIssue([]);
+  it('issues with a single POST and no lookup (fresh number per visit)', async () => {
+    mockPost();
     await open();
     await fillValid();
     await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
     );
-    const getCall = fetchMock.mock.calls.find(
-      (call) => call[0].includes('/api/v1/applicants/tokens?') && call[1]?.method !== 'POST',
-    );
-    expect(getCall![0]).toContain(`cnic=${token.cnic}`);
-    expect(getCall![0]).toContain(`branchId=${branchId}`);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/v1/applicants/tokens');
   });
 
   it('clears the slip when the dialog closes, so no stale slip stays mounted (N8)', async () => {
-    mockLookupThenIssue([]);
+    mockPost();
     await open();
 
     await fillValid();
@@ -172,106 +166,42 @@ describe('IssueApplicantTokenDialog', () => {
     expect(screen.getByLabelText(/Applicant name/)).toHaveValue('Ahmed Raza');
   });
 
-  it('shows the existing-token warning instead of issuing a duplicate', async () => {
-    mockLookupThenIssue([token]);
+  it('issues a fresh token number on a repeat visit and notes the replaced token', async () => {
+    const secondToken: ApplicantTokenView = {
+      ...token,
+      id: '00000000-0000-0000-0000-000000000002',
+      tokenNumber: 2,
+      tokenCode: 'KHI-GULSHAN-002',
+      supersededTokenCodes: ['KHI-GULSHAN-001'],
+    };
+    mockPost(201, secondToken);
     await open();
 
     await fillValid();
     await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
 
     await waitFor(() =>
-      expect(screen.getByText('An active token already exists')).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
     );
+    // The new number — 02, not the morning's 01 — on the fresh slip.
+    expect(screen.getAllByText('02')).toHaveLength(2);
     expect(
       screen.getByText(
-        'This applicant already has an active token. Please use the existing token instead of generating another one.',
+        'Previous token KHI-GULSHAN-001 was replaced — only this new token is valid now.',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText('KHI-GULSHAN-001')).toBeInTheDocument();
-    expect(screen.getByText('Ahmed Raza')).toBeInTheDocument();
-    expect(screen.getByText('42101-•••••••-1')).toBeInTheDocument();
-    expect(screen.getByText('+92300***4567')).toBeInTheDocument();
-    expect(screen.getByText('ISSUED')).toBeInTheDocument();
-    expect(screen.getByText('Karachi — Gulshan-e-Iqbal')).toBeInTheDocument();
-    // No second token was issued, and no slip is shown yet.
-    expect(fetchMock.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(false);
-    expect(screen.queryByRole('button', { name: 'Print token' })).not.toBeInTheDocument();
-
-    // View / Print shows the existing slip, ready to print.
-    await userEvent.click(screen.getByRole('button', { name: 'View / Print existing token' }));
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
-    );
-    expect(screen.getAllByText('01')).toHaveLength(2);
-  });
-
-  it('returns to the form with a different CNIC from the existing-token warning', async () => {
-    mockLookupThenIssue([token]);
-    await open();
-
-    await fillValid();
-    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
-    await waitFor(() =>
-      expect(screen.getByText('An active token already exists')).toBeInTheDocument(),
-    );
-
-    await userEvent.click(screen.getByRole('button', { name: 'Use a different CNIC' }));
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Generate token' })).toBeInTheDocument(),
-    );
-    expect(screen.getByLabelText(/CNIC number/)).toHaveValue('');
-    expect(screen.getByLabelText(/Applicant name/)).toHaveValue('Ahmed Raza');
-  });
-
-  it('issues a new token when the previous token is completed', async () => {
-    mockLookupThenIssue([{ ...token, status: 'COMPLETED' }]);
-    await open();
-
-    await fillValid();
-    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
-
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
-    );
-    expect(fetchMock.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(true);
-  });
-
-  it('issues a new token when the previous token is cancelled', async () => {
-    mockLookupThenIssue([{ ...token, status: 'CANCELLED' }]);
-    await open();
-
-    await fillValid();
-    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
-
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
-    );
-    expect(fetchMock.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(true);
-  });
-
-  it('shows the existing-token warning when the server reissues with 200 (lost race)', async () => {
-    mockLookupThenIssue([], 200);
-    await open();
-
-    await fillValid();
-    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
-
-    await waitFor(() =>
-      expect(screen.getByText('An active token already exists')).toBeInTheDocument(),
-    );
-    expect(screen.queryByRole('button', { name: 'Print token' })).not.toBeInTheDocument();
+    // One POST, no lookup: the repeat visit is issued, never blocked.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('disables Generate token while issuing, so repeated clicks cannot double-issue', async () => {
     let resolvePost!: (value: Response) => void;
-    fetchMock.mockImplementation(async (url: string, init?: { method?: string }) => {
-      if (init?.method === 'POST') {
-        return new Promise<Response>((resolve) => {
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
           resolvePost = resolve;
-        });
-      }
-      return json(200, { data: [] });
-    });
+        }),
+    );
     await open();
 
     await fillValid();

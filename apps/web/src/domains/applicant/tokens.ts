@@ -45,42 +45,27 @@ const tokens = schema.branchApplicantTokens;
  * hours after issue (`expires_at`, migration 0035), can be looked up and
  * reprinted, can be cancelled (which frees the CNIC for a new token), and are
  * completed — ISSUED → COMPLETED with the applicant linked — by the full
- * registration in the same transaction. Because the 24-hour validity spans
- * midnight, a live token issued yesterday must be re-handed, never duplicated:
- * the issue dedupe and the CNIC lookup check unexpired ISSUED tokens across
- * days, not just today.
+ * registration in the same transaction.
+ *
+ * Fresh number per visit (2026-11-17, user decision — reverses the
+ * one-live-token hand-back): every issue mints a new token number, even if
+ * the same CNIC already has a live token at this branch. The previous live
+ * token(s) are cancelled in the same transaction (reason 'superseded'), so
+ * exactly one live token per CNIC + branch remains and the old slip stops
+ * working. The CNIC lookup still finds live tokens across days, because the
+ * 24-hour validity spans midnight.
  */
 
 /** Retries for the daily-number race (N2): 10 attempts, then a 409 to retry. */
 const TOKEN_ISSUE_ATTEMPTS = 10;
 
-/**
- * Thrown inside the issue transaction when a live token for the same
- * branch + CNIC already exists (2026-11-17): the pre-transaction check
- * above can be beaten by a second counter issuing in between, and the
- * (branch, day, cnic) partial unique index only covers the same
- * registration day — a 24-hour token issued yesterday is live today but on
- * a different day. The caller catches this and hands back the live token
- * instead of inserting a duplicate. Carries the row so no re-read is
- * needed; the transaction rolls back with nothing written.
- */
-class ExistingLiveTokenError extends Error {
-  readonly row: typeof tokens.$inferSelect;
-
-  constructor(row: typeof tokens.$inferSelect) {
-    super('An active token already exists for this CNIC.');
-    this.name = 'ExistingLiveTokenError';
-    this.row = row;
-  }
-}
-
 export type { ApplicantTokenView };
 
-/** `issueApplicantToken` result: `reissued` is true when an existing token was handed back. */
+/** `issueApplicantToken` result: every issue is a fresh token number. */
 export interface IssueApplicantTokenResult {
   view: ApplicantTokenView;
-  /** True when the caller got a token issued earlier (same CNIC, same day). */
-  reissued: boolean;
+  /** Token codes cancelled by this issue — the previous live token(s), if any. */
+  supersededTokenCodes: string[];
 }
 
 function toView(
@@ -106,14 +91,16 @@ function toView(
 }
 
 /**
- * Audit 2026-11-11 (M-06): an expired ISSUED token is dead — cancel it
- * (guarded by status = ISSUED) so the (branch, day, cnic) partial unique
- * index frees the CNIC for a fresh issue. No-op if the token was already
- * completed or cancelled in between.
+ * Cancel one ISSUED token (guarded by status = ISSUED) so the (branch, day,
+ * cnic) partial unique index frees the CNIC for a fresh issue. No-op if the
+ * token was already completed or cancelled in between. Reason 'expired' for
+ * a token past its 24 hours (audit 2026-11-11, M-06); 'superseded' when a
+ * new visit replaces it (2026-11-17 fresh-number-per-visit rule).
  */
-async function cancelExpiredToken(
+async function cancelLiveToken(
   ctx: SignedIn,
   token: { id: string; tokenNumber: number; branchId: string },
+  reason: 'expired' | 'superseded',
 ): Promise<void> {
   await runCommand(ctx, async ({ tx, audit }) => {
     const [row] = await tx
@@ -129,7 +116,7 @@ async function cancelExpiredToken(
       branchId: token.branchId,
       before: { status: 'ISSUED' },
       after: { status: 'CANCELLED' },
-      reason: 'expired',
+      reason,
       metadata: { tokenNumber: token.tokenNumber },
     });
   });
@@ -168,66 +155,11 @@ export async function issueApplicantToken(
   const today = karachiDay(now);
   const expiresAt = tokenExpiresAt(now);
 
-  // Same person, same branch: hand back the token already issued instead of
-  // a duplicate (e.g. the slip was lost, or the counter double-clicked).
-  // No day filter: a 24-hour token issued yesterday can still be live today,
-  // and issuing a second one for the same CNIC would break the one-live-token
-  // rule. Only the most recent ISSUED token is considered; an expired one is
-  // auto-cancelled below, exactly as for a same-day expiry.
-  let [existing] = await db
-    .select()
-    .from(tokens)
-    .where(
-      and(
-        eq(tokens.branchId, input.branchId),
-        eq(tokens.cnic, input.cnic),
-        eq(tokens.status, 'ISSUED'),
-      ),
-    )
-    .orderBy(desc(tokens.issuedAt))
-    .limit(1);
-  // Audit 2026-11-11 (M-06): an expired ISSUED token is dead — never
-  // re-hand it. Cancel it first, then fall through to a fresh issue below.
-  if (existing && existing.expiresAt.getTime() <= now.getTime()) {
-    await cancelExpiredToken(ctx, existing);
-    existing = undefined;
-  }
-  if (existing) {
-    // If the name or phone now differ (a correction, or the slip details were
-    // mistyped), update the stored details instead of silently returning the
-    // stale ones (L17) — and audit the correction.
-    if (existing.applicantName !== input.applicantName || existing.phone !== input.phone) {
-      const updated = await runCommand(ctx, async ({ tx, audit }) => {
-        const [row] = await tx
-          .update(tokens)
-          .set({ applicantName: input.applicantName, phone: input.phone })
-          // Audit 2026-11-10 (A-M2): the SELECT above found an ISSUED
-          // token, but it may have been completed/cancelled in between —
-          // never rewrite a COMPLETED/CANCELLED token's name/phone.
-          .where(and(eq(tokens.id, existing.id), eq(tokens.status, 'ISSUED')))
-          .returning();
-        if (!row) throw new ConflictError('This token was already completed or cancelled.');
-        audit({
-          action: 'applicant.token_reissued',
-          entityType: 'applicant_token',
-          entityId: existing.id,
-          branchId: input.branchId,
-          before: { applicantName: existing.applicantName, phone: existing.phone },
-          after: { applicantName: input.applicantName, phone: input.phone },
-          metadata: { tokenNumber: existing.tokenNumber },
-        });
-        return row!;
-      });
-      return { view: toView(updated, branch), reissued: true };
-    }
-    return { view: toView(existing, branch), reissued: true };
-  }
-
   // Two counters can issue at the same moment: the unique indexes are the guard —
   // (branch, day, number) for the daily sequence, and the partial unique index on
   // (branch, day, cnic) WHERE status = 'ISSUED' (migration 0031) for the same-CNIC
-  // dedupe (H22). On a collision, retry with the next number — or hand back the
-  // token that won the race.
+  // dedupe (H22). On a collision, retry with the next number — cancelling the
+  // token that won the race first, so this visit still gets its fresh number.
   // N2: the retry budget is 10 attempts (was 5). MAX() still counts CANCELLED
   // rows, deliberately: the (branch, day, number) unique index is unconditional,
   // so reusing a cancelled number would collide on insert. A cancelled token
@@ -235,17 +167,19 @@ export async function issueApplicantToken(
   // index rebuild.
   for (let attempt = 0; attempt < TOKEN_ISSUE_ATTEMPTS; attempt++) {
     try {
-      const row = await runCommand(ctx, async ({ tx, audit }) => {
+      const { row, supersededTokenCodes } = await runCommand(ctx, async ({ tx, audit }) => {
         const recheckedOwner = await cnicOwner(tx, input.cnic);
         if (recheckedOwner) throw await cnicTakenError(tx, recheckedOwner);
 
-        // 2026-11-17: re-check for a live token INSIDE the transaction —
-        // the SELECT before the loop can be beaten by a second counter, and
-        // the day-scoped unique index does not cover a 24-hour token issued
-        // yesterday. An expired ISSUED row is left alone here: the next
-        // insert either succeeds (different day) or the unique-violation
-        // handler below cancels it and retries.
-        const [live] = await tx
+        // 2026-11-17 (fresh number per visit): a previous live token for
+        // this branch + CNIC does NOT block a new issue — it is cancelled
+        // in this same transaction, so exactly one live token remains and
+        // the (branch, day, cnic) partial unique index never blocks the
+        // insert. No day filter: a 24-hour token issued yesterday is still
+        // live today and is superseded the same way. An expired ISSUED row
+        // is cancelled with reason 'expired' instead. The new token carries
+        // the freshly entered name/phone, so no correction write is needed.
+        const liveRows = await tx
           .select()
           .from(tokens)
           .where(
@@ -255,10 +189,27 @@ export async function issueApplicantToken(
               eq(tokens.status, 'ISSUED'),
             ),
           )
-          .orderBy(desc(tokens.issuedAt))
-          .limit(1);
-        if (live && live.expiresAt.getTime() > now.getTime()) {
-          throw new ExistingLiveTokenError(live);
+          .orderBy(desc(tokens.issuedAt));
+        const supersededTokenCodes: string[] = [];
+        for (const liveRow of liveRows) {
+          const reason = liveRow.expiresAt.getTime() <= now.getTime() ? 'expired' : 'superseded';
+          const [cancelled] = await tx
+            .update(tokens)
+            .set({ status: 'CANCELLED' })
+            .where(and(eq(tokens.id, liveRow.id), eq(tokens.status, 'ISSUED')))
+            .returning();
+          if (!cancelled) continue;
+          supersededTokenCodes.push(tokenCodeFor(branch.code, liveRow.tokenNumber));
+          audit({
+            action: 'applicant.token_cancelled',
+            entityType: 'applicant_token',
+            entityId: liveRow.id,
+            branchId: input.branchId,
+            before: { status: 'ISSUED' },
+            after: { status: 'CANCELLED' },
+            reason,
+            metadata: { tokenNumber: liveRow.tokenNumber },
+          });
         }
 
         const [highest] = await tx
@@ -301,17 +252,10 @@ export async function issueApplicantToken(
           },
           metadata: { issuedBy: ctx.actor.userId },
         });
-        return created;
+        return { row: created, supersededTokenCodes };
       });
-      return { view: toView(row, branch), reissued: false };
+      return { view: toView(row, branch), supersededTokenCodes };
     } catch (error) {
-      // 2026-11-17: the in-transaction re-check found a live token — hand
-      // it back (reissued) instead of inserting a duplicate. No name/phone
-      // correction here: the pre-transaction path handles corrections, and
-      // this is the just-lost-the-race fallback.
-      if (error instanceof ExistingLiveTokenError) {
-        return { view: toView(error.row, branch), reissued: true };
-      }
       if (
         isUniqueViolation(error, 'branch_applicant_tokens_branch_day_number_unique') &&
         attempt < TOKEN_ISSUE_ATTEMPTS - 1
@@ -320,8 +264,10 @@ export async function issueApplicantToken(
       }
       if (isUniqueViolation(error, 'branch_applicant_tokens_branch_day_cnic_issued_unique')) {
         // A second counter issued for the same CNIC at the same moment: the
-        // partial unique index caught the race — hand back the token that won.
-        // No day filter: the winner may be yesterday's still-live token.
+        // partial unique index caught the race. Cancel the token that won —
+        // it is superseded by this visit, exactly as if the transaction
+        // above had found it — and retry for a fresh number. No day filter:
+        // the winner may be yesterday's still-live token.
         const [winner] = await db
           .select()
           .from(tokens)
@@ -335,14 +281,12 @@ export async function issueApplicantToken(
           .orderBy(desc(tokens.issuedAt))
           .limit(1);
         if (winner) {
-          // Audit 2026-11-11 (M-06): the race winner may be an expired
-          // token — never hand back a dead token. Cancel it first (frees
-          // the CNIC for a fresh issue) and retry the loop.
-          if (winner.expiresAt.getTime() <= Date.now()) {
-            await cancelExpiredToken(ctx, winner);
-            continue;
-          }
-          return { view: toView(winner, branch), reissued: true };
+          await cancelLiveToken(
+            ctx,
+            winner,
+            winner.expiresAt.getTime() <= Date.now() ? 'expired' : 'superseded',
+          );
+          continue;
         }
       }
       // Audit 2026-11-10 (A-L3): on the final attempt a number-unique
