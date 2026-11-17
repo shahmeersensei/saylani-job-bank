@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { DOCUMENT_MIME_TYPES, masterDataCodeSchema } from './master-data';
-import { pkMobileSchema } from './phone';
+import { pkMobileSchema, tokenPkMobileSchema } from './phone';
 
 /**
  * Applicant domain contracts (M6), shared by the API and the UI.
@@ -516,11 +516,79 @@ export type ApplicantTokenStatus = (typeof APPLICANT_TOKEN_STATUSES)[number];
  */
 export const MAX_TOKEN_NUMBER = 9999;
 
+/**
+ * Token-issue CNIC (2026-11-17): the same 13-digit rule as cnicSchema, but
+ * empty / wrong-length / invalid are told apart — "CNIC is required." /
+ * "CNIC must contain exactly 13 digits." / "Please enter a valid CNIC
+ * number." Letters and symbols are invalid (the CNIC input strips them
+ * while typing, so a pasted "42101A1234567" arrives short and fails the
+ * length check). cnicSchema stays untouched: registration forms keep their
+ * existing wording.
+ */
+export const tokenCnicSchema = z
+  .string('CNIC is required.')
+  .transform((value) => value.replace(/[\s-]/g, ''))
+  .pipe(
+    z.string().superRefine((digits, ctx) => {
+      if (digits.length === 0) {
+        ctx.addIssue({ code: 'custom', message: 'CNIC is required.' });
+        return;
+      }
+      if (/[^0-9]/.test(digits)) {
+        ctx.addIssue({ code: 'custom', message: 'Please enter a valid CNIC number.' });
+        return;
+      }
+      if (digits.length !== 13) {
+        ctx.addIssue({ code: 'custom', message: 'CNIC must contain exactly 13 digits.' });
+        return;
+      }
+      if (!/^[1-9]\d{12}$/.test(digits)) {
+        ctx.addIssue({ code: 'custom', message: 'Please enter a valid CNIC number.' });
+      }
+    }),
+  );
+
+/**
+ * Token-issue applicant name (2026-11-17): required, 3–100 characters
+ * after trimming, letters (any Unicode) with spaces, hyphens and
+ * apostrophes — the same character rule as personName, but numbers-only
+ * names are rejected explicitly and the messages match the token task.
+ * personName (max 120) stays untouched for registration forms.
+ */
+export const tokenApplicantNameSchema = z
+  .string('Applicant name is required.')
+  .transform((value) => value.trim())
+  .pipe(
+    z.string().superRefine((name, ctx) => {
+      if (name.length === 0) {
+        ctx.addIssue({ code: 'custom', message: 'Applicant name is required.' });
+        return;
+      }
+      if (name.length < 3) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Applicant name must contain at least 3 characters.',
+        });
+        return;
+      }
+      if (name.length > 100) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Applicant name must be 100 characters or fewer.',
+        });
+        return;
+      }
+      if (!/\p{L}/u.test(name) || !/^[\p{L}\p{M}][\p{L}\p{M}\s.'-]*$/u.test(name)) {
+        ctx.addIssue({ code: 'custom', message: 'Please enter a valid applicant name.' });
+      }
+    }),
+  );
+
 export const issueApplicantTokenSchema = z.object({
   branchId: z.uuid('Choose a branch'),
-  cnic: cnicSchema,
-  applicantName: personName('the applicant name'),
-  phone: pkMobileSchema,
+  cnic: tokenCnicSchema,
+  applicantName: tokenApplicantNameSchema,
+  phone: tokenPkMobileSchema,
 });
 export type IssueApplicantTokenInput = z.infer<typeof issueApplicantTokenSchema>;
 

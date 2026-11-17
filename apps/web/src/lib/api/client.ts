@@ -51,7 +51,7 @@ export function setApiOnBehalfOf(applicantId: string | null): void {
 export async function apiFetch<T>(
   path: string,
   options: ApiFetchOptions = {},
-): Promise<{ data: T; meta?: PaginationMeta }> {
+): Promise<{ data: T; meta?: PaginationMeta; status?: number }> {
   const headers: Record<string, string> = { accept: 'application/json' };
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
@@ -71,10 +71,12 @@ export async function apiFetch<T>(
     throw new ApiClientError(0, null, 'Cannot reach the server. Check your internet connection.');
   }
 
-  if (response.status === 204) return { data: undefined as T };
+  if (response.status === 204) return { data: undefined as T, status: response.status };
   const json = await response.json().catch(() => null);
   if (!response.ok) throw new ApiClientError(response.status, json as ApiError | null);
-  return json as { data: T; meta?: PaginationMeta };
+  // 2026-11-17: the HTTP status rides along so callers can tell a reissued
+  // token (200) from a freshly issued one (201) without a second lookup.
+  return { ...(json as { data: T; meta?: PaginationMeta }), status: response.status };
 }
 
 /** "items.0.skillCode" → "items #1 › skill code"; "salaryMin" → "salary min". */

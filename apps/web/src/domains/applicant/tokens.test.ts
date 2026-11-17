@@ -182,4 +182,88 @@ describe('issueApplicantTokenSchema', () => {
       }).success,
     ).toBe(false);
   });
+
+  // 2026-11-17: empty / wrong-length / invalid are told apart per field,
+  // so the counter sees the exact problem instead of one generic message.
+  it('tells empty, short, long and invalid CNICs apart', () => {
+    const fieldMessage = (cnic: string) => {
+      const parsed = issueApplicantTokenSchema.safeParse({
+        branchId,
+        cnic,
+        applicantName: 'Ahmed Raza',
+        phone: '03001234567',
+      });
+      expect(parsed.success).toBe(false);
+      if (parsed.success) return undefined;
+      return parsed.error.issues.find((issue) => issue.path[0] === 'cnic')?.message;
+    };
+    expect(fieldMessage('')).toBe('CNIC is required.');
+    expect(fieldMessage('42101')).toBe('CNIC must contain exactly 13 digits.');
+    expect(fieldMessage('42101123456712')).toBe('CNIC must contain exactly 13 digits.');
+    expect(fieldMessage('42101A1234567')).toBe('Please enter a valid CNIC number.');
+    expect(fieldMessage('0210112345671')).toBe('Please enter a valid CNIC number.');
+  });
+
+  it('accepts a CNIC without hyphens and normalizes +92 / 92 phone formats', () => {
+    for (const phone of ['03001234567', '+923001234567', '923001234567', '0300 1234567']) {
+      const parsed = issueApplicantTokenSchema.safeParse({
+        branchId,
+        cnic: '4210112345671',
+        applicantName: 'Ahmed Raza',
+        phone,
+      });
+      expect(parsed.success, phone).toBe(true);
+      if (parsed.success) expect(parsed.data.phone).toBe('+923001234567');
+    }
+  });
+
+  it('tells empty, incomplete and invalid phone numbers apart', () => {
+    const fieldMessage = (phone: string) => {
+      const parsed = issueApplicantTokenSchema.safeParse({
+        branchId,
+        cnic: '4210112345671',
+        applicantName: 'Ahmed Raza',
+        phone,
+      });
+      expect(parsed.success).toBe(false);
+      if (parsed.success) return undefined;
+      return parsed.error.issues.find((issue) => issue.path[0] === 'phone')?.message;
+    };
+    expect(fieldMessage('')).toBe('Phone number is required.');
+    expect(fieldMessage('30012')).toBe('Phone number is incomplete.');
+    expect(fieldMessage('03991234567')).toBe('Please enter a valid Pakistani mobile number.');
+    expect(fieldMessage('02134567890')).toBe('Please enter a valid Pakistani mobile number.');
+  });
+
+  it('tells empty, short, numbers-only, over-long and invalid names apart', () => {
+    const fieldMessage = (applicantName: string) => {
+      const parsed = issueApplicantTokenSchema.safeParse({
+        branchId,
+        cnic: '4210112345671',
+        applicantName,
+        phone: '03001234567',
+      });
+      expect(parsed.success).toBe(false);
+      if (parsed.success) return undefined;
+      return parsed.error.issues.find((issue) => issue.path[0] === 'applicantName')?.message;
+    };
+    expect(fieldMessage('')).toBe('Applicant name is required.');
+    expect(fieldMessage('   ')).toBe('Applicant name is required.');
+    expect(fieldMessage('Al')).toBe('Applicant name must contain at least 3 characters.');
+    expect(fieldMessage('12345')).toBe('Please enter a valid applicant name.');
+    expect(fieldMessage('Ahmed @ Raza')).toBe('Please enter a valid applicant name.');
+    expect(fieldMessage('A'.repeat(101))).toBe('Applicant name must be 100 characters or fewer.');
+  });
+
+  it('accepts legitimate hyphen, apostrophe and Unicode names up to 100 characters', () => {
+    for (const applicantName of ["Anne-Marie O'Brien", 'Fāṭimah Noor-ul-Ain', 'A'.repeat(100)]) {
+      const parsed = issueApplicantTokenSchema.safeParse({
+        branchId,
+        cnic: '4210112345671',
+        applicantName,
+        phone: '03001234567',
+      });
+      expect(parsed.success, applicantName).toBe(true);
+    }
+  });
 });

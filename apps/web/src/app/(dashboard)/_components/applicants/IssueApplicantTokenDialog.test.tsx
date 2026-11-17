@@ -43,6 +43,20 @@ async function open() {
   return screen.getByRole('dialog');
 }
 
+/** Route fetch by call: the CNIC lookup GET, then the issue POST. */
+function mockLookupThenIssue(lookup: unknown[], postStatus = 201, postBody: unknown = token) {
+  fetchMock.mockImplementation(async (url: string, init?: { method?: string }) => {
+    if (init?.method === 'POST') return json(postStatus, { data: postBody });
+    return json(200, { data: lookup });
+  });
+}
+
+async function fillValid(cnic = '4210112345671', name = 'Ahmed Raza', phone = '3001234567') {
+  if (cnic) await userEvent.type(screen.getByLabelText(/CNIC number/), cnic);
+  if (name) await userEvent.type(screen.getByLabelText(/Applicant name/), name);
+  if (phone) await userEvent.type(screen.getByLabelText('Phone number'), phone);
+}
+
 describe('IssueApplicantTokenDialog', () => {
   it('renders a wide dialog with CNIC and phone side by side', async () => {
     const dialog = await open();
@@ -53,12 +67,10 @@ describe('IssueApplicantTokenDialog', () => {
   });
 
   it('collects CNIC, name and phone, then shows only a Print button', async () => {
-    fetchMock.mockResolvedValue(json(201, { data: token }));
+    mockLookupThenIssue([]);
     await open();
 
-    await userEvent.type(screen.getByLabelText(/CNIC number/), '4210112345671');
-    await userEvent.type(screen.getByLabelText(/Applicant name/), 'Ahmed Raza');
-    await userEvent.type(screen.getByLabelText('Phone number'), '3001234567');
+    await fillValid();
     await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
 
     await waitFor(() =>
@@ -71,7 +83,8 @@ describe('IssueApplicantTokenDialog', () => {
     expect(screen.queryByRole('button', { name: 'Issue another token' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
 
-    const body = JSON.parse(fetchMock.mock.lastCall![1].body as string);
+    const postCall = fetchMock.mock.calls.find((call) => call[1]?.method === 'POST');
+    const body = JSON.parse(postCall![1].body as string);
     expect(body).toMatchObject({
       branchId,
       cnic: '4210112345671',
@@ -79,16 +92,29 @@ describe('IssueApplicantTokenDialog', () => {
       phone: '+923001234567',
     });
     // N7: the issue carries a fresh Idempotency-Key header.
-    expect(fetchMock.mock.lastCall![1].headers['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/);
+    expect(postCall![1].headers['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('checks for an existing token before issuing (GET lookup, then POST)', async () => {
+    mockLookupThenIssue([]);
+    await open();
+    await fillValid();
+    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
+    );
+    const getCall = fetchMock.mock.calls.find(
+      (call) => call[0].includes('/api/v1/applicants/tokens?') && call[1]?.method !== 'POST',
+    );
+    expect(getCall![0]).toContain(`cnic=${token.cnic}`);
+    expect(getCall![0]).toContain(`branchId=${branchId}`);
   });
 
   it('clears the slip when the dialog closes, so no stale slip stays mounted (N8)', async () => {
-    fetchMock.mockResolvedValue(json(201, { data: token }));
+    mockLookupThenIssue([]);
     await open();
 
-    await userEvent.type(screen.getByLabelText(/CNIC number/), '4210112345671');
-    await userEvent.type(screen.getByLabelText(/Applicant name/), 'Ahmed Raza');
-    await userEvent.type(screen.getByLabelText('Phone number'), '3001234567');
+    await fillValid();
     await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
@@ -107,17 +133,158 @@ describe('IssueApplicantTokenDialog', () => {
     expect(screen.queryByText('01')).not.toBeInTheDocument();
   });
 
-  it('shows a field error for an invalid phone number', async () => {
+  it('shows a field error for an incomplete phone number, and never calls the API', async () => {
     await open();
 
-    await userEvent.type(screen.getByLabelText(/CNIC number/), '4210112345671');
-    await userEvent.type(screen.getByLabelText(/Applicant name/), 'Ahmed Raza');
-    await userEvent.type(screen.getByLabelText('Phone number'), '30012');
+    await fillValid('4210112345671', 'Ahmed Raza', '30012');
     await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
 
     await waitFor(() =>
-      expect(screen.getByText(/Enter a Pakistani mobile number/)).toBeInTheDocument(),
+      expect(screen.getByText('Phone number is incomplete.')).toBeInTheDocument(),
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the exact required / length errors for CNIC and name', async () => {
+    await open();
+
+    // Empty CNIC, numbers-only name, empty phone — nothing is submitted.
+    await fillValid('', '12345', '');
+    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
+
+    await waitFor(() => expect(screen.getByText('CNIC is required.')).toBeInTheDocument());
+    expect(screen.getByText('Please enter a valid applicant name.')).toBeInTheDocument();
+    expect(screen.getByText('Phone number is required.')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the 13-digit error for a short CNIC and keeps the entered values', async () => {
+    await open();
+
+    await fillValid('42101', 'Ahmed Raza', '3001234567');
+    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('CNIC must contain exactly 13 digits.')).toBeInTheDocument(),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/CNIC number/)).toHaveValue('42101');
+    expect(screen.getByLabelText(/Applicant name/)).toHaveValue('Ahmed Raza');
+  });
+
+  it('shows the existing-token warning instead of issuing a duplicate', async () => {
+    mockLookupThenIssue([token]);
+    await open();
+
+    await fillValid();
+    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('An active token already exists')).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(
+        'This applicant already has an active token. Please use the existing token instead of generating another one.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('KHI-GULSHAN-001')).toBeInTheDocument();
+    expect(screen.getByText('Ahmed Raza')).toBeInTheDocument();
+    expect(screen.getByText('42101-•••••••-1')).toBeInTheDocument();
+    expect(screen.getByText('+92300***4567')).toBeInTheDocument();
+    expect(screen.getByText('ISSUED')).toBeInTheDocument();
+    expect(screen.getByText('Karachi — Gulshan-e-Iqbal')).toBeInTheDocument();
+    // No second token was issued, and no slip is shown yet.
+    expect(fetchMock.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Print token' })).not.toBeInTheDocument();
+
+    // View / Print shows the existing slip, ready to print.
+    await userEvent.click(screen.getByRole('button', { name: 'View / Print existing token' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
+    );
+    expect(screen.getAllByText('01')).toHaveLength(2);
+  });
+
+  it('returns to the form with a different CNIC from the existing-token warning', async () => {
+    mockLookupThenIssue([token]);
+    await open();
+
+    await fillValid();
+    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
+    await waitFor(() =>
+      expect(screen.getByText('An active token already exists')).toBeInTheDocument(),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Use a different CNIC' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generate token' })).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText(/CNIC number/)).toHaveValue('');
+    expect(screen.getByLabelText(/Applicant name/)).toHaveValue('Ahmed Raza');
+  });
+
+  it('issues a new token when the previous token is completed', async () => {
+    mockLookupThenIssue([{ ...token, status: 'COMPLETED' }]);
+    await open();
+
+    await fillValid();
+    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
+    );
+    expect(fetchMock.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(true);
+  });
+
+  it('issues a new token when the previous token is cancelled', async () => {
+    mockLookupThenIssue([{ ...token, status: 'CANCELLED' }]);
+    await open();
+
+    await fillValid();
+    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
+    );
+    expect(fetchMock.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(true);
+  });
+
+  it('shows the existing-token warning when the server reissues with 200 (lost race)', async () => {
+    mockLookupThenIssue([], 200);
+    await open();
+
+    await fillValid();
+    await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('An active token already exists')).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('button', { name: 'Print token' })).not.toBeInTheDocument();
+  });
+
+  it('disables Generate token while issuing, so repeated clicks cannot double-issue', async () => {
+    let resolvePost!: (value: Response) => void;
+    fetchMock.mockImplementation(async (url: string, init?: { method?: string }) => {
+      if (init?.method === 'POST') {
+        return new Promise<Response>((resolve) => {
+          resolvePost = resolve;
+        });
+      }
+      return json(200, { data: [] });
+    });
+    await open();
+
+    await fillValid();
+    const generate = screen.getByRole('button', { name: 'Generate token' });
+    await userEvent.click(generate);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Issuing token…' })).toBeDisabled(),
+    );
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(1);
+    resolvePost(json(201, { data: token }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Print token' })).toBeInTheDocument(),
+    );
   });
 });

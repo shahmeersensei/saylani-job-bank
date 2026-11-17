@@ -52,10 +52,37 @@ export const pkMobileSchema = z
     z
       .string()
       .regex(/^3\d{9}$/, 'Enter a Pakistani mobile number, e.g. 0300 1234567')
-      .refine(
-        isSupportedPkMobileNational,
-        'Enter a Pakistani mobile number, e.g. 0300 1234567',
-      ),
+      .refine(isSupportedPkMobileNational, 'Enter a Pakistani mobile number, e.g. 0300 1234567'),
+  )
+  .transform(toE164);
+
+/**
+ * Token-issue mobile (2026-11-17): the same Pakistani-mobile rule as
+ * pkMobileSchema, but empty / incomplete / invalid are told apart, so the
+ * counter sees "Phone number is required." / "Phone number is incomplete."
+ * / "Please enter a valid Pakistani mobile number." pkMobileSchema stays
+ * untouched: registration forms keep their existing wording.
+ */
+export const tokenPkMobileSchema = z
+  .string('Phone number is required.')
+  .transform(nationalDigits)
+  .pipe(
+    z.string().superRefine((national, ctx) => {
+      if (national.length === 0) {
+        ctx.addIssue({ code: 'custom', message: 'Phone number is required.' });
+        return;
+      }
+      if (national.length < 10) {
+        ctx.addIssue({ code: 'custom', message: 'Phone number is incomplete.' });
+        return;
+      }
+      if (!/^3\d{9}$/.test(national) || !isSupportedPkMobileNational(national)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Please enter a valid Pakistani mobile number.',
+        });
+      }
+    }),
   )
   .transform(toE164);
 

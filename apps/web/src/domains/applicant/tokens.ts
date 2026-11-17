@@ -54,6 +54,26 @@ const tokens = schema.branchApplicantTokens;
 /** Retries for the daily-number race (N2): 10 attempts, then a 409 to retry. */
 const TOKEN_ISSUE_ATTEMPTS = 10;
 
+/**
+ * Thrown inside the issue transaction when a live token for the same
+ * branch + CNIC already exists (2026-11-17): the pre-transaction check
+ * above can be beaten by a second counter issuing in between, and the
+ * (branch, day, cnic) partial unique index only covers the same
+ * registration day — a 24-hour token issued yesterday is live today but on
+ * a different day. The caller catches this and hands back the live token
+ * instead of inserting a duplicate. Carries the row so no re-read is
+ * needed; the transaction rolls back with nothing written.
+ */
+class ExistingLiveTokenError extends Error {
+  readonly row: typeof tokens.$inferSelect;
+
+  constructor(row: typeof tokens.$inferSelect) {
+    super('An active token already exists for this CNIC.');
+    this.name = 'ExistingLiveTokenError';
+    this.row = row;
+  }
+}
+
 export type { ApplicantTokenView };
 
 /** `issueApplicantToken` result: `reissued` is true when an existing token was handed back. */
@@ -219,6 +239,28 @@ export async function issueApplicantToken(
         const recheckedOwner = await cnicOwner(tx, input.cnic);
         if (recheckedOwner) throw await cnicTakenError(tx, recheckedOwner);
 
+        // 2026-11-17: re-check for a live token INSIDE the transaction —
+        // the SELECT before the loop can be beaten by a second counter, and
+        // the day-scoped unique index does not cover a 24-hour token issued
+        // yesterday. An expired ISSUED row is left alone here: the next
+        // insert either succeeds (different day) or the unique-violation
+        // handler below cancels it and retries.
+        const [live] = await tx
+          .select()
+          .from(tokens)
+          .where(
+            and(
+              eq(tokens.branchId, input.branchId),
+              eq(tokens.cnic, input.cnic),
+              eq(tokens.status, 'ISSUED'),
+            ),
+          )
+          .orderBy(desc(tokens.issuedAt))
+          .limit(1);
+        if (live && live.expiresAt.getTime() > now.getTime()) {
+          throw new ExistingLiveTokenError(live);
+        }
+
         const [highest] = await tx
           .select({ value: max(tokens.tokenNumber) })
           .from(tokens)
@@ -263,6 +305,13 @@ export async function issueApplicantToken(
       });
       return { view: toView(row, branch), reissued: false };
     } catch (error) {
+      // 2026-11-17: the in-transaction re-check found a live token — hand
+      // it back (reissued) instead of inserting a duplicate. No name/phone
+      // correction here: the pre-transaction path handles corrections, and
+      // this is the just-lost-the-race fallback.
+      if (error instanceof ExistingLiveTokenError) {
+        return { view: toView(error.row, branch), reissued: true };
+      }
       if (
         isUniqueViolation(error, 'branch_applicant_tokens_branch_day_number_unique') &&
         attempt < TOKEN_ISSUE_ATTEMPTS - 1
