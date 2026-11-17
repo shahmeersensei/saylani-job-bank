@@ -46,9 +46,6 @@ export interface JobMatchView {
   /** Applicant display name from the applicants table (null if deleted). */
   fullName: string | null;
   score: number | null;
-  distanceM: number | null;
-  /** Display distance rounded to one decimal (10 900 m → "10.9 km"). */
-  distanceKm: string | null;
   reviewStatus: string;
   /** REJECTION_REASON code + note behind a REJECTED decision. */
   reviewReasonCode: string | null;
@@ -86,8 +83,6 @@ export interface MatchesPage {
   matches: JobMatchView[];
   total: number;
 }
-
-const formatKm = (meters: number) => `${(meters / 1000).toFixed(1)} km`;
 
 /** Short pages are immutable per run (run_id in the key), so a fresh run's new
  * run_id misses old entries automatically; TTL only sweeps leftovers. */
@@ -204,16 +199,13 @@ async function finishPage(
       // empty runs) → null / false, never thin by default.
       const completeness =
         matchFactors.length > 0
-          ? Math.round(
-              (matchFactors.filter((f) => f.hasData).length / matchFactors.length) * 100,
-            ) / 100
+          ? Math.round((matchFactors.filter((f) => f.hasData).length / matchFactors.length) * 100) /
+            100
           : null;
       return {
         applicantId: r.applicantId,
         fullName,
         score: r.score,
-        distanceM: r.distanceM,
-        distanceKm: r.distanceM != null ? formatKm(r.distanceM) : null,
         reviewStatus: r.reviewStatus,
         reviewReasonCode: r.reviewReasonCode,
         reviewNote: r.reviewNote,

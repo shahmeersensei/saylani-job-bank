@@ -14,7 +14,6 @@ export interface ApplicantProfileManagerProps {
   lists: ProfileLists;
   labels: ProfileLabels;
   documentTypes: ApplicantDocumentType[];
-  maxRadiusM: number;
 }
 
 export function ApplicantProfileManager({
@@ -24,7 +23,6 @@ export function ApplicantProfileManager({
   lists,
   labels,
   documentTypes,
-  maxRadiusM,
 }: ApplicantProfileManagerProps) {
   const [profile, setProfile] = useState<ApplicantProfile | null>(initialProfile);
   // If the applicant has no profile yet, they must start in wizard mode.
@@ -62,7 +60,6 @@ export function ApplicantProfileManager({
       initialStep={stepIndex}
       lists={lists}
       documentTypes={documentTypes}
-      maxRadiusM={maxRadiusM}
       onReturnToOverview={profile ? handleReturnToOverview : undefined}
       onProfileUpdate={setProfile}
     />

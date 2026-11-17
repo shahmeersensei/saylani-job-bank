@@ -30,8 +30,6 @@ def frontend_job() -> JobCriteria:
         min_education_rank=5,
         min_experience_years=2,
         required_languages=["ENGLISH"],
-        preferred_radius_m=8_000,
-        max_radius_m=10_000,
     )
 
 
@@ -51,9 +49,7 @@ def perfect_applicant() -> ApplicantProfile:
         total_experience_years=2.5,
         languages={"ENGLISH": "FLUENT", "URDU": "NATIVE"},
         min_salary_pkr=50_000,
-        willing_radius_m=10_000,
         shifts=["DAY"],
         job_types=["FULL_TIME"],
         category_codes=["IT_SOFTWARE"],
-        distance_m=4_200,
     )

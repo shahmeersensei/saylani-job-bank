@@ -85,8 +85,11 @@ export const WEEKDAY_LABELS = [
 ] as const;
 
 // ─── Matching radius (match_radius_policies) ─────────────────────────
-
-/** PRD: the max radius never exceeds 10 km — a hard database CHECK, with no override. */
+//
+// The policies table is retained (no migration drops it) but matching no
+// longer uses radius: the Python engine scores without distance and the web
+// app has no radius UI or API. These constants stay for the table's CHECK
+// and scope enum in packages/db.
 export const RADIUS_LIMITS = {
   minM: 500,
   maxM: 10_000,
@@ -96,25 +99,3 @@ export const RADIUS_LIMITS = {
 
 export const RADIUS_SCOPES = ['GLOBAL', 'BRANCH', 'CATEGORY', 'JOB'] as const;
 export type RadiusScope = (typeof RADIUS_SCOPES)[number];
-
-const meters = z
-  .number('Enter a distance')
-  .int('Use whole metres')
-  .min(RADIUS_LIMITS.minM, `Must be at least ${RADIUS_LIMITS.minM / 1000} km`)
-  .max(RADIUS_LIMITS.maxM, `Cannot be more than ${RADIUS_LIMITS.maxM / 1000} km`);
-
-export const radiusValueSchema = z
-  .strictObject({ preferredM: meters, maxM: meters })
-  .refine((r) => r.preferredM <= r.maxM, {
-    message: 'Preferred radius cannot be larger than the maximum',
-    path: ['preferredM'],
-  });
-
-export type RadiusValue = z.infer<typeof radiusValueSchema>;
-
-export interface ResolvedRadius extends RadiusValue {
-  /** Which policy supplied the value (most specific wins). */
-  source: RadiusScope | 'DEFAULT';
-  /** True when the chosen policy was larger than the global max and got capped. */
-  capped: boolean;
-}

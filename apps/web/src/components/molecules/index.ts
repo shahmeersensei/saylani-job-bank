@@ -4,7 +4,6 @@ export * from './ErrorBanner';
 export * from './StatCard';
 export * from './ConfirmDialog';
 export * from './DateTimePicker';
-export * from './DistanceBadge';
 export * from './EmptyState';
 export * from './FileUploader';
 export * from './FormField';

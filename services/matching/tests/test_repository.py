@@ -39,8 +39,20 @@ class _FakeConn:
 @pytest.mark.asyncio
 async def test_pool_includes_inactive_and_excludes_rejected_identity():
     conn = _FakeConn()
-    await load_candidate_pool(conn, "job-1", 10_000)
+    await load_candidate_pool(conn)
     sql = conn.cursor_obj.sql
     assert "a.status IN ('ACTIVE', 'INACTIVE')" in sql
     assert "a.identity_status <> 'REJECTED'" in sql
     assert "a.status = 'ACTIVE'" not in sql
+
+
+@pytest.mark.asyncio
+async def test_pool_has_no_location_filter():
+    # Radius feature removed 2026-11-17: no distance filter, no address join.
+    conn = _FakeConn()
+    await load_candidate_pool(conn)
+    sql = conn.cursor_obj.sql
+    assert "ST_DWithin" not in sql
+    assert "ST_Distance" not in sql
+    assert "applicant_addresses" not in sql
+    assert "job_locations" not in sql

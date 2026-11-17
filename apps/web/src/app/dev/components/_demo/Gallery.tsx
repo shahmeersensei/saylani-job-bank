@@ -26,7 +26,6 @@ import {
   CNICInput,
   ConfirmDialog,
   DateTimePicker,
-  DistanceBadge,
   EmptyState,
   FileUploader,
   FormField,
@@ -86,7 +85,7 @@ export function Gallery() {
   const [otp, setOtp] = useState('');
   const [when, setWhen] = useState('');
   const [page, setPage] = useState(3);
-  const [sort, setSort] = useState<SortState | null>({ id: 'distance', direction: 'asc' });
+  const [sort, setSort] = useState<SortState | null>({ id: 'updated', direction: 'asc' });
   const [tableLoading, setTableLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [notify, setNotify] = useState(true);
@@ -95,7 +94,6 @@ export function Gallery() {
     if (!sort) return demoCandidates;
     const factor = sort.direction === 'asc' ? 1 : -1;
     return [...demoCandidates].sort((a, b) => {
-      if (sort.id === 'distance') return (a.distanceM - b.distanceM) * factor;
       if (sort.id === 'updated') return a.updatedAt.localeCompare(b.updatedAt) * factor;
       return a.code.localeCompare(b.code) * factor;
     });
@@ -406,18 +404,6 @@ export function Gallery() {
                   trigger={<Button variant="danger">Withdraw…</Button>}
                 />
               </Demo>
-              <Demo
-                title="DistanceBadge — exact (staff) vs masked (employer)"
-                className="grid gap-3"
-              >
-                {[3_400, 7_900, 9_500, 10_400].map((meters) => (
-                  <div key={meters} className="flex items-center gap-3">
-                    <DistanceBadge meters={meters} />
-                    <span className="text-fg-subtle text-xs">→ employer sees</span>
-                    <DistanceBadge meters={meters} masked />
-                  </div>
-                ))}
-              </Demo>
               <Demo title="KeyValue">
                 <KeyValue
                   items={[
@@ -521,12 +507,6 @@ export function Gallery() {
                   },
                   { id: 'trade', header: 'Trade', hideBelow: 'md', cell: (row) => row.trade },
                   { id: 'area', header: 'Area', hideBelow: 'lg', cell: (row) => row.area },
-                  {
-                    id: 'distance',
-                    header: 'Distance',
-                    sortable: true,
-                    cell: (row) => <DistanceBadge meters={row.distanceM} />,
-                  },
                   { id: 'status', header: 'Status', cell: (row) => <StatusPill {...row.status} /> },
                   {
                     id: 'updated',
@@ -560,7 +540,7 @@ export function Gallery() {
                 empty={
                   <EmptyState
                     compact
-                    title="No matches within 10 km"
+                    title="No matches yet"
                     description="Try again after new applicants register."
                   />
                 }
@@ -573,10 +553,7 @@ export function Gallery() {
                 onCardClick={(item) => toast(`Open ${item.code}`)}
                 renderCard={(item) => (
                   <div className="grid gap-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-fg text-sm font-medium">{item.name}</span>
-                      <DistanceBadge meters={item.distanceM} />
-                    </div>
+                    <span className="text-fg text-sm font-medium">{item.name}</span>
                     <span className="text-fg-muted text-xs">
                       {item.trade} · {item.area}
                     </span>

@@ -31,9 +31,6 @@ class Settings(BaseSettings):
     # Pause caching for this long after a Redis error (circuit breaker).
     cache_cooldown_seconds: float = 30.0
 
-    # Hard policy ceiling (PRD: never above 10 km, DB CHECK enforces it too).
-    max_radius_m: int = 10_000
-
     # Phase 3: semantic skill matching via pgvector embeddings (backfill first).
     semantic_enabled: bool = True
 

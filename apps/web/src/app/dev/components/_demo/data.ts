@@ -21,7 +21,6 @@ export interface DemoCandidate {
   name: string;
   area: string;
   trade: string;
-  distanceM: number;
   status: { label: string; tone: Tone };
   updatedAt: string;
 }
@@ -33,7 +32,6 @@ export const demoCandidates: DemoCandidate[] = [
     name: 'Ahmed Raza',
     area: 'Gulshan-e-Iqbal',
     trade: 'Electrician',
-    distanceM: 3_400,
     status: { label: 'Eligible', tone: 'success' },
     updatedAt: '2026-09-29T09:15:00Z',
   },
@@ -43,7 +41,6 @@ export const demoCandidates: DemoCandidate[] = [
     name: 'Sana Iqbal',
     area: 'North Nazimabad',
     trade: 'Data entry',
-    distanceM: 7_900,
     status: { label: 'Referred', tone: 'accent' },
     updatedAt: '2026-09-30T11:40:00Z',
   },
@@ -53,7 +50,6 @@ export const demoCandidates: DemoCandidate[] = [
     name: 'Bilal Ahmed',
     area: 'Korangi',
     trade: 'Driver (LTV)',
-    distanceM: 9_500,
     status: { label: 'Interview scheduled', tone: 'info' },
     updatedAt: '2026-10-01T05:05:00Z',
   },
@@ -63,7 +59,6 @@ export const demoCandidates: DemoCandidate[] = [
     name: 'Fatima Noor',
     area: 'Saddar',
     trade: 'Sales associate',
-    distanceM: 1_200,
     status: { label: 'Decision pending', tone: 'warning' },
     updatedAt: '2026-09-27T14:20:00Z',
   },
@@ -73,7 +68,6 @@ export const demoCandidates: DemoCandidate[] = [
     name: 'Usman Tariq',
     area: 'Landhi',
     trade: 'Welder',
-    distanceM: 10_400,
     status: { label: 'Not eligible', tone: 'danger' },
     updatedAt: '2026-09-25T08:00:00Z',
   },
@@ -83,7 +77,6 @@ export const demoCandidates: DemoCandidate[] = [
     name: 'Hira Siddiqui',
     area: 'Clifton',
     trade: 'Receptionist',
-    distanceM: 5_600,
     status: { label: 'Placed', tone: 'primary' },
     updatedAt: '2026-09-20T10:30:00Z',
   },

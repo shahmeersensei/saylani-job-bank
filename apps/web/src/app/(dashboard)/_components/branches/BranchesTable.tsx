@@ -7,7 +7,6 @@ import { Button, StatusPill } from '@/components/atoms';
 import { EmptyState } from '@/components/molecules';
 import { DataTable } from '@/components/organisms';
 import type { BranchView } from '@/domains/branch';
-import { formatDistance } from '@/lib/format/distance';
 
 export function BranchesTable({
   branches,
@@ -51,19 +50,6 @@ export function BranchesTable({
           ),
         },
         { id: 'city', header: 'City', hideBelow: 'sm', cell: (b) => b.city },
-        {
-          id: 'radius',
-          header: 'Match radius',
-          hideBelow: 'md',
-          cell: (b) => (
-            <span className="numeric">
-              {formatDistance(b.matchRadius.maxM)}
-              {b.matchRadius.source !== 'BRANCH' && (
-                <span className="text-fg-subtle"> · global</span>
-              )}
-            </span>
-          ),
-        },
         {
           id: 'staff',
           header: 'Staff',

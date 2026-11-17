@@ -10,8 +10,9 @@ from pydantic import BaseModel, Field
 
 CRITERIA_VERSION = 1
 #: v2 added semantic (embedding) skill credit; v3 adds the text_fit factor
-#: (profile↔job embedding similarity in the score breakdown).
-SCORING_VERSION = "v3"
+#: (profile↔job embedding similarity in the score breakdown); v4 removes
+#: the distance factor entirely (radius feature removed 2026-11-17).
+SCORING_VERSION = "v4"
 
 #: Cosine similarity (embeddings) at/above which a non-exact skill counts as a
 #: similar skill — used by the eligibility gate and for scoring partial credit.
@@ -89,8 +90,6 @@ class JobCriteria(BaseModel):
     min_education_rank: int | None = None
     min_experience_years: int | None = None
     required_languages: list[str] = Field(default_factory=list)
-    preferred_radius_m: int = 8_000
-    max_radius_m: int = 10_000
 
 
 class ApplicantProfile(BaseModel):
@@ -106,11 +105,9 @@ class ApplicantProfile(BaseModel):
     has_no_experience: bool = False
     languages: dict[str, str] = Field(default_factory=dict)  # code → proficiency
     min_salary_pkr: int | None = None
-    willing_radius_m: int | None = None
     shifts: list[str] = Field(default_factory=list)
     job_types: list[str] = Field(default_factory=list)
     category_codes: list[str] = Field(default_factory=list)
-    distance_m: float | None = None  # filled by the repository (PostGIS)
 
 
 class FactorScore(BaseModel):
@@ -135,10 +132,9 @@ class MatchResult(BaseModel):
     applicant_id: str
     eligible: bool
     score: int | None = None
-    distance_m: int | None = None
     summary: str = ""
     factors: list[FactorScore] = Field(default_factory=list)
-    # Audit 2026-11-11 (L-10): fraction of the 9 factors scored from real
+    # Audit 2026-11-11 (L-10): fraction of the 8 factors scored from real
     # data (0.0–1.0). thin_profile is True when fewer than half the factors
     # had real data — the score may still be high (missing data is neutral),
     # but staff should treat it as weakly evidenced. Weights are unchanged.

@@ -40,7 +40,7 @@ export interface GeocodeAddressPickerProps {
  * 2026-11-14): type an area, street or landmark, pick a match, and the
  * point comes from the server geocoder (GET /api/v1/geocode/search,
  * Photon → Nominatim, no key). The point keeps the same GeoPoint shape as
- * the old typed fields, so matching and radius logic are unchanged.
+ * the old typed fields, so matching logic is unchanged.
  *
  * When search finds nothing or is unreachable, the caller-supplied city
  * offers its centre as a fallback pin — same fallback the CompanyWizard

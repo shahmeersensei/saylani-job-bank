@@ -65,31 +65,6 @@ def test_missing_language_fails(frontend_job, perfect_applicant):
     assert any("ENGLISH" in r for r in result.reasons)
 
 
-def test_no_location_fails(frontend_job, perfect_applicant):
-    perfect_applicant.distance_m = None
-    result = check_eligibility(frontend_job, perfect_applicant)
-    assert not result.eligible
-    assert any("location" in r.lower() for r in result.reasons)
-
-
-def test_beyond_max_radius_fails_even_if_rounded_label_would_show_10_0(
-    frontend_job, perfect_applicant
-):
-    # 10 900 m = 10.9 km → beyond the 10 km hard cap (display rounds, policy does not).
-    perfect_applicant.distance_m = 10_900
-    result = check_eligibility(frontend_job, perfect_applicant)
-    assert not result.eligible
-    assert any("radius" in r.lower() for r in result.reasons)
-
-
-def test_willing_radius_smaller_than_distance_fails(frontend_job, perfect_applicant):
-    perfect_applicant.distance_m = 7_000
-    perfect_applicant.willing_radius_m = 5_000
-    result = check_eligibility(frontend_job, perfect_applicant)
-    assert not result.eligible
-    assert any("willing" in r.lower() for r in result.reasons)
-
-
 def test_rejected_identity_fails(frontend_job, perfect_applicant):
     # Audit 2026-11-11 (M-12): a REJECTED identity can never be referred,
     # so the engine must not surface the candidate at all.

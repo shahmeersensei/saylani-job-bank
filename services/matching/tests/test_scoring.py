@@ -1,6 +1,6 @@
-"""Scoring: weights, boundaries, radius fixtures (7.9 / 9.5 / 10.1 km), tie-breaks."""
+"""Scoring: weights, boundaries, tie-breaks."""
 
-from app.scoring import format_distance_km, score_candidate, sort_matches
+from app.scoring import score_candidate, sort_matches
 from app.types import ApplicantProfile, ApplicantSkill, JobCriteria, MatchResult, SkillLevel
 
 
@@ -24,7 +24,6 @@ def test_every_factor_present(frontend_job, perfect_applicant):
         "experience",
         "education",
         "languages",
-        "distance",
         "salary",
         "preferences",
         "text_fit",
@@ -32,22 +31,6 @@ def test_every_factor_present(frontend_job, perfect_applicant):
     for factor in match.factors:
         assert 0 <= factor.score <= factor.weight
         assert factor.reason
-
-
-def test_distance_7_9_scores_more_than_9_5(frontend_job, perfect_applicant):
-    near = perfect_applicant.model_copy(update={"distance_m": 7_900})
-    far = perfect_applicant.model_copy(update={"distance_m": 9_500})
-    near_match = score_candidate(frontend_job, near)
-    far_match = score_candidate(frontend_job, far)
-
-    near_distance = next(f for f in near_match.factors if f.factor == "distance")
-    far_distance = next(f for f in far_match.factors if f.factor == "distance")
-
-    # 7.9 km is inside the preferred 8 km → full points.
-    assert near_distance.score == near_distance.weight
-    # 9.5 km is between preferred (8) and max (10) → linear decay, strictly less.
-    assert 0 < far_distance.score < near_distance.score
-    assert near_match.score > far_match.score
 
 
 def test_missing_optional_data_is_neutral(frontend_job, perfect_applicant):
@@ -79,9 +62,8 @@ def test_thin_profile_flagged_without_changing_score():
     )
     bare_applicant = ApplicantProfile(applicant_id="thin-1")
     match = score_candidate(bare_job, bare_applicant)
-    # Only distance scores 0 without a location (weight 14); the other
-    # eight factors are neutral at full weight.
-    assert match.score == 86
+    # All eight factors are neutral at full weight (no data anywhere).
+    assert match.score == 100
     assert match.completeness == 0.0
     assert match.thin_profile is True
     assert all(f.has_data is False for f in match.factors)
@@ -90,8 +72,8 @@ def test_thin_profile_flagged_without_changing_score():
 
 def test_full_profile_is_not_thin(frontend_job, perfect_applicant):
     match = score_candidate(frontend_job, perfect_applicant)
-    # Only text_fit lacks data without embeddings (8 of 9 factors real).
-    assert match.completeness == 0.89
+    # Only text_fit lacks data without embeddings (7 of 8 factors real).
+    assert match.completeness == 0.88
     assert match.thin_profile is False
     text_fit = next(f for f in match.factors if f.factor == "text_fit")
     assert text_fit.has_data is False
@@ -117,21 +99,15 @@ def test_preferred_skills_partial(frontend_job, perfect_applicant):
     assert "0/1" in preferred.reason
 
 
-def test_display_distance_rounds_to_one_decimal():
-    assert format_distance_km(10_900) == "10.9 km"
-    assert format_distance_km(4_240) == "4.2 km"
-    assert format_distance_km(7_950) == "8.0 km"
-
-
-def test_sort_by_score_then_distance_then_id():
+def test_sort_by_score_then_id():
     matches = [
-        MatchResult(applicant_id="b", eligible=True, score=70, distance_m=3_000),
-        MatchResult(applicant_id="a", eligible=True, score=70, distance_m=3_000),
-        MatchResult(applicant_id="c", eligible=True, score=90, distance_m=9_000),
-        MatchResult(applicant_id="d", eligible=True, score=70, distance_m=1_000),
+        MatchResult(applicant_id="b", eligible=True, score=70),
+        MatchResult(applicant_id="a", eligible=True, score=70),
+        MatchResult(applicant_id="c", eligible=True, score=90),
+        MatchResult(applicant_id="d", eligible=True, score=70),
     ]
     ordered = [m.applicant_id for m in sort_matches(matches)]
-    assert ordered == ["c", "d", "a", "b"]
+    assert ordered == ["c", "a", "b", "d"]
 
 
 # ── Phase 3: semantic (embedding-based) skill credit ─────────────────────
@@ -158,8 +134,8 @@ def test_semantic_skill_earns_partial_credit(frontend_job, perfect_applicant):
     similar = _nextjs_applicant(perfect_applicant)
     match = score_candidate(frontend_job, similar, semantic=_react_nextjs_sim)
     required = next(f for f in match.factors if f.factor == "required_skills")
-    # 1 exact (JAVASCRIPT) + 0.5 semantic (NEXTJS ≈ REACT) = 1.5 / 2 → 18.75 / 25.
-    assert required.score == 18.75
+    # 1 exact (JAVASCRIPT) + 0.5 semantic (NEXTJS ≈ REACT) = 1.5 / 2 → 23.25 / 31.
+    assert required.score == 23.25
     assert required.detail["semantic"] is True
     assert "similar skills" in required.reason
 
@@ -168,7 +144,7 @@ def test_without_semantics_no_partial_credit(frontend_job, perfect_applicant):
     similar = _nextjs_applicant(perfect_applicant)
     match = score_candidate(frontend_job, similar)
     required = next(f for f in match.factors if f.factor == "required_skills")
-    assert required.score == 12.5  # exact-only: 1 / 2
+    assert required.score == 15.5  # exact-only: 1 / 2
     assert required.detail["semantic"] is False
 
 
@@ -177,7 +153,7 @@ def test_low_similarity_is_not_credited(frontend_job, perfect_applicant):
     weak = lambda a, b: 0.4  # noqa: E731 — below SEMANTIC_MIN_SIMILARITY (0.75)
     match = score_candidate(frontend_job, similar, semantic=weak)
     required = next(f for f in match.factors if f.factor == "required_skills")
-    assert required.score == 12.5
+    assert required.score == 15.5
 
 
 # ── v3: profile↔job text fit (embedding similarity) ──────────────────────

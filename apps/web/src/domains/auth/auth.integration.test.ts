@@ -12,7 +12,6 @@ import { PUT as scope } from '@/app/api/v1/auth/scope/route';
 import { GET as getBranchRoute } from '@/app/api/v1/branches/[id]/route';
 import { GET as listBranchesRoute } from '@/app/api/v1/branches/route';
 import { GET as listMasterDataRoute } from '@/app/api/v1/master-data/route';
-import { GET as radiusPoliciesRoute } from '@/app/api/v1/radius-policies/route';
 import { GET as listSettingsRoute } from '@/app/api/v1/settings/route';
 import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import { db } from '@/lib/db';
@@ -90,9 +89,6 @@ describe('role × endpoint access matrix', () => {
       // M5: settings are for admins; reference lists are for every signed-in user.
       const canManageSettings = ROLE_PERMISSIONS[role as Role].includes('settings:manage');
       expect((await call(listSettingsRoute, '/api/v1/settings', { jar })).status).toBe(
-        canManageSettings ? 200 : 403,
-      );
-      expect((await call(radiusPoliciesRoute, '/api/v1/radius-policies', { jar })).status).toBe(
         canManageSettings ? 200 : 403,
       );
       expect(

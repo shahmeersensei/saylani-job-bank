@@ -3,7 +3,6 @@ import { getApplicantForStaff, listApplicantDocumentTypes } from '@/domains/appl
 import { requireRole } from '@/domains/auth';
 import { listRefusalReasons } from '@/domains/matching';
 import { listCandidateCalls } from '@/domains/placement';
-import { resolveMatchRadius } from '@/domains/settings';
 import { profileLists } from '../applicants/lists';
 import { WIZARD_STEPS } from '../../applicant/_components/wizard-steps';
 import { CallList } from './CallList';
@@ -50,10 +49,9 @@ export async function CounterCompletePage({
   // Candidates with their own login keep their profile themselves.
   if (!applicant.counterRegistered) redirect(detailHref);
 
-  const [lists, documentTypes, radius] = await Promise.all([
+  const [lists, documentTypes] = await Promise.all([
     profileLists(actor),
     listApplicantDocumentTypes(),
-    resolveMatchRadius({ branchId: applicant.branch?.id ?? null }),
   ]);
   return (
     <CounterWizard
@@ -63,7 +61,6 @@ export async function CounterCompletePage({
       initialStep={WIZARD_STEPS.findIndex((s) => s.id === 'location')}
       lists={lists}
       documentTypes={documentTypes}
-      maxRadiusM={radius.maxM}
     />
   );
 }

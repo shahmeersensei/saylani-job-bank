@@ -1,6 +1,5 @@
 import { getMyProfile, listApplicantDocumentTypes } from '@/domains/applicant';
 import { requireRole } from '@/domains/auth';
-import { resolveMatchRadius } from '@/domains/settings';
 import { profileLabels, profileLists } from '../../_components/applicants/lists';
 import { ApplicantProfileManager } from '../_components/ApplicantProfileManager';
 import { WIZARD_STEPS } from '../_components/wizard-steps';
@@ -20,7 +19,6 @@ export default async function ApplicantProfilePage({
     listApplicantDocumentTypes(),
     searchParams,
   ]);
-  const radius = await resolveMatchRadius({ branchId: profile?.branch?.id ?? null });
 
   const hasSpecificStep = Boolean(params.step);
   const isEditingParam = params.edit === 'true';
@@ -39,7 +37,6 @@ export default async function ApplicantProfilePage({
       lists={lists}
       labels={labels}
       documentTypes={documentTypes}
-      maxRadiusM={radius.maxM}
     />
   );
 }

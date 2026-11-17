@@ -1,9 +1,8 @@
 """Deterministic 0–100 scoring with a per-factor breakdown.
 
 Every factor returns points earned, its weight and a short human reason, e.g.
-"Required skills: 3/3 met" or "Location: 4.2 km (within preferred radius)".
-Missing optional data is NEUTRAL (full weight) so a thin profile is not
-punished for data the platform never asked for.
+"Required skills: 3/3 met". Missing optional data is NEUTRAL (full weight)
+so a thin profile is not punished for data the platform never asked for.
 """
 
 from collections.abc import Callable
@@ -26,11 +25,6 @@ from .weights import DEFAULT_WEIGHTS, Weights
 SemanticSim = Callable[[str, str], float]
 #: applicant_id → cosine(job text, profile text) in [0, 1]; None = no opinion
 TextFitSim = Callable[[str], float] | None
-
-
-def format_distance_km(distance_m: float) -> str:
-    """Display helper: distances are rounded to one decimal (10 900 m → 10.9 km)."""
-    return f"{distance_m / 1000:.1f} km"
 
 
 def _skill_match_count(
@@ -192,33 +186,6 @@ def score_languages(job, applicant, weight: float) -> FactorScore:
     )
 
 
-def score_distance(job, applicant, weight: float) -> FactorScore:
-    if applicant.distance_m is None:
-        return _factor("distance", 0.0, weight, "Location: not on profile", has_data=False)
-    preferred = job.preferred_radius_m
-    maximum = max(job.max_radius_m, preferred)
-    distance = applicant.distance_m
-    label = format_distance_km(distance)
-    if distance <= preferred:
-        return _factor(
-            "distance",
-            weight,
-            weight,
-            f"Location: {label}; preferred radius {format_distance_km(preferred)}",
-            distance_km=round(distance / 1000, 1),
-        )
-    # Linear decay from the preferred radius out to the maximum.
-    remaining = max(0.0, (maximum - distance) / (maximum - preferred))
-    return _factor(
-        "distance",
-        weight * remaining,
-        weight,
-        f"Location: {label}; beyond preferred radius "
-        f"({format_distance_km(preferred)}–{format_distance_km(maximum)})",
-        distance_km=round(distance / 1000, 1),
-    )
-
-
 def score_salary(job, applicant, weight: float) -> FactorScore:
     expectation = applicant.min_salary_pkr
     if expectation is None or job.salary_max is None:
@@ -324,7 +291,6 @@ def score_candidate(
         score_experience(job, applicant, weights.experience),
         score_education(job, applicant, weights.education),
         score_languages(job, applicant, weights.languages),
-        score_distance(job, applicant, weights.distance),
         score_salary(job, applicant, weights.salary),
         score_preferences(job, applicant, weights.preferences),
         score_text_fit(job, applicant, weights.text_fit, fit),
@@ -340,7 +306,6 @@ def score_candidate(
         applicant_id=applicant.applicant_id,
         eligible=True,
         score=total,
-        distance_m=round(applicant.distance_m) if applicant.distance_m is not None else None,
         summary=summary,
         factors=factors,
         completeness=completeness,
@@ -349,12 +314,11 @@ def score_candidate(
 
 
 def sort_matches(matches: list[MatchResult]) -> list[MatchResult]:
-    """Score descending; ties by nearer distance, then applicant id (stable)."""
+    """Score descending; ties by applicant id (stable)."""
     return sorted(
         matches,
         key=lambda m: (
             -(m.score or 0),
-            m.distance_m if m.distance_m is not None else 2**31,
             m.applicant_id,
         ),
     )

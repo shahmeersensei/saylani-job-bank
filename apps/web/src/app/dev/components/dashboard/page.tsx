@@ -2,7 +2,7 @@
 
 import { Bell, LogOut, Pencil, Send, UserRound } from 'lucide-react';
 import { Button, StatusPill } from '@/components/atoms';
-import { ConfirmDialog, DistanceBadge, KeyValue, Tabs, toast } from '@/components/molecules';
+import { ConfirmDialog, KeyValue, Tabs, toast } from '@/components/molecules';
 import { Timeline } from '@/components/organisms';
 import { DashboardLayout, DetailPageLayout } from '@/components/templates';
 import { demoNavigation } from '../_demo/data';
@@ -66,7 +66,6 @@ export default function DashboardDemoPage() {
               <KeyValue
                 columns={1}
                 items={[
-                  { label: 'Distance to job site', value: <DistanceBadge meters={3_400} /> },
                   { label: 'Match score', value: '86 / 100' },
                   { label: 'Assigned staff', value: 'Sana Malik' },
                 ]}

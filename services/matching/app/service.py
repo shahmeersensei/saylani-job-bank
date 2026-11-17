@@ -36,7 +36,7 @@ async def run_job_match(pool: AsyncConnectionPool, job_id: str, trigger: str) ->
         try:
             async with conn.transaction():
                 job = await load_job_criteria(conn, job_id)
-                pool_rows = await load_candidate_pool(conn, job_id, job.max_radius_m)
+                pool_rows = await load_candidate_pool(conn)
 
             # Version-keyed Redis cache: unchanged profiles skip all detail
             # queries; misses fall back to Postgres and repopulate the cache.
@@ -54,12 +54,7 @@ async def run_job_match(pool: AsyncConnectionPool, job_id: str, trigger: str) ->
                 profile = profiles_by_id.get(str(row["applicant_id"]))
                 if profile is None:
                     continue
-                distance = row["distance_m"]
-                profiles.append(
-                    profile.model_copy(
-                        update={"distance_m": float(distance) if distance is not None else None}
-                    )
-                )
+                profiles.append(profile)
 
             # Phase 3: skill embeddings enable semantic (fuzzy) skill credit.
             # v3: profile↔job text similarity powers the text_fit factor.

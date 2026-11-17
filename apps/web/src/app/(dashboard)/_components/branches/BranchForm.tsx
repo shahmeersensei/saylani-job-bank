@@ -2,22 +2,17 @@
 
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
-import type { RadiusValue } from '@jobbank/shared';
-import { Button, Input, Switch } from '@/components/atoms';
+import { Button, Input } from '@/components/atoms';
 import { FormField, GeocodeAddressPicker, toast } from '@/components/molecules';
 import type { BranchView } from '@/domains/branch';
 import { ApiClientError, apiFetch, friendlyApiError } from '@/lib/api/client';
-import { formatDistance } from '@/lib/format/distance';
-import { RadiusFields, toKm, toMeters, type RadiusKm } from '../settings/RadiusFields';
 
 interface Props {
   branch?: BranchView;
-  /** The global matching radius: the default, and the ceiling for a branch's own radius. */
-  globalRadius: RadiusValue;
 }
 
 /** Create (no `branch`) or edit a branch. The code is editable by Super Admin only (this form lives on Super Admin pages); changing it breaks token slips issued under the old code. */
-export function BranchForm({ branch, globalRadius }: Props) {
+export function BranchForm({ branch }: Props) {
   const router = useRouter();
   const idempotencyKey = useRef(crypto.randomUUID());
   const [values, setValues] = useState({
@@ -27,9 +22,6 @@ export function BranchForm({ branch, globalRadius }: Props) {
     address: branch?.address ?? '',
     phone: branch?.phone ?? '',
   });
-  const hadOwnRadius = branch?.matchRadius.source === 'BRANCH';
-  const [ownRadius, setOwnRadius] = useState(hadOwnRadius);
-  const [radius, setRadius] = useState<RadiusKm>(toKm(branch?.matchRadius ?? globalRadius));
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
     branch?.location ?? null,
   );
@@ -58,12 +50,6 @@ export function BranchForm({ branch, globalRadius }: Props) {
       address: values.address || null,
       phone: values.phone || null,
       location,
-      // Own radius → write it; switched back to global → remove the branch policy.
-      ...(ownRadius
-        ? { matchRadius: toMeters(radius) }
-        : hadOwnRadius
-          ? { matchRadius: null }
-          : {}),
     };
     try {
       const { data } = branch
@@ -122,26 +108,6 @@ export function BranchForm({ branch, globalRadius }: Props) {
           <Input value={values.address} onChange={set('address')} />
         </FormField>
       </div>
-      <fieldset className="border-border grid gap-4 rounded-lg border p-4">
-        <legend className="text-fg px-1 text-sm font-medium">Matching radius</legend>
-        <Switch
-          checked={ownRadius}
-          onCheckedChange={setOwnRadius}
-          label="Use a branch-specific radius"
-          description={`Off: follows the global radius (${formatDistance(globalRadius.preferredM)} preferred, ${formatDistance(globalRadius.maxM)} max).`}
-        />
-        {ownRadius && (
-          <RadiusFields
-            value={radius}
-            onChange={setRadius}
-            maxAllowedM={globalRadius.maxM}
-            errors={{
-              preferredM: errors['matchRadius.preferredM'],
-              maxM: errors['matchRadius.maxM'] ?? errors.maxM,
-            }}
-          />
-        )}
-      </fieldset>
       <GeocodeAddressPicker
         value={location}
         onChange={setLocation}

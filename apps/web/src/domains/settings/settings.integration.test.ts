@@ -1,33 +1,16 @@
 import { schema } from '@jobbank/db';
 import { and, desc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { POST as createBranchRoute } from '@/app/api/v1/branches/route';
 import { PATCH as patchHoliday } from '@/app/api/v1/holidays/[id]/route';
 import { GET as listHolidaysRoute, POST as createHolidayRoute } from '@/app/api/v1/holidays/route';
 import { PATCH as patchItem } from '@/app/api/v1/master-data/[id]/route';
 import { GET as listItems, POST as createItem } from '@/app/api/v1/master-data/route';
-import {
-  DELETE as clearBranchRadius,
-  PUT as putBranchRadius,
-} from '@/app/api/v1/radius-policies/branches/[branchId]/route';
-import { PUT as putCategoryRadius } from '@/app/api/v1/radius-policies/categories/[categoryId]/route';
-import { PUT as putGlobalRadius } from '@/app/api/v1/radius-policies/global/route';
-import { GET as resolveRoute } from '@/app/api/v1/radius-policies/resolve/route';
-import { GET as radiusOverview } from '@/app/api/v1/radius-policies/route';
 import { PUT as putSetting } from '@/app/api/v1/settings/[key]/route';
 import { GET as listSettingsRoute } from '@/app/api/v1/settings/route';
 import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import { db } from '@/lib/db';
 import { call, type Jar, owner, signInWith2fa, signInAdmin } from '@/test/api-client';
-import { getWorkingCalendar, resolveMatchRadius, slaDueDate } from '.';
-
-const branchId = async (code: string) =>
-  (
-    await db
-      .select({ id: schema.branches.id })
-      .from(schema.branches)
-      .where(eq(schema.branches.code, code))
-  )[0]!.id;
+import { getWorkingCalendar, slaDueDate } from '.';
 
 const lastAudit = async (action: string, entityId: string) =>
   (
@@ -45,40 +28,17 @@ const idem = () => ({ 'idempotency-key': crypto.randomUUID() });
 let superAdmin: Jar;
 let branchAdmin: Jar;
 let staff: Jar;
-let KHI: string;
-let LHR: string;
 
 beforeAll(async () => {
   superAdmin = await signInAdmin('superadmin@jobbank.local');
   branchAdmin = await signInAdmin('branchadmin.khi@jobbank.local');
   staff = await signInWith2fa('staff.khi@jobbank.local');
-  KHI = await branchId('KHI-GULSHAN');
-  LHR = await branchId('LHR-JOHAR');
 });
 beforeEach(() => resetMemoryRateLimits());
 
-/** Branches/categories created by these tests — removed again so later runs
- * (and other files sharing the test DB) never see a second active Karachi
- * branch. A leftover "Radius test branch" used to hijack applicant branch
- * assignment in applicant.integration.test.ts. */
-const createdBranchIds: string[] = [];
-const createdCategoryIds: string[] = [];
-
 /** Global state touched by these tests goes back to the seeded defaults. */
 async function restoreGlobals() {
-  await owner`UPDATE match_radius_policies SET preferred_m = 8000, max_m = 10000 WHERE scope = 'GLOBAL'`;
-  await owner`DELETE FROM match_radius_policies WHERE branch_id IN (${KHI}, ${LHR})`;
   await owner`DELETE FROM system_settings WHERE branch_id IS NULL`;
-  for (const id of createdBranchIds) {
-    await owner`DELETE FROM match_radius_policies WHERE branch_id = ${id}`;
-    await owner`DELETE FROM branches WHERE id = ${id}`;
-  }
-  createdBranchIds.length = 0;
-  for (const id of createdCategoryIds) {
-    await owner`DELETE FROM match_radius_policies WHERE category_id = ${id}`;
-    await owner`DELETE FROM master_data WHERE id = ${id}`;
-  }
-  createdCategoryIds.length = 0;
 }
 afterAll(restoreGlobals);
 
@@ -342,133 +302,5 @@ describe('system settings', () => {
     });
     expect(denied.status).toBe(403);
     expect((await call(listSettingsRoute, '/api/v1/settings', { jar: staff })).status).toBe(403);
-  });
-});
-
-// ─── Matching radius ──────────────────────────────────────────────────
-
-describe('matching radius policies', () => {
-  const putBranch = (jar: Jar, id: string, body: object) =>
-    call(putBranchRadius, `/api/v1/radius-policies/branches/${id}`, {
-      method: 'PUT',
-      jar,
-      params: { branchId: id },
-      body,
-    });
-  const putGlobal = (jar: Jar, body: object) =>
-    call(putGlobalRadius, '/api/v1/radius-policies/global', { method: 'PUT', jar, body });
-
-  it('resolves job → category → branch → global, capped by the global max', async () => {
-    await restoreGlobals();
-    const branch = await call(createBranchRoute, '/api/v1/branches', {
-      method: 'POST',
-      jar: superAdmin,
-      headers: idem(),
-      body: {
-        code: `R-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
-        name: 'Radius test branch',
-        // Round 3: NOT Karachi — a leftover Karachi branch used to win the
-        // applicant location auto-assignment lottery over KHI-GULSHAN (the
-        // old unordered LIMIT 1). The radius test never needs the city.
-        city: 'Hyderabad',
-        location: { lat: 24.9, lng: 67.1 },
-      },
-    });
-    const bId = branch.body.data.id;
-    createdBranchIds.push(bId);
-    expect(branch.body.data.matchRadius).toMatchObject({ maxM: 10_000, source: 'GLOBAL' });
-
-    const category = await call(createItem, '/api/v1/master-data', {
-      method: 'POST',
-      jar: superAdmin,
-      headers: idem(),
-      body: { type: 'JOB_CATEGORY', code: code('RADIUS'), label: 'Radius test category' },
-    });
-    const cId = category.body.data.id;
-    createdCategoryIds.push(cId);
-
-    expect(await resolveMatchRadius({ branchId: bId, categoryId: cId })).toMatchObject({
-      preferredM: 8000,
-      maxM: 10_000,
-      source: 'GLOBAL',
-    });
-
-    expect((await putBranch(superAdmin, bId, { preferredM: 4000, maxM: 6000 })).status).toBe(200);
-    expect(await resolveMatchRadius({ branchId: bId, categoryId: cId })).toMatchObject({
-      maxM: 6000,
-      source: 'BRANCH',
-    });
-
-    const cat = await call(putCategoryRadius, `/api/v1/radius-policies/categories/${cId}`, {
-      method: 'PUT',
-      jar: superAdmin,
-      params: { categoryId: cId },
-      body: { preferredM: 7000, maxM: 9000 },
-    });
-    expect(cat.status, JSON.stringify(cat.body)).toBe(200);
-    expect(await resolveMatchRadius({ branchId: bId, categoryId: cId })).toMatchObject({
-      preferredM: 7000,
-      maxM: 9000,
-      source: 'CATEGORY',
-    });
-    expect(await resolveMatchRadius({ branchId: bId })).toMatchObject({ source: 'BRANCH' });
-
-    // Lowering the global max tightens every override at resolution time.
-    expect((await putGlobal(superAdmin, { preferredM: 5000, maxM: 7000 })).status).toBe(200);
-    const preview = await call(
-      resolveRoute,
-      `/api/v1/radius-policies/resolve?branchId=${bId}&categoryId=${cId}`,
-      { jar: superAdmin },
-    );
-    expect(preview.body.data).toEqual({
-      preferredM: 7000,
-      maxM: 7000,
-      source: 'CATEGORY',
-      capped: true,
-    });
-
-    await restoreGlobals();
-    await owner`DELETE FROM match_radius_policies WHERE branch_id = ${bId} OR category_id = ${cId}`;
-  });
-
-  it('Branch Admin overrides only their own branch, within the global max', async () => {
-    await restoreGlobals();
-    const own = await putBranch(branchAdmin, KHI, { preferredM: 5000, maxM: 9000 });
-    expect(own.status, JSON.stringify(own.body)).toBe(200);
-    expect(own.body.data.branches).toEqual([
-      expect.objectContaining({ branchId: KHI, preferredM: 5000, maxM: 9000 }),
-    ]);
-    expect(await lastAudit('radius_policy.create', KHI)).toMatchObject({
-      after: { preferredM: 5000, maxM: 9000 },
-    });
-
-    expect((await putBranch(branchAdmin, KHI, { preferredM: 5000, maxM: 12_000 })).status).toBe(
-      422,
-    );
-    expect((await putBranch(branchAdmin, KHI, { preferredM: 9500, maxM: 9000 })).status).toBe(422);
-
-    await putGlobal(superAdmin, { preferredM: 6000, maxM: 8000 });
-    const aboveGlobal = await putBranch(branchAdmin, KHI, { preferredM: 5000, maxM: 8500 });
-    expect(aboveGlobal.status).toBe(422);
-    expect(aboveGlobal.body.error.issues[0]).toMatchObject({ path: 'maxM' });
-
-    const otherBranch = await putBranch(branchAdmin, LHR, { preferredM: 5000, maxM: 6000 });
-    expect(otherBranch.status).toBe(403);
-    expect(await lastAudit('access.scope_violation', LHR)).toBeDefined();
-
-    expect((await putGlobal(branchAdmin, { preferredM: 5000, maxM: 6000 })).status).toBe(403);
-
-    const reset = await call(clearBranchRadius, `/api/v1/radius-policies/branches/${KHI}`, {
-      method: 'DELETE',
-      jar: branchAdmin,
-      params: { branchId: KHI },
-    });
-    expect(reset.body.data.branches).toEqual([]);
-    expect(await resolveMatchRadius({ branchId: KHI })).toMatchObject({ source: 'GLOBAL' });
-
-    expect((await call(radiusOverview, '/api/v1/radius-policies', { jar: staff })).status).toBe(
-      403,
-    );
-    await restoreGlobals();
   });
 });

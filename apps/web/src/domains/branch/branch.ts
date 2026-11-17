@@ -1,11 +1,6 @@
 import 'server-only';
 import { schema, type GeoPoint } from '@jobbank/db';
-import {
-  pakistanPointSchema,
-  pkPhoneSchema,
-  radiusValueSchema,
-  type ResolvedRadius,
-} from '@jobbank/shared';
+import { pakistanPointSchema, pkPhoneSchema } from '@jobbank/shared';
 import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { runCommand, type RequestContext } from '@/domains/shared/audit';
@@ -16,7 +11,6 @@ import {
   branchScope,
   type Actor,
 } from '@/domains/shared/scope';
-import { branchRadii, deleteRadiusPolicy, writeRadiusPolicy } from '@/domains/settings';
 import { MAX_UNPAGINATED_LIST_ROWS } from '@/domains/shared/pagination';
 import { db, type DbExecutor } from '@/lib/db';
 import { toGeography } from '@/lib/geospatial';
@@ -29,8 +23,6 @@ export interface BranchView {
   address: string | null;
   phone: string | null;
   location: GeoPoint | null;
-  /** Effective matching radius: the branch's own policy, else the global one (M5). */
-  matchRadius: ResolvedRadius;
   isActive: boolean;
   /** Distinct staff accounts (Branch Admin, Verifier, Staff) assigned here. */
   staffCount: number;
@@ -46,11 +38,6 @@ const branchFields = z.object({
   phone: pkPhoneSchema.nullable().optional(),
   // Branch pins must be inside Pakistan, like applicant pins (L14).
   location: pakistanPointSchema,
-  /**
-   * The branch's own matching radius (BRANCH policy, within the global max). `null`
-   * removes it so the branch follows the global radius; omitted = unchanged.
-   */
-  matchRadius: radiusValueSchema.nullable().optional(),
 });
 
 /** Branch code format (create + update): letters, digits and dashes, e.g. KHI-GULSHAN. */
@@ -101,11 +88,10 @@ const columns = {
   isActive: b.isActive,
 };
 
-type BranchRow = Omit<BranchView, 'staffCount' | 'matchRadius'>;
+type BranchRow = Omit<BranchView, 'staffCount'>;
 
 async function withStaffCounts(rows: BranchRow[]): Promise<BranchView[]> {
   if (rows.length === 0) return [];
-  const radii = await branchRadii(rows.map((r) => r.id));
   const counts = await db
     .select({
       branchId: schema.userRoles.branchId,
@@ -122,7 +108,6 @@ async function withStaffCounts(rows: BranchRow[]): Promise<BranchView[]> {
   const byBranch = new Map(counts.map((c) => [c.branchId, c.staff]));
   return rows.map((row) => ({
     ...row,
-    matchRadius: radii.get(row.id)!,
     staffCount: byBranch.get(row.id) ?? 0,
   }));
 }
@@ -235,17 +220,13 @@ export async function createBranch(ctx: SignedIn, input: CreateBranchInput): Pro
         location: input.location,
       })
       .returning({ id: b.id });
-    const { matchRadius, ...fields } = input;
     audit({
       action: 'branch.create',
       entityType: 'branch',
       entityId: created!.id,
       branchId: created!.id,
-      after: fields,
+      after: input,
     });
-    if (matchRadius) {
-      await writeRadiusPolicy(cmd, { scope: 'BRANCH', branchId: created!.id }, matchRadius);
-    }
     return created!.id;
   });
   return getBranch(ctx.actor, id);
@@ -257,7 +238,7 @@ export async function updateBranch(
   patch: UpdateBranchInput,
 ): Promise<BranchView> {
   assertPermission(ctx.actor, 'branch:manage');
-  const { matchRadius, ...fields } = patch;
+  const fields = patch;
   const [before] = await db.select(columns).from(b).where(eq(b.id, branchId));
   if (!before) throw new NotFoundError('Branch', branchId);
   // The form sends every field: only the ones that really differ are written and audited.
@@ -266,16 +247,13 @@ export async function updateBranch(
       ([k, v]) => v !== undefined && canonical(v) !== canonical(before[k as keyof typeof before]),
     ),
   );
-  if (Object.keys(changes).length === 0 && matchRadius === undefined) {
+  if (Object.keys(changes).length === 0) {
     return getBranch(ctx.actor, branchId);
   }
   await runCommand(
     ctx,
     async (cmd) => {
       const { tx, audit } = cmd;
-      // Radius changes are audited by the policy writes themselves.
-      if (matchRadius) await writeRadiusPolicy(cmd, { scope: 'BRANCH', branchId }, matchRadius);
-      if (matchRadius === null) await deleteRadiusPolicy(cmd, { scope: 'BRANCH', branchId });
       if (Object.keys(changes).length === 0) return;
       if (changes.code) {
         const [taken] = await tx
@@ -315,8 +293,7 @@ export async function updateBranch(
  * row — no schema change. Refuses while anything still points at the branch:
  * staff assignments, applicants, companies, jobs and applications would
  * otherwise be orphaned (jobs / applications carry a plain branch id) or
- * trip the restrict FKs. The branch's own radius policy and settings rows
- * cascade away with it.
+ * trip the restrict FKs. Its settings rows cascade away with it.
  */
 export async function deleteBranch(ctx: SignedIn, branchId: string, reason: string): Promise<void> {
   assertPermission(ctx.actor, 'branch:manage');

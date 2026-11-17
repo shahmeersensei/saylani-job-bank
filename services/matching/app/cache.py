@@ -1,7 +1,7 @@
 """Redis profile cache: version-keyed entries, fail-open on any error.
 
 Key:    mj:ap:v1:{applicant_id}:{profile_version}   (version = applicants.updated_at μs)
-Value:  ApplicantProfile JSON without distance_m (distance is per-job, never cached).
+Value:  ApplicantProfile JSON.
 
 Correctness comes from migration 0015's jobbank_profile_touch trigger: any change
 to profile data (skills, languages, education, experience, preferences, address)
@@ -113,7 +113,7 @@ class ProfileCache:
                 version = versions.get(aid)
                 if version is None:
                     continue
-                payload = profile.model_dump(mode="json", exclude={"distance_m"})
+                payload = profile.model_dump(mode="json")
                 pipe.set(
                     self._key(aid, version),
                     json.dumps(payload, separators=(",", ":")),

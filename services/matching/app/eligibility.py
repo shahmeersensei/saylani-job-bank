@@ -50,24 +50,8 @@ def check_eligibility(
     if applicant.identity_status == "REJECTED":
         reasons.append("Identity verification rejected")
 
-    # ── Location (hard): must be inside the job's max radius AND the applicant's
-    # own willing radius. Distance comes from PostGIS; None = no home pin.
-    if applicant.distance_m is None:
-        reasons.append("No home location on profile")
-    else:
-        if applicant.distance_m > job.max_radius_m:
-            reasons.append(
-                f"Outside maximum radius ({applicant.distance_m / 1000:.1f} km; "
-                f"max {job.max_radius_m / 1000:.0f} km)"
-            )
-        if (
-            applicant.willing_radius_m is not None
-            and applicant.distance_m > applicant.willing_radius_m
-        ):
-            reasons.append(
-                f"Outside applicant's willing radius ({applicant.distance_m / 1000:.1f} km; "
-                f"willing {applicant.willing_radius_m / 1000:.0f} km)"
-            )
+    # ── Location: no gate at all — the radius feature was removed
+    # 2026-11-17, so distance and home pins never decide eligibility.
 
     # ── Required skills with minimum levels (semantic similarity accepted when
     # embeddings are available; exact codes remain the fast path).

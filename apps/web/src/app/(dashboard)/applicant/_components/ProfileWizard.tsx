@@ -30,7 +30,6 @@ export function ProfileWizard({
   initialStep: number;
   lists: ProfileLists;
   documentTypes: ApplicantDocumentType[];
-  maxRadiusM: number;
   onReturnToOverview?: () => void;
   onProfileUpdate?: (profile: ApplicantProfile) => void;
 }) {

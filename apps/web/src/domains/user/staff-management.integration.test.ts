@@ -273,7 +273,6 @@ describe('branch management', () => {
       name: 'Test Branch',
       city: 'Hyderabad',
       location: { lat: 25.396, lng: 68.3578 },
-      matchRadius: { preferredM: 6000, maxM: 8000 },
     };
     const create = () =>
       call(createBranchRoute, '/api/v1/branches', {
@@ -291,7 +290,6 @@ describe('branch management', () => {
       code,
       staffCount: 0,
       location: { lat: 25.396, lng: 68.3578 },
-      matchRadius: { preferredM: 6000, maxM: 8000, source: 'BRANCH' },
     });
 
     const dup = await call(createBranchRoute, '/api/v1/branches', {
@@ -314,11 +312,12 @@ describe('branch management', () => {
       body: { name: 'Test Branch Renamed', code: newCode },
     });
     expect(renamed.status, JSON.stringify(renamed.body)).toBe(200);
-    // A partial update must not reset unrelated fields (regression: radius default leaked into PATCH).
+    // A partial update must not reset unrelated fields.
     expect(renamed.body.data).toMatchObject({
       name: 'Test Branch Renamed',
       code: newCode,
-      matchRadius: { maxM: 8000, source: 'BRANCH' },
+      city: 'Hyderabad',
+      location: { lat: 25.396, lng: 68.3578 },
     });
 
     // A code that already belongs to another branch is refused.
@@ -361,15 +360,6 @@ describe('branch management', () => {
     });
     expect(await auditCount()).toBe(rowsBefore);
 
-    // Switching the branch back to the global radius removes its own policy.
-    const inherited = await call(patchBranch, `/api/v1/branches/${id}`, {
-      method: 'PATCH',
-      jar,
-      params: { id },
-      body: { matchRadius: null },
-    });
-    expect(inherited.body.data.matchRadius.source).toBe('GLOBAL');
-
     await call(patchBranch, `/api/v1/branches/${id}`, {
       method: 'PATCH',
       jar,
@@ -385,22 +375,7 @@ describe('branch management', () => {
     expect(audit?.before).toEqual({ isActive: true });
   });
 
-  it('rejects radius beyond the PRD 10 km cap, and non-Super-Admins', async () => {
-    const jar = await signInAdmin('superadmin@jobbank.local');
-    const tooFar = await call(createBranchRoute, '/api/v1/branches', {
-      method: 'POST',
-      jar,
-      headers: { 'idempotency-key': crypto.randomUUID() },
-      body: {
-        code: 'TOO-FAR',
-        name: 'X',
-        city: 'Y',
-        location: { lat: 24, lng: 67 },
-        matchRadius: { preferredM: 8000, maxM: 15_000 },
-      },
-    });
-    expect(tooFar.status).toBe(422);
-
+  it('rejects branch edits by non-Super-Admins', async () => {
     const ba = await signInAdmin('branchadmin.khi@jobbank.local');
     const denied = await call(patchBranch, `/api/v1/branches/${KHI}`, {
       method: 'PATCH',

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PAKISTAN_MOBILE_PREFIXES as SHARED_MOBILE_PREFIXES } from '@jobbank/shared';
 import { formatCnic, isValidCnic, maskCnic } from './cnic';
-import { distanceBand, distanceTone, formatDistance } from './distance';
 import {
   PAKISTAN_MOBILE_PREFIXES,
   formatPkMobileDisplay,
@@ -43,9 +42,9 @@ describe('normalizePkMobile', () => {
   // list must hold the same prefixes, or the input and the schema
   // disagree again.
   it('dropdown prefix table matches the shared allowlist', () => {
-    expect([...PAKISTAN_MOBILE_PREFIXES.map(({ prefix }) => prefix)].sort()).toEqual([
-      ...SHARED_MOBILE_PREFIXES,
-    ].sort());
+    expect([...PAKISTAN_MOBILE_PREFIXES.map(({ prefix }) => prefix)].sort()).toEqual(
+      [...SHARED_MOBILE_PREFIXES].sort(),
+    );
   });
 });
 
@@ -66,30 +65,5 @@ describe('CNIC helpers', () => {
 
   it('masks the middle block', () => {
     expect(maskCnic('4210112345671')).toBe('42101-•••••••-1');
-  });
-});
-
-describe('distance helpers', () => {
-  it('formats metres and kilometres', () => {
-    expect(formatDistance(850)).toBe('850 m');
-    expect(formatDistance(6240)).toBe('6.2 km');
-    expect(formatDistance(8000)).toBe('8 km');
-    expect(formatDistance(12_400)).toBe('12 km');
-    expect(formatDistance(-1)).toBe('—');
-  });
-
-  it('maps distance to tone using the PRD radius policy (≤8 km preferred, ≤10 km max)', () => {
-    expect(distanceTone(7_900)).toBe('success');
-    expect(distanceTone(8_000)).toBe('success');
-    expect(distanceTone(9_500)).toBe('warning');
-    expect(distanceTone(10_100)).toBe('danger');
-    expect(distanceTone(5_000, { preferredMeters: 3_000, maxMeters: 6_000 })).toBe('warning');
-  });
-
-  it('bands distance for masked employer views', () => {
-    expect(distanceBand(4_999)).toBe('< 5 km');
-    expect(distanceBand(7_900)).toBe('5–8 km');
-    expect(distanceBand(9_500)).toBe('8–10 km');
-    expect(distanceBand(10_100)).toBe('> 10 km');
   });
 });

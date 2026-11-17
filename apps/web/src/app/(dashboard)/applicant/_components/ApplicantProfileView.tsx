@@ -326,7 +326,7 @@ export function ApplicantProfileView({
             {address?.location && (
               <div className="text-primary bg-primary-soft/50 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium sm:col-span-2">
                 <CheckCircle2 className="size-4 shrink-0" />
-                Home location pin is recorded for nearby radius job matching.
+                Home location pin is recorded.
               </div>
             )}
           </div>

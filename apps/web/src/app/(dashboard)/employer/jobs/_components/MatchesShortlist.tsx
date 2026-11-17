@@ -7,7 +7,7 @@ import type { JobMatchView, MatchesPage, MatchReviewStatus } from '@/domains/mat
 import { apiFetch, friendlyApiError } from '@/lib/api/client';
 import { formatDate } from '@/lib/format/date';
 import { Badge, Button, Label, Select, StatusPill, Textarea } from '@/components/atoms';
-import { DistanceBadge, EmptyState, Modal, toast } from '@/components/molecules';
+import { EmptyState, Modal, toast } from '@/components/molecules';
 import { DataTable } from '@/components/organisms';
 
 export interface ReasonOption {
@@ -41,7 +41,6 @@ const FACTOR_LABELS: Record<string, string> = {
   experience: 'Experience',
   education: 'Education',
   languages: 'Languages',
-  distance: 'Distance',
   salary: 'Salary',
   preferences: 'Job preferences',
   text_fit: 'Profile fit (AI)',
@@ -254,17 +253,6 @@ export function MatchesShortlist({ jobId, matches, page, pageSize, reasons }: Pr
             ),
           },
           {
-            id: 'distance',
-            header: 'Distance',
-            hideBelow: 'md',
-            cell: (r) =>
-              r.distanceM != null ? (
-                <DistanceBadge meters={r.distanceM} masked />
-              ) : (
-                <span className="text-fg-subtle">—</span>
-              ),
-          },
-          {
             id: 'status',
             header: 'Status',
             cell: (r) => {
@@ -393,8 +381,8 @@ export function MatchesShortlist({ jobId, matches, page, pageSize, reasons }: Pr
             <p className="text-fg-muted text-sm">{breakdown.summary}</p>
             {breakdown.completeness !== null && (
               <p className="text-fg-muted text-sm">
-                Profile completeness: {Math.round(breakdown.completeness * 100)}% of factors
-                scored from real data
+                Profile completeness: {Math.round(breakdown.completeness * 100)}% of factors scored
+                from real data
                 {breakdown.thinProfile
                   ? ' — thin profile, treat this score as weakly evidenced.'
                   : '.'}

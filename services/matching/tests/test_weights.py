@@ -12,7 +12,6 @@ def test_every_factor_has_a_weight():
         "experience",
         "education",
         "languages",
-        "distance",
         "salary",
         "preferences",
         "text_fit",
@@ -20,4 +19,4 @@ def test_every_factor_has_a_weight():
 
 
 def test_weights_version_is_stable():
-    assert WEIGHTS_VERSION == "v2"
+    assert WEIGHTS_VERSION == "v3"

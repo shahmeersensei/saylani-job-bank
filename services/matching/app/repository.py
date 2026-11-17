@@ -1,7 +1,8 @@
-"""Database access: PostGIS candidate pools, criteria resolution, persistence.
+"""Database access: candidate pools, criteria resolution, persistence.
 
-Uses psycopg 3 (async). All geo filters run in SQL so the GiST index does the
-heavy lifting; scoring stays in Python (pure, testable).
+Uses psycopg 3 (async). Location plays no part here any more — the radius
+feature was removed 2026-11-17, so the pool is every referrable applicant
+and scoring stays in Python (pure, testable).
 """
 
 from __future__ import annotations
@@ -46,17 +47,14 @@ async def load_education_ranks(conn: AsyncConnection) -> dict[str, int]:
     return {r["code"]: r["rank"] for r in rows} or dict(EDUCATION_RANKS)
 
 
-async def load_job_criteria(
-    conn: AsyncConnection, job_id: str, hard_cap_m: int = 10_000
-) -> JobCriteria:
+async def load_job_criteria(conn: AsyncConnection, job_id: str) -> JobCriteria:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
             """
             SELECT j.id, j.title, j.category_code, j.description, j.job_type, j.shift,
                    j.gender_preference, j.salary_min, j.salary_max, j.status,
                    j.closes_at, j.vacancies, j.vacancies_filled, j.branch_id,
-                   c.status AS company_status,
-                   EXISTS (SELECT 1 FROM job_locations jl WHERE jl.job_id = j.id) AS has_location
+                   c.status AS company_status
             FROM jobs j
             JOIN companies c ON c.id = j.company_id
             WHERE j.id = %s
@@ -76,8 +74,6 @@ async def load_job_criteria(
             problems.append("job has expired (closes_at in the past)")
         if job["vacancies_filled"] >= job["vacancies"]:
             problems.append("no vacancies left")
-        if not job["has_location"]:
-            problems.append("job has no location pin")
         if problems:
             raise JobNotMatchable("; ".join(problems))
 
@@ -99,31 +95,6 @@ async def load_job_criteria(
         )
         req = await cur.fetchone()
 
-        # Radius: most specific policy wins (branch → category → global), capped.
-        await cur.execute(
-            """
-            WITH picks AS (
-                SELECT 'BRANCH' AS src, preferred_m, max_m
-                FROM match_radius_policies WHERE branch_id = %s
-                UNION ALL
-                SELECT 'CATEGORY', p.preferred_m, p.max_m
-                FROM match_radius_policies p
-                JOIN master_data md ON md.id = p.category_id
-                WHERE md.type = 'JOB_CATEGORY' AND md.code = %s
-                UNION ALL
-                SELECT 'GLOBAL', preferred_m, max_m
-                FROM match_radius_policies WHERE scope = 'GLOBAL'
-            )
-            SELECT src, preferred_m, max_m FROM picks
-            ORDER BY CASE src WHEN 'BRANCH' THEN 0 WHEN 'CATEGORY' THEN 1 ELSE 2 END
-            LIMIT 1
-            """,
-            (job["branch_id"], job["category_code"]),
-        )
-        radius = await cur.fetchone()
-        preferred_m = min(radius["preferred_m"], hard_cap_m) if radius else 8_000
-        max_m = min(radius["max_m"], hard_cap_m) if radius else hard_cap_m
-
     ranks = await load_education_ranks(conn)
     edu_code = req["education_level_code"] if req else None
 
@@ -143,39 +114,31 @@ async def load_job_criteria(
         min_education_rank=ranks.get(edu_code) if edu_code else None,
         min_experience_years=req["min_experience_years"] if req else None,
         required_languages=list(req["language_codes"] or []) if req else [],
-        preferred_radius_m=preferred_m,
-        max_radius_m=max_m,
     )
 
 
-async def load_candidate_pool(
-    conn: AsyncConnection, job_id: str, max_radius_m: int
-) -> list[dict[str, Any]]:
-    """ACTIVE or INACTIVE applicants inside the max radius with distance + profile version.
+async def load_candidate_pool(conn: AsyncConnection) -> list[dict[str, Any]]:
+    """Every ACTIVE or INACTIVE applicant, with profile version — no location
+    filter at all since the radius feature was removed (2026-11-17).
 
     INACTIVE applicants are included (audit 2026-11-11, M-13): the interim
     referral rule explicitly allows referring INACTIVE applicants, so the
     engine must surface the same candidates staff are allowed to refer.
     REJECTED-identity applicants are excluded here too (audit 2026-11-11,
     M-12): they can never be referred, so the engine must not surface them
-    as shortlist candidates. Only identity/distance/version here: everything
-    else lives in the Redis profile cache (keyed by updated_at) or is fetched
-    on a cache miss.
+    as shortlist candidates. Only identity/version here: everything else
+    lives in the Redis profile cache (keyed by updated_at) or is fetched on
+    a cache miss.
     """
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
             """
             SELECT a.id AS applicant_id,
-                   ST_Distance(aa.location, jl.location) AS distance_m,
                    a.updated_at AS profile_version
             FROM applicants a
-            JOIN applicant_addresses aa ON aa.applicant_id = a.id
-            CROSS JOIN (SELECT location FROM job_locations WHERE job_id = %s LIMIT 1) jl
             WHERE a.status IN ('ACTIVE', 'INACTIVE')
               AND a.identity_status <> 'REJECTED'
-              AND ST_DWithin(aa.location, jl.location, %s)
-            """,
-            (job_id, max_radius_m),
+            """
         )
         return list(await cur.fetchall())
 
@@ -183,7 +146,7 @@ async def load_candidate_pool(
 async def load_full_profiles(
     conn: AsyncConnection, applicant_ids: list[str]
 ) -> dict[str, ApplicantProfile]:
-    """Full profiles (everything except distance) for cache misses."""
+    """Full profiles for cache misses."""
     if not applicant_ids:
         return {}
 
@@ -193,7 +156,6 @@ async def load_full_profiles(
             "identity_status": "UNVERIFIED",
             "has_no_experience": False,
             "min_salary_pkr": None,
-            "willing_radius_m": None,
             "shifts": [],
             "job_types": [],
             "category_codes": [],
@@ -210,7 +172,7 @@ async def load_full_profiles(
         await cur.execute(
             """
             SELECT a.id AS applicant_id, a.gender, a.identity_status, a.has_no_experience,
-                   p.min_salary_pkr, p.willing_radius_m, p.shifts, p.job_types, p.category_codes
+                   p.min_salary_pkr, p.shifts, p.job_types, p.category_codes
             FROM applicants a
             LEFT JOIN applicant_preferences p ON p.applicant_id = a.id
             WHERE a.id = ANY(%s::uuid[])
@@ -225,7 +187,6 @@ async def load_full_profiles(
             b["identity_status"] = r["identity_status"]
             b["has_no_experience"] = r["has_no_experience"]
             b["min_salary_pkr"] = r["min_salary_pkr"]
-            b["willing_radius_m"] = r["willing_radius_m"]
             b["shifts"] = list(r["shifts"] or [])
             b["job_types"] = list(r["job_types"] or [])
             b["category_codes"] = list(r["category_codes"] or [])
@@ -354,8 +315,8 @@ async def save_run_result(
             await cur.execute(
                 """
                 WITH incoming AS (
-                  SELECT * FROM unnest(%s::uuid[], %s::float8[], %s::float8[], %s::text[])
-                    AS t(applicant_id, score, distance_m, summary)
+                  SELECT * FROM unnest(%s::uuid[], %s::float8[], %s::text[])
+                    AS t(applicant_id, score, summary)
                 ), prev AS (
                   SELECT DISTINCT ON (jm.applicant_id) jm.applicant_id, jm.review_status,
                          jm.review_reason_code, jm.review_note, jm.reviewed_by, jm.reviewed_at,
@@ -367,11 +328,11 @@ async def save_run_result(
                   ORDER BY jm.applicant_id, mr.created_at DESC
                 )
                 INSERT INTO job_matches
-                  (run_id, job_id, applicant_id, score, distance_m, review_status,
+                  (run_id, job_id, applicant_id, score, review_status,
                    review_reason_code, review_note, reviewed_by, reviewed_at,
                    applicant_response, refusal_reason_code, responded_at, summary,
                    vacancy_filled)
-                SELECT %s::uuid, %s::uuid, i.applicant_id, i.score, i.distance_m,
+                SELECT %s::uuid, %s::uuid, i.applicant_id, i.score,
                        COALESCE(p.review_status, 'NEW'),
                        p.review_reason_code, p.review_note, p.reviewed_by, p.reviewed_at,
                        p.applicant_response, p.refusal_reason_code, p.responded_at, i.summary,
@@ -383,7 +344,6 @@ async def save_run_result(
                 (
                     [m.applicant_id for m in matches],
                     [m.score for m in matches],
-                    [m.distance_m for m in matches],
                     [m.summary for m in matches],
                     job_id,
                     run_id,
@@ -450,9 +410,9 @@ async def read_latest_matches(
 
         await cur.execute(
             """
-            SELECT id, applicant_id, score, distance_m, review_status, summary, generated_at
+            SELECT id, applicant_id, score, review_status, summary, generated_at
             FROM job_matches WHERE run_id = %s
-            ORDER BY score DESC NULLS LAST, distance_m ASC NULLS LAST, applicant_id ASC
+            ORDER BY score DESC NULLS LAST, applicant_id ASC
             LIMIT %s OFFSET %s
             """,
             (run["id"], limit, offset),
@@ -485,10 +445,6 @@ async def read_latest_matches(
                     {
                         "applicant_id": str(r["applicant_id"]),
                         "score": r["score"],
-                        "distance_m": r["distance_m"],
-                        "distance_km": round(r["distance_m"] / 1000, 1)
-                        if r["distance_m"] is not None
-                        else None,
                         "review_status": r["review_status"],
                         "summary": r["summary"],
                         "factors": factors_by_match.get(str(r["id"]), []),

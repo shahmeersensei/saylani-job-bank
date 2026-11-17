@@ -395,7 +395,7 @@ describe('location, branch and profile sections', () => {
     expect(stored).toMatchObject({ type: 'POINT', lat: KARACHI_HOME.lat });
   });
 
-  it('validates section codes, dates and the radius cap', async () => {
+  it('validates section codes and dates', async () => {
     const { jar } = await registered();
     await call(putLocation, '/api/v1/applicants/me/location', {
       method: 'PUT',

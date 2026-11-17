@@ -1,9 +1,10 @@
 """End-to-end smoke test against the dev database.
 
-Activates three seeded applicants, places them ~0 km / ~4.8 km / ~9.5 km from a
-new OPEN job (SALES required), runs the real pipeline (PostGIS pool ->
-eligibility -> scoring -> persistence) and prints the shortlist. Everything is
-restored/cleaned up afterwards.
+Activates three seeded applicants for a new OPEN job (SALES required), runs
+the real pipeline (pool -> eligibility -> scoring -> persistence) and prints
+the shortlist. Pins are still placed (and restored) for realism, but since
+the radius feature was removed (2026-11-17) distance no longer affects the
+pool, eligibility or scores. Everything is restored/cleaned up afterwards.
 
 Usage:  .venv/Scripts/python.exe scripts/smoke.py
 """
@@ -105,8 +106,8 @@ async def main() -> None:
                     """
                     INSERT INTO applicant_preferences
                       (applicant_id, min_salary_pkr, shifts, job_types,
-                       category_codes, willing_radius_m)
-                    VALUES (%s, %s, '{DAY}', '{FULL_TIME}', '{CALL_CENTRE}', 10000)
+                       category_codes)
+                    VALUES (%s, %s, '{DAY}', '{FULL_TIME}', '{CALL_CENTRE}')
                     """,
                     (aid, [35_000, 45_000, 30_000][i]),
                 )
