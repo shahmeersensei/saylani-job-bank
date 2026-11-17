@@ -124,7 +124,7 @@ export default async function EmployerJobsPage({ searchParams }: { searchParams:
             {pagination.total} posting{pagination.total !== 1 ? 's' : ''}
           </p>
         </div>
-        <Link href="/employer/jobs/new">
+        <Link href="/employer/jobs/new" variant="unstyled">
           <Button size="sm">
             <PlusCircle className="mr-1.5 size-4" />
             Post a job
@@ -146,6 +146,7 @@ export default async function EmployerJobsPage({ searchParams }: { searchParams:
               <Link
                 key={job.id}
                 href={`/employer/jobs/${job.id}`}
+                variant="unstyled"
                 className="border-border bg-surface hover:bg-surface-muted flex items-center justify-between rounded-xl border px-5 py-4 transition-colors"
               >
                 <div className="flex items-start gap-3">

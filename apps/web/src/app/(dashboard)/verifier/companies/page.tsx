@@ -55,6 +55,7 @@ export default async function VerifierCompaniesPage() {
               <Link
                 key={c.id}
                 href={`/verifier/companies/${c.id}`}
+                variant="unstyled"
                 className="border-border bg-surface hover:bg-surface-muted flex items-center justify-between rounded-xl border px-5 py-4 transition-colors"
               >
                 <div className="flex items-start gap-3">

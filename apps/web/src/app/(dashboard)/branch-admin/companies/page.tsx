@@ -122,6 +122,7 @@ export default async function BranchAdminCompaniesPage({
               <Link
                 key={c.id}
                 href={`/branch-admin/companies/${c.id}`}
+                variant="unstyled"
                 className="border-border bg-surface hover:bg-surface-muted flex items-center justify-between rounded-xl border px-5 py-4 transition-colors"
               >
                 <div className="flex items-start gap-3">
