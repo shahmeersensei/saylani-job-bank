@@ -76,7 +76,6 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
   // false while a photo URL/image is still loading.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoSettled, setPhotoSettled] = useState(true);
-  const [photoFailed, setPhotoFailed] = useState(false);
   const photoRef = useRef<HTMLImageElement>(null);
   const photoDocIdRef = useRef<string | null>(null);
 

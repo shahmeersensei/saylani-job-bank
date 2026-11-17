@@ -73,7 +73,6 @@ describe('RegistrationPrintClient', () => {
     expect(print).toHaveBeenCalledOnce();
   });
 
-<<<<<<< HEAD
   it('shows the applicant photo beside the personal details', async () => {
     render(<RegistrationPrintClient applicantId="applicant-id" />);
 
@@ -129,7 +128,8 @@ describe('RegistrationPrintClient', () => {
     expect(await screen.findByText('Photo could not be loaded')).toBeInTheDocument();
     expect(screen.queryByText('No photo on file')).not.toBeInTheDocument();
     expect(screen.queryByAltText('Applicant photo')).not.toBeInTheDocument();
-=======
+  });
+
   it('shows the passport photo top-right and refreshes its link before printing', async () => {
     const photoForm = { ...form, photoDocumentId: '00000000-0000-0000-0000-000000000099' };
     vi.mocked(apiFetch).mockImplementation((path: string) =>
@@ -171,6 +171,5 @@ describe('RegistrationPrintClient', () => {
       );
     // Once on load, once on print.
     expect(photoLinkCalls.length).toBeGreaterThanOrEqual(2);
->>>>>>> 786ad2b (feat(web): add 24-hour token validity and photo on registration print)
   });
 });
