@@ -26,6 +26,7 @@ import {
   assertPermission,
   hasRole,
   isSuperAdmin,
+  visibleBranches,
 } from '@/domains/shared/scope';
 import { db } from '@/lib/db';
 import { cnicTakenError } from './profile';
@@ -309,6 +310,40 @@ export async function issueApplicantToken(
 // ─── Lookup / reprint ──────────────────────────────────────────────────
 
 /**
+ * The one branch a bare token number can belong to: the branch the caller
+ * picked, or the caller's only visible branch. Null when the number is
+ * ambiguous — a Super Admin on "all branches", or anyone with several.
+ */
+function singleBranchForNumber(
+  actor: SignedIn['actor'],
+  branchId: string | undefined,
+): string | null {
+  if (branchId) return branchId;
+  const visible = visibleBranches(actor);
+  if (visible === 'all' || visible.length !== 1) return null;
+  return visible[0]!;
+}
+
+/**
+ * Tokens for one branch + daily number, most recent day first.
+ * Audit 2026-11-11 (M-07): no `.limit(1)` here — the number is reused
+ * every day, so returning only the most recent silently hands staff a
+ * different person's slip. Return all days, most recent first.
+ */
+async function tokensForBranchNumber(
+  branch: { id: string; code: string; name: string },
+  tokenNumber: number,
+): Promise<ApplicantTokenView[]> {
+  const rows = await db
+    .select()
+    .from(tokens)
+    .where(and(eq(tokens.branchId, branch.id), eq(tokens.tokenNumber, tokenNumber)))
+    .orderBy(desc(tokens.registrationDay), desc(tokens.issuedAt))
+    .limit(30);
+  return rows.map((row) => toView(row, branch));
+}
+
+/**
  * Staff token lookup (step 2): by token code (`KHI-GULSHAN-007`), by CNIC +
  * branch (+ day, default today), or the whole branch-day list. Always
  * branch-scoped; Super Admins may look up any branch. A token code has no
@@ -316,6 +351,10 @@ export async function issueApplicantToken(
  * token with that branch + number, most recent day first, and the dialog
  * shows each one's issue date so staff pick the right day (M-07). Returns
  * an array so the list and single shapes stay one contract.
+ *
+ * Auto-detect (2026-11-17): a bare number (`007`) is enough — the branch
+ * comes from the branch the caller picked, or their only visible branch.
+ * Staff at one branch never type the `KHI-GULSHAN-` prefix at all.
  */
 export async function lookupApplicantTokens(
   ctx: SignedIn,
@@ -324,7 +363,29 @@ export async function lookupApplicantTokens(
   assertPermission(ctx.actor, 'applicant:manage');
 
   if (query.tokenCode) {
-    const parsed = parseTokenCode(query.tokenCode.trim());
+    const code = query.tokenCode.trim();
+    if (/^\d+$/.test(code)) {
+      const tokenNumber = Number(code);
+      if (tokenNumber < 1 || tokenNumber > MAX_TOKEN_NUMBER) {
+        throw new ValidationError([
+          { path: 'tokenCode', message: 'Enter a token number from 1 to 9999' },
+        ]);
+      }
+      const branchId = singleBranchForNumber(ctx.actor, query.branchId);
+      if (!branchId) {
+        throw new ValidationError([
+          {
+            path: 'branchId',
+            message: 'Choose a branch — a number alone does not say which branch it is from',
+          },
+        ]);
+      }
+      if (!isSuperAdmin(ctx.actor)) assertBranchAccess(ctx.actor, branchId);
+      const branch = await getBranchContact(branchId);
+      if (!branch) throw new NotFoundError('Token');
+      return tokensForBranchNumber(branch, tokenNumber);
+    }
+    const parsed = parseTokenCode(code);
     if (!parsed) {
       throw new ValidationError([
         { path: 'tokenCode', message: 'Enter a token code like KHI-GULSHAN-007' },
@@ -338,16 +399,7 @@ export async function lookupApplicantTokens(
     if (!isSuperAdmin(ctx.actor)) assertBranchAccess(ctx.actor, branchRow.id);
     const branch = await getBranchContact(branchRow.id);
     if (!branch) throw new NotFoundError('Token');
-    // Audit 2026-11-11 (M-07): no `.limit(1)` here — the number is reused
-    // every day, so returning only the most recent silently hands staff a
-    // different person's slip. Return all days, most recent first.
-    const rows = await db
-      .select()
-      .from(tokens)
-      .where(and(eq(tokens.branchId, branch.id), eq(tokens.tokenNumber, parsed.tokenNumber)))
-      .orderBy(desc(tokens.registrationDay), desc(tokens.issuedAt))
-      .limit(30);
-    return rows.map((row) => toView(row, branch));
+    return tokensForBranchNumber(branch, parsed.tokenNumber);
   }
 
   const branchId = query.branchId!;

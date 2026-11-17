@@ -271,7 +271,7 @@ export async function TokenRegistrationPage({ role, basePath }: { role: Role; ba
         </p>
       </header>
       <TokenRegistrationFlow
-        branches={branches.map((b) => ({ value: b.id, label: b.name }))}
+        branches={branches.map((b) => ({ value: b.id, label: b.name, code: b.code }))}
         cities={lists.cities}
         areas={lists.areas}
         educationLevels={lists.educationLevels}

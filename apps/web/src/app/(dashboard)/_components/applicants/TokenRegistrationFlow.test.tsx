@@ -36,7 +36,7 @@ const issuedToken: ApplicantTokenView = {
 };
 
 const props = {
-  branches: [{ value: issuedToken.branchId, label: 'Gulshan' }],
+  branches: [{ value: issuedToken.branchId, label: 'Gulshan', code: 'KHI-GULSHAN' }],
   cities: [],
   areas: [],
   educationLevels: [],
@@ -66,12 +66,12 @@ describe('TokenRegistrationFlow', () => {
     apiFetchMock.mockResolvedValue({ data: [issuedToken] });
     render(<TokenRegistrationFlow {...props} />);
 
-    await user.type(screen.getByPlaceholderText('KHI-GULSHAN-001'), 'khi-gulshan-007');
+    await user.type(screen.getByPlaceholderText('001'), 'khi-gulshan-007');
     await user.click(screen.getByRole('button', { name: 'Find token' }));
 
     await waitFor(() =>
       expect(apiFetchMock).toHaveBeenCalledWith(
-        '/api/v1/applicants/tokens?tokenCode=KHI-GULSHAN-007',
+        '/api/v1/applicants/tokens?tokenCode=KHI-GULSHAN-007&branchId=22222222-2222-4222-8222-222222222222',
       ),
     );
     expect(screen.getByText(/Ahmed Raza/)).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('TokenRegistrationFlow', () => {
     });
     render(<TokenRegistrationFlow {...props} />);
 
-    await user.type(screen.getByPlaceholderText('KHI-GULSHAN-001'), 'KHI-GULSHAN-007');
+    await user.type(screen.getByPlaceholderText('001'), 'KHI-GULSHAN-007');
     await user.click(screen.getByRole('button', { name: 'Find token' }));
 
     await waitFor(() => expect(screen.getByText('Already registered')).toBeInTheDocument());
@@ -111,9 +111,52 @@ describe('TokenRegistrationFlow', () => {
     apiFetchMock.mockResolvedValue({ data: [] });
     render(<TokenRegistrationFlow {...props} />);
 
-    await user.type(screen.getByPlaceholderText('KHI-GULSHAN-001'), 'KHI-GULSHAN-007');
+    await user.type(screen.getByPlaceholderText('001'), 'KHI-GULSHAN-007');
     await user.click(screen.getByRole('button', { name: 'Find token' }));
 
     await waitFor(() => expect(screen.getByText(/No token found/)).toBeInTheDocument());
+  });
+
+  it('auto-detects the full code from just the number at a single branch', async () => {
+    const user = userEvent.setup();
+    apiFetchMock.mockResolvedValue({ data: [issuedToken] });
+    render(<TokenRegistrationFlow {...props} />);
+
+    await user.type(screen.getByPlaceholderText('001'), '007');
+
+    expect(screen.getByText('Auto-detected: KHI-GULSHAN-007')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Find token' }));
+
+    await waitFor(() =>
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        '/api/v1/applicants/tokens?tokenCode=007&branchId=22222222-2222-4222-8222-222222222222',
+      ),
+    );
+    expect(screen.getByText(/Ahmed Raza/)).toBeInTheDocument();
+  });
+
+  it('asks for a branch when the number alone is typed with several branches', async () => {
+    const user = userEvent.setup();
+    render(
+      <TokenRegistrationFlow
+        {...props}
+        branches={[
+          ...props.branches,
+          {
+            value: '44444444-4444-4444-8444-444444444444',
+            label: 'North Nazimabad',
+            code: 'KHI-NORTH',
+          },
+        ]}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText('001'), '007');
+    await user.click(screen.getByRole('button', { name: 'Find token' }));
+
+    expect(
+      screen.getByText('Choose a branch — a number alone does not say which branch it is from'),
+    ).toBeInTheDocument();
+    expect(apiFetchMock).not.toHaveBeenCalled();
   });
 });

@@ -160,6 +160,31 @@ describe('first-counter applicant tokens', () => {
     expect(missing.body.data).toHaveLength(0);
   });
 
+  it('auto-detects the branch from just the token number (2026-11-17)', async () => {
+    const cnic = randomCnic();
+    const issued = await issue(khi, cnic);
+    expect(issued.status).toBe(201);
+    const tokenNumber = issued.body.data.tokenNumber as number;
+
+    // Staff at one branch type only the number — no `KHI-GULSHAN-` prefix.
+    // The staff account's single branch supplies it; the branch also rides
+    // along explicitly, as the Counter 2 form sends it.
+    const byNumber = await lookup(`?tokenCode=${tokenNumber}`);
+    expect(byNumber.status).toBe(200);
+    expect(byNumber.body.data).toContainEqual(
+      expect.objectContaining({ id: issued.body.data.id, tokenNumber }),
+    );
+
+    const byNumberAndBranch = await lookup(`?tokenCode=${tokenNumber}&branchId=${khi}`);
+    expect(byNumberAndBranch.status).toBe(200);
+    expect(byNumberAndBranch.body.data).toContainEqual(
+      expect.objectContaining({ id: issued.body.data.id, tokenNumber }),
+    );
+
+    const invalid = await lookup('?tokenCode=0');
+    expect(invalid.status).toBe(422);
+  });
+
   it('cancelling a token frees the CNIC for a new token the same day (N5)', async () => {
     const cnic = randomCnic();
     const first = await issue(khi, cnic);
