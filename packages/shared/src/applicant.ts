@@ -554,10 +554,22 @@ export function karachiDay(date: Date = new Date()): string {
 }
 
 /**
+ * Applicant token validity: exactly 24 hours (1440 minutes) from issue.
+ * Tokens are derived from the issue instant, never from the calendar day.
+ */
+export const APPLICANT_TOKEN_TTL_MINUTES = 1440;
+
+/** The instant a token issued at `issuedAt` expires: issuedAt + 24 hours. */
+export function tokenExpiresAt(issuedAt: Date = new Date()): Date {
+  return new Date(issuedAt.getTime() + APPLICANT_TOKEN_TTL_MINUTES * 60 * 1000);
+}
+
+/**
  * End of the Pakistan day containing `date`, as an instant: midnight at the
- * start of the next Pakistan day. A token issued at `date` expires then
- * (migration 0035 `expires_at`); the value is derived from the same instant
- * as `issued_at` so a midnight rollover can never split the two (N3).
+ * start of the next Pakistan day. Retained for day-boundary helpers (token
+ * numbers still reset on the Pakistan day); it is no longer token expiry —
+ * tokens now expire 24 hours after issue via `tokenExpiresAt` (migration
+ * 0035 `expires_at`).
  */
 export function karachiDayEnd(date: Date = new Date()): Date {
   const day = karachiDay(date);
@@ -578,7 +590,7 @@ export const applicantTokenSchema = z.object({
   applicantName: z.string(),
   phone: z.string(),
   issuedAt: z.string(),
-  /** End of the issue day in Pakistan time; the token is expired after this. */
+  /** 24 hours after issue; the token is expired after this. */
   expiresAt: z.string(),
   /** True once `expiresAt` has passed (derived server-side, so lookups show it). */
   expired: z.boolean(),

@@ -15,8 +15,8 @@ const token: ApplicantTokenView = {
   phone: '+923001234567',
   // 19:39:20 PKT on 2026-11-07.
   issuedAt: '2026-11-07T14:39:20.000Z',
-  // End of the 2026-11-07 Pakistan day.
-  expiresAt: '2026-11-07T19:00:00.000Z',
+  // Exactly 24 hours after issue: 19:39:20 PKT on 2026-11-08.
+  expiresAt: '2026-11-08T14:39:20.000Z',
   expired: false,
   status: 'ISSUED',
   applicantId: null,
@@ -32,6 +32,8 @@ describe('ApplicantTokenSlip', () => {
     expect(screen.getByText('01')).toBeInTheDocument();
     expect(screen.getByText('KHI-GULSHAN-001')).toBeInTheDocument();
     expect(screen.getByText('07/11/2026 • 7:39 pm')).toBeInTheDocument();
+    expect(screen.getByText('Valid Until')).toBeInTheDocument();
+    expect(screen.getByText('08/11/2026 • 7:39 pm')).toBeInTheDocument();
     expect(screen.getByText('4240127739744')).toBeInTheDocument();
     expect(screen.getByText('Test Applicant')).toBeInTheDocument();
     expect(screen.getByText('+92 300 1234567')).toBeInTheDocument();

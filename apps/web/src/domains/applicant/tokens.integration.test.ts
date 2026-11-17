@@ -68,9 +68,13 @@ describe('first-counter applicant tokens', () => {
     expect(second.body.data.tokenCode).toBe(
       `KHI-GULSHAN-${String(firstNumber + 1).padStart(3, '0')}`,
     );
-    // N11: every token carries its end-of-day expiry.
+    // N11: every token carries its 24-hour expiry (issued + 1440 minutes).
     expect(second.body.data.expiresAt).toEqual(expect.any(String));
     expect(second.body.data.expired).toBe(false);
+    expect(
+      new Date(second.body.data.expiresAt as string).getTime() -
+        new Date(second.body.data.issuedAt as string).getTime(),
+    ).toBe(24 * 60 * 60 * 1000);
   });
 
   it('returns the same token with 200 (not 201) when the same CNIC is issued twice in a day', async () => {

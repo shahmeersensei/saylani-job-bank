@@ -12,24 +12,30 @@
 
 /* Token slip — styled exactly like the approved demo (Saylani logo top-left,
    TOKEN SLIP badge, big two-digit number, detail rows, Job Bank logo
-   watermark). Sizes are the demo's proportions scaled to a 3.4in slip on
-   screen. On paper the @media print rules below re-lay it for the
-   counter's BlackCopper 80mm thermal roll (72mm printable width, its own
-   named page) — do not put it back on A4: an 86mm slip cannot fit 80mm
-   paper and prints clipped/blank on the roll. */
+   watermark). Compact thermal-ticket sizing, modelled on a short Epson
+   ePOS slip (centred title, divider, a few detail lines, feed, cut):
+   same design and same details, just literally half the original slip —
+   ~53mm tall instead of the original ~110mm. The width stays 80mm:
+   that is the thermal roll's paper width, halving it to 40mm would not
+   fit the details. Screen preview is the real 80mm paper width, so what
+   staff see in the dialog is what the roll prints. On paper the @media
+   print rules below re-lay it for the counter's BlackCopper 80mm thermal
+   roll (72mm printable width, its own named page) — do not put it back
+   on A4: an 86mm slip cannot fit 80mm paper and prints clipped/blank
+   on the roll. */
 .token-slip {
   position: relative;
   width: 100%;
-  max-width: 3.4in;
+  max-width: 80mm;
   margin: 0 auto;
   overflow: hidden;
-  border: 2px solid #0f3557;
-  border-radius: 13px;
+  border: 1px solid #0f3557;
+  border-radius: 6px;
   background: #fff;
-  padding: 20px 22px 16px;
+  padding: 4px 10px;
   font-family: Arial, Helvetica, sans-serif;
   color: #102a43;
-  box-shadow: 0 8px 24px rgb(15 53 87 / 0.12);
+  box-shadow: 0 4px 12px rgb(15 53 87 / 0.12);
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
@@ -38,7 +44,7 @@
   position: absolute;
   left: 50%;
   top: 54%;
-  width: 82%;
+  width: 60%;
   transform: translate(-50%, -50%);
   opacity: 0.1;
   pointer-events: none;
@@ -57,44 +63,44 @@
 
 .token-slip__logo {
   display: block;
-  height: 42px;
+  height: 18px;
   width: auto;
 }
 
 .token-slip__badge {
-  margin-top: 6px;
+  margin-top: 1px;
   border-radius: 999px;
   background: #0f3557;
-  padding: 5px 9px;
+  padding: 2px 6px;
   color: #fff;
-  font-size: 9px;
+  font-size: 6px;
   font-weight: 700;
   letter-spacing: 1px;
   white-space: nowrap;
 }
 
 .token-slip__title {
-  margin-top: 9px;
+  margin-top: 4px;
   text-align: center;
 }
 
 .token-slip__title h1 {
   color: #0f3557;
-  font-size: 20px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
 
 .token-slip__title p {
-  margin-top: 3px;
+  margin-top: 1px;
   color: #5a6b7a;
-  font-size: 9px;
+  font-size: 6px;
   letter-spacing: 0.5px;
 }
 
 .token-slip__divider {
-  height: 2px;
-  margin: 12px 0 11px;
+  height: 1px;
+  margin: 4px 0 3px;
   border: 0;
   background: #dbe4ea;
 }
@@ -105,34 +111,34 @@
 
 .token-slip__number-label {
   color: #7a8a99;
-  font-size: 8px;
+  font-size: 6px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
 }
 
 .token-slip__number-value {
   color: #0f3557;
-  font-size: 53px;
+  font-size: 26px;
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1;
 }
 
 /* N6: four-digit token numbers (1000–9999) shrink so the slip layout holds. */
 .token-slip__number-value--wide {
-  font-size: 44px;
+  font-size: 22px;
   letter-spacing: -1px;
 }
 
 .token-slip__rows {
-  margin-top: 9px;
+  margin-top: 3px;
 }
 
 .token-slip__row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
-  padding: 7px 2px;
+  gap: 6px;
+  padding: 2px 1px;
   border-bottom: 1px solid #e6edf1;
 }
 
@@ -142,7 +148,7 @@
 
 .token-slip__key {
   color: #6b7d8d;
-  font-size: 9px;
+  font-size: 7px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
@@ -150,31 +156,31 @@
 .token-slip__value {
   overflow-wrap: anywhere;
   color: #102a43;
-  font-size: 11px;
+  font-size: 8px;
   font-weight: 800;
   text-align: right;
 }
 
 .token-slip__footer {
-  margin-top: 11px;
-  border-top: 2px dashed #c3d2dc;
-  padding-top: 9px;
+  margin-top: 4px;
+  border-top: 1px dashed #c3d2dc;
+  padding-top: 3px;
   text-align: center;
 }
 
 .token-slip__footer p {
   color: #43566a;
-  font-size: 9px;
+  font-size: 6px;
   font-style: italic;
 }
 
 .token-slip__footer small {
   display: block;
-  margin-top: 5px;
+  margin-top: 2px;
   color: #8ba0b0;
-  font-size: 7px;
+  font-size: 6px;
   font-style: normal;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
 }
 
 /* Map semantic CSS variables → Tailwind colour utilities (bg-surface, text-fg-muted, …). */
@@ -333,6 +339,24 @@
     gap: 1rem;
     border-bottom: 2px solid #14783e;
     padding-bottom: 1rem;
+  }
+
+  /* With a photo, the header gains a fourth column at the far right. */
+  .registration-print-header--with-photo {
+    grid-template-columns: 35mm 1fr auto 35mm;
+  }
+
+  /* Applicant passport photo (2026-11-17): 35mm x 45mm, aspect kept by
+     object-fit cover — never stretched. Only rendered when a usable
+     PHOTO document exists; no photo means no slot and no gap. */
+  .registration-print-photo {
+    width: 35mm;
+    height: 45mm;
+    aspect-ratio: 35 / 45;
+    object-fit: cover;
+    border: 1px solid #14783e;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .registration-print-logo {
@@ -539,7 +563,7 @@
        an A4 sheet the roll cannot fit. 80mm paper has ~72mm printable
        width; the roll feeds the 297mm height and the printer cuts it. */
     @page token-slip {
-      size: 80mm 297mm;
+      size: 80mm auto;
       margin: 0;
     }
 
@@ -593,13 +617,15 @@
 
     /* Token slip: the demo-styled slip, centred, on one page — laid out
        for the 80mm thermal roll (72mm printable width), not A4. The
-       `page` property puts it on the named 80mm page above. */
+       `page` property puts it on the named 80mm page above. Compact
+       like the Epson reference slip: tight padding, small logo, and the
+       roll cuts right after the footer — no long blank feed. */
     .token-slip {
       page: token-slip;
       width: 72mm !important;
       max-width: 72mm !important;
       margin: 0 auto !important;
-      padding: 16px 12px 12px !important;
+      padding: 4px 8px 3px !important;
       box-shadow: none !important;
       break-inside: avoid !important;
       page-break-inside: avoid !important;
@@ -607,7 +633,7 @@
 
     /* At 72mm the header row (logo + badge) only fits with a smaller logo. */
     .token-slip__logo {
-      height: 34px !important;
+      height: 18px !important;
     }
 
     .registration-form-print-sheet {

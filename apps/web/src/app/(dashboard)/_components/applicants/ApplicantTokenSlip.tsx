@@ -11,25 +11,32 @@ import { formatDate, formatTime } from '@/lib/format/date';
  * logo as a centre watermark, and the dashed footer. The same markup
  * renders on screen in the issue dialog and as the print-only portal —
  * the matching styles live in design-system/global.css, with @media print
- * rules that print only this slip, on one page. On paper it is laid out
- * for the counter's BlackCopper 80mm thermal roll (72mm printable width,
- * named 80mm page) — not A4.
+ * rules that print only this slip, on one page. Compact thermal-ticket
+ * sizing (2026-11-16): same design and details, literally half the
+ * original slip — 80mm wide, ~53mm tall — instead of the original
+ * ~110mm. Width stays 80mm: that is the thermal roll's paper width.
+ * On paper it is laid out for the counter's BlackCopper 80mm
+ * thermal roll (72mm printable width, named 80mm page) — not A4.
  *
  * Values are the live token: the big number is the day's token number,
  * zero-padded to two digits; the Applicant ID row shows the token code,
- * because there is no applicant record yet at token time.
+ * because there is no applicant record yet at token time. The token is
+ * valid for 24 hours from issue (2026-11-17): the Valid Until row shows
+ * exactly when it expires.
  *
  * N9 (2026-11-08): the full CNIC is on the slip by design. This is a
  * counter queue ticket, not a record: the bearer paper slip must identify
  * its holder when staff call the number, and the CNIC is the only
  * identifier collected at token time (there is no applicant record yet).
  * Trade-off accepted: anyone holding the slip can read the CNIC, so slips
- * should be treated as single-day bearer tokens and not retained. No
+ * should be treated as 24-hour bearer tokens and not retained. No
  * consent checkbox — the CNIC is required to issue the token at all.
  */
 export function ApplicantTokenSlip({ token }: { token: ApplicantTokenView }) {
   const date = formatDate(token.issuedAt);
   const time = formatTime(token.issuedAt);
+  const validUntilDate = formatDate(token.expiresAt);
+  const validUntilTime = formatTime(token.expiresAt);
 
   return (
     <article className="token-slip">
@@ -82,6 +89,12 @@ export function ApplicantTokenSlip({ token }: { token: ApplicantTokenView }) {
             <dt className="token-slip__key">Date &amp; Time</dt>
             <dd className="token-slip__value">
               {date} • {time}
+            </dd>
+          </div>
+          <div className="token-slip__row">
+            <dt className="token-slip__key">Valid Until</dt>
+            <dd className="token-slip__value">
+              {validUntilDate} • {validUntilTime}
             </dd>
           </div>
           {(token.status !== 'ISSUED' || token.expired) && (

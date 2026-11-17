@@ -1,4 +1,5 @@
 import {
+  APPLICANT_TOKEN_TTL_MINUTES,
   cancelApplicantTokenSchema,
   issueApplicantTokenSchema,
   karachiDay,
@@ -6,6 +7,7 @@ import {
   MAX_TOKEN_NUMBER,
   parseTokenCode,
   tokenCodeFor,
+  tokenExpiresAt,
   tokenLookupQuerySchema,
 } from '@jobbank/shared';
 import { describe, expect, it } from 'vitest';
@@ -47,6 +49,18 @@ describe('karachiDay', () => {
     expect(karachiDay(new Date('2026-11-07T18:00:00Z'))).toBe('2026-11-07');
     // 19:00 UTC is midnight in Karachi — already the 8th.
     expect(karachiDay(new Date('2026-11-07T19:00:00Z'))).toBe('2026-11-08');
+  });
+});
+
+describe('tokenExpiresAt', () => {
+  it('is exactly 24 hours (1440 minutes) after issue, across midnight', () => {
+    expect(APPLICANT_TOKEN_TTL_MINUTES).toBe(1440);
+    // 19:39 PKT on the 7th expires at 19:39 PKT on the 8th — not at midnight.
+    expect(tokenExpiresAt(new Date('2026-11-07T14:39:20.000Z')).toISOString()).toBe(
+      '2026-11-08T14:39:20.000Z',
+    );
+    const issuedAt = new Date('2026-11-07T19:30:00.000Z');
+    expect(tokenExpiresAt(issuedAt).getTime() - issuedAt.getTime()).toBe(24 * 60 * 60 * 1000);
   });
 });
 

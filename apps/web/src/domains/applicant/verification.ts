@@ -184,6 +184,15 @@ export async function createApplicantRegistrationForm(
     ensureApplicantVerificationToken(ctx, applicantId, false, 'city'),
     applicantPhoto(applicantId),
   ]);
+  // The applicant's current passport-size photo, if one was captured and
+  // confirmed: the newest current PHOTO document that is usable (uploaded
+  // or accepted — rejected and virus-flagged photos never print). Only the
+  // document id travels in the form payload; the client fetches a fresh
+  // short-lived view link when printing.
+  const photoDocuments = await currentDocuments(db, applicantId);
+  const photoDocument = photoDocuments.find(
+    (doc) => doc.typeCode === 'PHOTO' && doc.status !== 'REJECTED' && doc.scanResult !== 'infected',
+  );
   const label = (type: keyof typeof labels, code: string | null) =>
     code ? (labels[type]?.[code] ?? 'Not available') : null;
   const verificationUrl = new URL(`/verify/applicant/${token}`, env.NEXT_PUBLIC_APP_URL).toString();
@@ -255,6 +264,7 @@ export async function createApplicantRegistrationForm(
     photoDataUrl: photo.dataUrl,
     photoUrl: photo.viewUrl,
     canRegenerate: profile.can.manage,
+    photoDocumentId: photoDocument?.id ?? null,
   };
 }
 
