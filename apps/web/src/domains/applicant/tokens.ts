@@ -2,10 +2,10 @@ import 'server-only';
 import { schema } from '@jobbank/db';
 import {
   karachiDay,
-  karachiDayEnd,
   MAX_TOKEN_NUMBER,
   parseTokenCode,
   tokenCodeFor,
+  tokenExpiresAt,
   type ApplicantTokenView,
   type CancelApplicantTokenInput,
   type IssueApplicantTokenInput,
@@ -40,11 +40,14 @@ const tokens = schema.branchApplicantTokens;
  * registration happens at a later step and links back through `applicantId`
  * on the token row.
  *
- * Step 2 (2026-11-08): tokens now expire at the end of their Pakistan day
- * (`expires_at`, migration 0035), can be looked up and reprinted, can be
- * cancelled (which frees the CNIC for a new token the same day), and are
+ * Step 2 (2026-11-08, revised 2026-11-17): tokens now expire exactly 24
+ * hours after issue (`expires_at`, migration 0035), can be looked up and
+ * reprinted, can be cancelled (which frees the CNIC for a new token), and are
  * completed — ISSUED → COMPLETED with the applicant linked — by the full
- * registration in the same transaction.
+ * registration in the same transaction. Because the 24-hour validity spans
+ * midnight, a live token issued yesterday must be re-handed, never duplicated:
+ * the issue dedupe and the CNIC lookup check unexpired ISSUED tokens across
+ * days, not just today.
  */
 
 /** Retries for the daily-number race (N2): 10 attempts, then a 409 to retry. */
@@ -137,20 +140,25 @@ export async function issueApplicantToken(
   if (owner) throw await cnicTakenError(db, owner);
 
   // N3: one instant drives the whole issue — the Pakistan day, `issued_at`
-  // and `expires_at` can never disagree across a midnight rollover.
+  // and `expires_at` can never disagree across a midnight rollover. Expiry
+  // is exactly 24 hours after issue (APPLICANT_TOKEN_TTL_MINUTES = 1440),
+  // calculated on the backend — never trusted from the frontend.
   const now = new Date();
   const today = karachiDay(now);
-  const expiresAt = karachiDayEnd(now);
+  const expiresAt = tokenExpiresAt(now);
 
-  // Same person, same branch, same day: hand back the token already issued
-  // instead of a duplicate (e.g. the slip was lost, or the counter double-clicked).
+  // Same person, same branch: hand back the token already issued instead of
+  // a duplicate (e.g. the slip was lost, or the counter double-clicked).
+  // No day filter: a 24-hour token issued yesterday can still be live today,
+  // and issuing a second one for the same CNIC would break the one-live-token
+  // rule. Only the most recent ISSUED token is considered; an expired one is
+  // auto-cancelled below, exactly as for a same-day expiry.
   let [existing] = await db
     .select()
     .from(tokens)
     .where(
       and(
         eq(tokens.branchId, input.branchId),
-        eq(tokens.registrationDay, today),
         eq(tokens.cnic, input.cnic),
         eq(tokens.status, 'ISSUED'),
       ),
@@ -263,13 +271,13 @@ export async function issueApplicantToken(
       if (isUniqueViolation(error, 'branch_applicant_tokens_branch_day_cnic_issued_unique')) {
         // A second counter issued for the same CNIC at the same moment: the
         // partial unique index caught the race — hand back the token that won.
+        // No day filter: the winner may be yesterday's still-live token.
         const [winner] = await db
           .select()
           .from(tokens)
           .where(
             and(
               eq(tokens.branchId, input.branchId),
-              eq(tokens.registrationDay, today),
               eq(tokens.cnic, input.cnic),
               eq(tokens.status, 'ISSUED'),
             ),
@@ -352,12 +360,16 @@ export async function lookupApplicantTokens(
 
   if (query.cnic) {
     const cnic = query.cnic.replace(/[\s-]/g, '');
+    // No explicit day: a 24-hour token issued yesterday can still be live
+    // today, so the CNIC lookup must find it — search across days, most
+    // recent first. An explicit day keeps its exact-day meaning (the
+    // branch-day list below, and staff checking a specific day).
+    const conditions = [eq(tokens.branchId, branchId), eq(tokens.cnic, cnic)];
+    if (query.day) conditions.push(eq(tokens.registrationDay, day));
     const [row] = await db
       .select()
       .from(tokens)
-      .where(
-        and(eq(tokens.branchId, branchId), eq(tokens.registrationDay, day), eq(tokens.cnic, cnic)),
-      )
+      .where(and(...conditions))
       .orderBy(desc(tokens.issuedAt))
       .limit(1);
     return row ? [toView(row, branch)] : [];
@@ -446,7 +458,7 @@ export async function completeTokenForRegistration(
     throw new ConflictError(`This token is already ${row.status}.`);
   }
   if (row.expiresAt.getTime() <= now.getTime()) {
-    throw new ConflictError('This token expired at the end of its issue day. Issue a new token.');
+    throw new ConflictError('This token expired 24 hours after it was issued. Issue a new token.');
   }
   const [updated] = await tx
     .update(tokens)

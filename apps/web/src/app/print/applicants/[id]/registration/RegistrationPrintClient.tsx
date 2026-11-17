@@ -12,7 +12,7 @@ import Image from 'next/image';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/atoms';
 import { APPLICANT_STATUS_PILL } from '@/app/(dashboard)/_components/applicants/labels';
-import type { RegistrationFormData } from '@/domains/applicant';
+import type { DocumentLink, RegistrationFormData } from '@/domains/applicant';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import { formatCnic } from '@/lib/format/cnic';
 import { formatDate } from '@/lib/format/date';
@@ -46,6 +46,18 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/**
+ * Fresh view link for a document. Links live only 120 seconds, so the
+ * photo URL is never stored in the form payload — it is fetched when the
+ * print page loads and again on print, so it cannot expire in between.
+ */
+async function fetchPhotoUrl(applicantId: string, documentId: string): Promise<string> {
+  const { data } = await apiFetch<DocumentLink>(
+    `/api/v1/applicants/${applicantId}/documents/${documentId}/url`,
+  );
+  return data.url;
+}
+
 export function RegistrationPrintClient({ applicantId }: { applicantId: string }) {
   const [form, setForm] = useState<RegistrationFormData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +71,14 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
   const [photoUseDownload, setPhotoUseDownload] = useState(false);
   const logoRef = useRef<HTMLImageElement>(null);
   const qrRef = useRef<HTMLImageElement>(null);
+  // Passport photo (2026-11-17): the captured PHOTO document, fetched as a
+  // fresh signed URL. `photoSettled` starts true (no photo) and only goes
+  // false while a photo URL/image is still loading.
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoSettled, setPhotoSettled] = useState(true);
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const photoRef = useRef<HTMLImageElement>(null);
+  const photoDocIdRef = useRef<string | null>(null);
 
   const loadForm = async () => {
     setLoading(true);
@@ -118,7 +138,40 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
     const qr = qrRef.current;
     if (logo?.complete && logo.naturalWidth > 0) setLogoLoaded(true);
     if (qr?.complete && qr.naturalWidth > 0) setQrLoaded(true);
-  }, [form]);
+    const photo = photoRef.current;
+    if (photo?.complete && photo.naturalWidth > 0) setPhotoSettled(true);
+  }, [form, photoUrl]);
+
+  // Fetch a fresh photo URL whenever the form (re)loads with a photo
+  // document. No photo → nothing to fetch, and the print gate stays open.
+  useEffect(() => {
+    if (!form?.photoDocumentId) {
+      photoDocIdRef.current = null;
+      setPhotoUrl(null);
+      setPhotoFailed(false);
+      setPhotoSettled(true);
+      return;
+    }
+    if (photoDocIdRef.current === form.photoDocumentId && photoUrl) return;
+    photoDocIdRef.current = form.photoDocumentId;
+    let active = true;
+    setPhotoFailed(false);
+    setPhotoSettled(false);
+    void fetchPhotoUrl(applicantId, form.photoDocumentId)
+      .then((url) => {
+        if (active) setPhotoUrl(url);
+      })
+      .catch(() => {
+        // A failed link must not block the form: print without the photo.
+        if (active) {
+          setPhotoFailed(true);
+          setPhotoSettled(true);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [form, applicantId, photoUrl]);
 
   // A fresh form resets the photo state, so a retry after a failed load
   // starts from the embedded copy again instead of a stale fallback.
@@ -148,7 +201,41 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
     }
   };
 
-  const readyToPrint = Boolean(form && logoLoaded && qrLoaded && !imageError && !loading);
+  const readyToPrint = Boolean(
+    form && logoLoaded && qrLoaded && photoSettled && !imageError && !loading,
+  );
+
+  /**
+   * Refresh the photo link before printing: the 120-second URL fetched at
+   * load time may have expired while staff reviewed the form. The fresh
+   * URL is preloaded (so the printed <img> is already cached), pointed
+   * at, and given one paint before the print dialog opens. A failed
+   * refresh never blocks printing — the existing photo (or none) prints.
+   */
+  const handlePrint = async () => {
+    if (form?.photoDocumentId) {
+      try {
+        const url = await fetchPhotoUrl(applicantId, form.photoDocumentId);
+        // Preload the fresh URL so the <img> in the document is already
+        // cached when print opens — but never let a stalled image block
+        // printing: the wait is capped at 1.5s.
+        await new Promise<void>((resolve) => {
+          const img = new window.Image();
+          const done = () => resolve();
+          img.onload = done;
+          img.onerror = done;
+          img.src = url;
+          setTimeout(done, 1500);
+        });
+        setPhotoUrl(url);
+        setPhotoFailed(false);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      } catch {
+        // Keep the existing photo URL (or no photo) and print anyway.
+      }
+    }
+    window.print();
+  };
 
   return (
     <main className="registration-print-page">
@@ -168,7 +255,11 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
               Replace QR code
             </Button>
           )}
-          <Button leftIcon={<Printer />} disabled={!readyToPrint} onClick={() => window.print()}>
+          <Button
+            leftIcon={<Printer />}
+            disabled={!readyToPrint}
+            onClick={() => void handlePrint()}
+          >
             {readyToPrint ? 'Print Registration Form' : 'Preparing form…'}
           </Button>
         </div>
@@ -194,7 +285,13 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
 
       {form && (
         <article className="registration-print-document">
-          <header className="registration-print-header">
+          <header
+            className={
+              photoUrl && !photoFailed
+                ? 'registration-print-header registration-print-header--with-photo'
+                : 'registration-print-header'
+            }
+          >
             <Image
               ref={logoRef}
               src="/logo.png"
@@ -215,6 +312,22 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
               <strong>{form.registrationReference}</strong>
               <span>{formatDate(form.registeredAt)}</span>
             </div>
+            {photoUrl && !photoFailed && (
+              <Image
+                ref={photoRef}
+                src={photoUrl}
+                width={132}
+                height={170}
+                alt="Applicant passport photo"
+                unoptimized
+                onLoad={() => setPhotoSettled(true)}
+                onError={() => {
+                  setPhotoFailed(true);
+                  setPhotoSettled(true);
+                }}
+                className="registration-print-photo"
+              />
+            )}
           </header>
 
           <dl className="registration-print-summary">

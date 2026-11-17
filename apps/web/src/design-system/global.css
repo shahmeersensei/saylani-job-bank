@@ -341,6 +341,24 @@
     padding-bottom: 1rem;
   }
 
+  /* With a photo, the header gains a fourth column at the far right. */
+  .registration-print-header--with-photo {
+    grid-template-columns: 35mm 1fr auto 35mm;
+  }
+
+  /* Applicant passport photo (2026-11-17): 35mm x 45mm, aspect kept by
+     object-fit cover — never stretched. Only rendered when a usable
+     PHOTO document exists; no photo means no slot and no gap. */
+  .registration-print-photo {
+    width: 35mm;
+    height: 45mm;
+    aspect-ratio: 35 / 45;
+    object-fit: cover;
+    border: 1px solid #14783e;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   .registration-print-logo {
     width: 35mm;
     height: auto;
@@ -545,7 +563,7 @@
        an A4 sheet the roll cannot fit. 80mm paper has ~72mm printable
        width; the roll feeds the 297mm height and the printer cuts it. */
     @page token-slip {
-      size: 80mm 297mm;
+      size: 80mm auto;
       margin: 0;
     }
 

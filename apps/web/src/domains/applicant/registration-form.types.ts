@@ -76,6 +76,13 @@ export interface RegistrationFormData {
    */
   photoUrl: string | null;
   canRegenerate: boolean;
+  /**
+   * Current passport-size PHOTO document id, or null when the applicant has
+   * no usable photo. An id, never a signed URL: view links live only 120
+   * seconds, so the client fetches a fresh one when the print page loads
+   * and again on print.
+   */
+  photoDocumentId: string | null;
 }
 
 export interface PublicApplicantVerification {

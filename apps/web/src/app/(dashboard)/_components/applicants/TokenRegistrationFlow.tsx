@@ -82,7 +82,9 @@ export function TokenRegistrationFlow({
       setResults(data);
       setSelected(null);
       if (data.length === 0) {
-        setAlert('No token found. Check the code and try again — tokens are for today only.');
+        setAlert(
+          'No token found. Check the code and try again — tokens are valid for 24 hours from issue.',
+        );
       }
     } catch (error) {
       if (error instanceof ApiClientError && error.issues.length > 0) {
@@ -110,7 +112,7 @@ export function TokenRegistrationFlow({
           </div>
           <p className="text-fg-muted text-sm">
             {selected.applicantName} · CNIC {selected.cnic} · {selected.branchName} · issued{' '}
-            {formatIssuedAt(selected.issuedAt)}
+            {formatIssuedAt(selected.issuedAt)} · valid until {formatDateTime(selected.expiresAt)}
           </p>
         </section>
         <StaffRegisterApplicantForm
@@ -193,7 +195,8 @@ export function TokenRegistrationFlow({
                     {token.applicantName} · CNIC {token.cnic} · {token.phone}
                   </p>
                   <p className="text-fg-muted text-sm">
-                    {token.branchName} · issued {formatIssuedAt(token.issuedAt)}
+                    {token.branchName} · issued {formatIssuedAt(token.issuedAt)} · valid until{' '}
+                    {formatDateTime(token.expiresAt)}
                   </p>
                   <p className="text-fg-muted text-sm">{tokenState(token)}</p>
                 </div>
