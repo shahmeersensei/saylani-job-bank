@@ -32,7 +32,6 @@ import {
   c,
   changedSinceInfoRequest,
   contacts,
-  findCompaniesForUser,
   findCompanyForUser,
   loadCompany,
   locs,
@@ -74,33 +73,11 @@ async function assertNtnFree(executor: DbExecutor, ntn: string, exceptId?: strin
 
 // ─── Reads ─────────────────────────────────────────────────────────────
 
-/** One employer account may register up to two companies (2026-11-12). */
-export const MAX_COMPANIES_PER_EMPLOYER = 2;
-
 /** The signed-in employer's company, or null before they register it. */
 export async function getMyCompany(actor: Actor): Promise<CompanyView | null> {
   assertPermission(actor, 'company:register');
-  let row: CompanyRow | null = null;
-  if (actor.companyId) {
-    // The active company (picked in the switcher, or the employer's only
-    // one). A stale id falls back to the first membership, never a 404.
-    try {
-      row = await loadCompany(db, actor.companyId);
-    } catch (error) {
-      if (!(error instanceof NotFoundError)) throw error;
-      row = await findCompanyForUser(db, actor.userId);
-    }
-  } else {
-    row = await findCompanyForUser(db, actor.userId);
-  }
+  const row = await findCompanyForUser(db, actor.userId);
   return row ? buildCompanyView(db, row) : null;
-}
-
-/** Every company the signed-in employer belongs to, oldest first. */
-export async function listMyCompanies(actor: Actor): Promise<CompanyView[]> {
-  assertPermission(actor, 'company:register');
-  const rows = await findCompaniesForUser(db, actor.userId);
-  return Promise.all(rows.map((row) => buildCompanyView(db, row)));
 }
 
 async function myCompany(actor: Actor): Promise<CompanyView> {
@@ -127,12 +104,12 @@ export async function registerCompany(
   let createdId = '';
   try {
     createdId = await runCommand(ctx, async ({ tx, audit }) => {
-      // One account may hold up to two companies; a third is still refused
-      // with the same ALREADY_REGISTERED conflict as before.
-      const existing = await findCompaniesForUser(tx, ctx.actor.userId);
-      if (existing.length >= MAX_COMPANIES_PER_EMPLOYER) {
+      // One employer account holds one company; a second registration is
+      // refused with the same ALREADY_REGISTERED conflict as before.
+      const existing = await findCompanyForUser(tx, ctx.actor.userId);
+      if (existing) {
         throw new ConflictError(
-          'You already have two registered companies. To register another company, use a different email address.',
+          'You already have a registered company. To register another company, use a different email address.',
           { reason: 'ALREADY_REGISTERED' },
         );
       }
@@ -152,21 +129,12 @@ export async function registerCompany(
       return row!.id;
     });
   } catch (error) {
-    if (isUniqueViolation(error, 'company_members_user_id_unique')) {
-      // Race backstop (or a database where migration 0046 has not run yet):
-      // two concurrent registrations both passed the count check.
-      throw new ConflictError(
-        'You already have two registered companies. To register another company, use a different email address.',
-        { reason: 'ALREADY_REGISTERED' },
-      );
-    }
     // A concurrent duplicate NTN hits the active-NTN unique index (L12): report
     // it as NTN_TAKEN, not a generic 409.
     if (isUniqueViolation(error, ACTIVE_NTN_CONSTRAINT)) throw ntnTaken();
     throw error;
   }
-  // Return the company just created — not myCompany(actor), whose active
-  // company is still the first one until the client switches to this one.
+  // Return the company just created.
   return buildCompanyView(db, await loadCompany(db, createdId));
 }
 

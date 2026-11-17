@@ -195,27 +195,6 @@ export async function changedSinceInfoRequest(
   return company.length > 0 || location.length > 0 || document.length > 0 || contact.length > 0;
 }
 
-/**
- * Every company an employer account belongs to, oldest first. One account may
- * hold up to two companies (2026-11-12); the first is the default active one
- * until the employer picks the other.
- */
-export async function findCompaniesForUser(
-  executor: DbExecutor,
-  userId: string,
-): Promise<CompanyRow[]> {
-  const memberRows = await executor
-    .select({ companyId: members.companyId })
-    .from(members)
-    .where(eq(members.userId, userId))
-    .orderBy(asc(members.createdAt));
-  const rows: CompanyRow[] = [];
-  for (const member of memberRows) {
-    rows.push(await loadCompany(executor, member.companyId));
-  }
-  return rows;
-}
-
 export async function findCompanyForUser(
   executor: DbExecutor,
   userId: string,

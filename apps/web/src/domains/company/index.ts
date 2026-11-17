@@ -27,8 +27,6 @@ export {
   addMySite,
   companyIdsForUsers,
   getMyCompany,
-  listMyCompanies,
-  MAX_COMPANIES_PER_EMPLOYER,
   myCompanyBranchOptions,
   registerCompany,
   resubmitMyCompany,

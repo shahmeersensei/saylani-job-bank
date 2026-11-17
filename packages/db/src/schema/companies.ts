@@ -141,9 +141,10 @@ export const companyOnboarding = pgTable(
   (t) => [index('company_onboarding_onboarded_by_idx').on(t.onboardedBy)],
 );
 
-/** Employer accounts acting for a company. Up to two companies per account
- * (2026-11-12: one email may register two companies); the (companyId, userId)
- * primary key still stops the same account joining the same company twice. */
+/** Employer accounts acting for a company. One company per account
+ * (2026-11-17: an employer creates and runs one company at a time); the
+ * (companyId, userId) primary key still stops the same account joining the
+ * same company twice. */
 export const companyMembers = pgTable(
   'company_members',
   {

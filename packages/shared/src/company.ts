@@ -7,8 +7,8 @@ import { pkPhoneSchema } from './phone';
 /**
  * Company & verification contracts (M7), shared by the API and the UI.
  * Owner decisions (2026-10-02, all recommended defaults): employers sign up with email +
- * password after confirming a 6-digit code; up to two companies per employer account
- * (2026-11-12: one email may register two companies); documents
+ * password after confirming a 6-digit code; one company per employer account
+ * (2026-11-17: an employer creates and runs one company at a time); documents
  * required per legal structure; NTN required and unique among non-rejected companies; the
  * nearest branch to the head office is suggested; claim-based verifier queue with automatic
  * conflict-of-interest checks; SLA = 2 working days, paused while waiting for the employer;

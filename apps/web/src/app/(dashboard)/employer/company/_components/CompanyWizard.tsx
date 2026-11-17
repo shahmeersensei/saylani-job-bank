@@ -23,7 +23,6 @@ import { apiFetch, ApiClientError } from '@/lib/api/client';
 import { putWithProgress } from '@/lib/upload/put-with-progress';
 import type { CompanyView } from '@/domains/company';
 import { normalizePkMobile } from '@/lib/format/phone';
-import { setActiveCompanyCookie } from '@/lib/active-company';
 import {
   FormErrorSummary,
   fieldControlId,
@@ -188,10 +187,6 @@ function DetailsStep({
           body,
           idempotencyKey: registrationIdempotency.current.key,
         }));
-        // The company just created becomes the active one, so the remaining
-        // wizard steps (contacts, location, documents, submit) save to it —
-        // not to the employer's first company.
-        setActiveCompanyCookie(saved.id);
       } else {
         ({ data: saved } = await apiFetch<CompanyView>('/api/v1/companies/me', {
           method: 'PATCH',
