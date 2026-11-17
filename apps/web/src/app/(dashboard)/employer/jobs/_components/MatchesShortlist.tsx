@@ -181,7 +181,7 @@ export function MatchesShortlist({ jobId, matches, page, pageSize, reasons }: Pr
         <StatusPill {...runPill} />
         <span className="text-fg-muted">
           <span className="numeric text-fg font-medium">{matches.total}</span> eligible of{' '}
-          <span className="numeric">{run.candidateCount ?? '—'}</span> nearby candidates
+          <span className="numeric">{run.candidateCount ?? '—'}</span> candidates
         </span>
         {run.completedAt && (
           <span className="text-fg-subtle">Calculated {formatDate(run.completedAt)}</span>
@@ -199,7 +199,7 @@ export function MatchesShortlist({ jobId, matches, page, pageSize, reasons }: Pr
           <EmptyState
             icon={Users}
             title="No eligible applicants yet"
-            description="Nobody nearby matched the required skills and filters. Try widening the requirements or wait for new applicants."
+            description="Nobody matched the required skills and filters. Try widening the requirements or wait for new applicants."
             compact
           />
         }

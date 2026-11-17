@@ -913,7 +913,7 @@ export function JobWizard({ initialJob = null, basePath = '/employer' }: Props) 
             <h2 className="text-fg text-lg font-semibold">Work location</h2>
             <p className="text-fg-muted text-sm">
               Type the job site&apos;s address and pick the city — we&apos;ll locate it for you when
-              you save. Matching uses this point to rank nearby applicants.
+              you save.
             </p>
           </div>
 

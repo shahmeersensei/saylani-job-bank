@@ -123,7 +123,7 @@ export function BranchForm({ branch }: Props) {
           }
         }}
         label="Location"
-        hint="Matching uses this point to rank nearby applicants."
+        hint="Used to suggest the nearest branch to applicants."
         initialQuery={branch?.address ?? ''}
         required
         error={errors.location}
