@@ -239,6 +239,103 @@ describe('PhotoCapture', () => {
     );
   });
 
+  it('falls back to the other camera when the remembered camera is gone', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem('jobbank-camera-device-id', 'int-1');
+    const streamFor = (deviceId: string) => ({
+      getTracks: () => [{ stop: vi.fn() }],
+      getVideoTracks: () => [{ getSettings: () => ({ deviceId }) }],
+    });
+    getUserMediaMock.mockImplementation(async (constraints: MediaStreamConstraints) => {
+      const wanted = (constraints.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+      // The saved integrated camera no longer exists; the USB webcam works.
+      if (wanted === 'int-1') throw new DOMException('gone', 'OverconstrainedError');
+      return streamFor(wanted ?? 'usb-1');
+    });
+    enumerateDevicesMock.mockResolvedValue([
+      { deviceId: 'usb-1', kind: 'videoinput', label: 'USB Webcam' },
+      { deviceId: 'int-1', kind: 'videoinput', label: 'Integrated Camera' },
+    ]);
+    renderCapture();
+
+    await user.click(screen.getByRole('button', { name: 'Start camera' }));
+
+    // Regression: one dead camera used to end the whole capture with
+    // "No camera was found", even though the other camera worked.
+    await waitFor(() => expect(screen.getByText('● LIVE')).toBeInTheDocument());
+    expect(screen.queryByText(/No camera was found/)).not.toBeInTheDocument();
+    expect(getUserMediaMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        video: expect.objectContaining({ deviceId: { exact: 'usb-1' } }),
+      }),
+    );
+    expect(screen.getByLabelText('Choose camera')).toHaveValue('usb-1');
+    // The dead saved id is forgotten; the working camera is remembered.
+    expect(window.localStorage.getItem('jobbank-camera-device-id')).toBe('usb-1');
+  });
+
+  it('keeps the working camera when the integrated webcam will not start', async () => {
+    const user = userEvent.setup();
+    const streamFor = (deviceId: string) => ({
+      getTracks: () => [{ stop: vi.fn() }],
+      getVideoTracks: () => [{ getSettings: () => ({ deviceId }) }],
+    });
+    getUserMediaMock.mockImplementation(async (constraints: MediaStreamConstraints) => {
+      const wanted = (constraints.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+      if (wanted === 'int-1') throw new DOMException('busy', 'NotFoundError');
+      return streamFor(wanted ?? 'usb-1');
+    });
+    enumerateDevicesMock.mockResolvedValue([
+      { deviceId: 'usb-1', kind: 'videoinput', label: 'USB Webcam' },
+      { deviceId: 'int-1', kind: 'videoinput', label: 'Integrated Camera' },
+    ]);
+    renderCapture();
+
+    await user.click(screen.getByRole('button', { name: 'Start camera' }));
+
+    // The integrated switch was attempted but failed; the USB preview that
+    // was already working stays live instead of failing the capture.
+    await waitFor(() => expect(screen.getByText('● LIVE')).toBeInTheDocument());
+    expect(screen.queryByText(/No camera was found/)).not.toBeInTheDocument();
+    expect(getUserMediaMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        video: expect.objectContaining({ deviceId: { exact: 'int-1' } }),
+      }),
+    );
+    expect(screen.getByLabelText('Choose camera')).toHaveValue('usb-1');
+  });
+
+  it('lists both cameras before Start so staff can pick either one', async () => {
+    enumerateDevicesMock.mockResolvedValue([
+      { deviceId: 'usb-1', kind: 'videoinput', label: 'USB Webcam' },
+      { deviceId: 'int-1', kind: 'videoinput', label: 'Integrated Camera' },
+    ]);
+    renderCapture();
+
+    const select = await screen.findByLabelText('Choose camera');
+    expect(screen.getByRole('option', { name: 'USB Webcam' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Integrated Camera' })).toBeInTheDocument();
+    expect(select).toBeInTheDocument();
+  });
+
+  it('keeps the camera selector visible after a failed start', async () => {
+    const user = userEvent.setup();
+    getUserMediaMock.mockRejectedValue(new DOMException('none', 'NotFoundError'));
+    enumerateDevicesMock.mockResolvedValue([
+      { deviceId: 'usb-1', kind: 'videoinput', label: 'USB Webcam' },
+      { deviceId: 'int-1', kind: 'videoinput', label: 'Integrated Camera' },
+    ]);
+    renderCapture();
+
+    await user.click(screen.getByRole('button', { name: 'Start camera' }));
+
+    await waitFor(() => expect(screen.getByText(/No camera was found/)).toBeInTheDocument());
+    // Staff are not stuck: the other camera can still be picked from here.
+    expect(screen.getByLabelText('Choose camera')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'USB Webcam' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Integrated Camera' })).toBeInTheDocument();
+  });
+
   it('shows which camera is in use when there is only one', async () => {
     const user = userEvent.setup();
     enumerateDevicesMock.mockResolvedValue([

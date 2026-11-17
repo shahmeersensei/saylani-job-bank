@@ -117,6 +117,16 @@ export function PhotoCapture({
     }
   };
 
+  /** Forget a saved camera id that no longer exists, so the next Start does not retry a dead camera. */
+  const forgetDevice = () => {
+    setSelectedDeviceId(null);
+    try {
+      window.localStorage.removeItem(CAMERA_DEVICE_STORAGE_KEY);
+    } catch {
+      // Private mode / blocked storage: nothing to forget.
+    }
+  };
+
   const activeTrackDeviceId = (stream: MediaStream): string | undefined =>
     stream.getVideoTracks?.()[0]?.getSettings?.().deviceId;
 
@@ -140,6 +150,29 @@ export function PhotoCapture({
   };
 
   useEffect(() => stopCamera, []);
+
+  /**
+   * List the cameras as soon as the form opens, so staff can see both the
+   * laptop's own camera and a plugged-in webcam before pressing Start — and
+   * pick either one. Labels stay blank until permission is granted, so the
+   * list shows "Camera 1", "Camera 2" until then; plugging a webcam in (or
+   * unplugging one) refreshes the list.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    const refreshCameras = async () => {
+      const cameras = await listCameras();
+      if (!cancelled && cameras.length > 0) setDevices(cameras);
+    };
+    void refreshCameras();
+    const mediaDevices = navigator.mediaDevices;
+    mediaDevices?.addEventListener?.('devicechange', refreshCameras);
+    return () => {
+      cancelled = true;
+      mediaDevices?.removeEventListener?.('devicechange', refreshCameras);
+    };
+    // listCameras only reads navigator.mediaDevices; no state belongs here.
+  }, []);
 
   /**
    * The <video> element only mounts once camera is 'live', so the stream
@@ -180,11 +213,14 @@ export function PhotoCapture({
     });
 
   /**
-   * Starts the camera on `deviceId` when given, otherwise on the remembered
-   * choice. With no choice, the browser picks its default — then, once
-   * permission has made device labels visible, we switch to the laptop's
-   * integrated webcam when it is a different camera, so the applicant is
-   * photographed with the built-in camera instead of a USB/virtual one.
+   * Starts the camera. A staff member's pick (or the remembered camera) is
+   * tried first; with no pick, every camera found on this device is tried in
+   * turn — laptop camera and USB webcam alike — and only when none of them
+   * starts do we report "No camera was found". One dead camera (unplugged,
+   * busy, or a saved id that no longer exists) must never hide the working
+   * one. With no pick, the integrated webcam is still preferred once labels
+   * are visible, but only when it actually starts: if it does not, the
+   * camera already previewing stays live instead of failing the capture.
    */
   const startCamera = async (deviceId?: string | null) => {
     if (disabled) return;
@@ -196,23 +232,93 @@ export function PhotoCapture({
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new DOMException('Camera not supported', 'NotFoundError');
       }
-      const explicit = deviceId !== undefined ? deviceId : selectedDeviceId;
-      let stream = await requestCamera(explicit);
+      // A pick from the selector is explicit; the remembered camera is only
+      // a first try in the chain below, never an explicit pick — it may be
+      // gone, and then the other camera must take over.
+      const picked = deviceId !== undefined ? deviceId : null;
+      // Cameras first: trying the saved/default camera blind can fail with
+      // NotFoundError while the other camera on this laptop works fine.
+      const camerasBefore = await listCameras();
+      if (camerasBefore.length > 0) setDevices(camerasBefore);
+      const knownIds = new Set(camerasBefore.map((device) => device.deviceId));
+      const tried = new Set<string>();
+      let lastError: unknown = null;
+      let staleRemembered = false;
+
+      const tryCamera = async (id: string | null): Promise<MediaStream | null> => {
+        try {
+          const stream = await requestCamera(id);
+          if (id) tried.add(id);
+          return stream;
+        } catch (caught) {
+          if (id) tried.add(id);
+          const name = (caught as { name?: string } | null)?.name;
+          // Permission denied: no other camera will work either.
+          if (name === 'NotAllowedError' || name === 'SecurityError') throw caught;
+          if (
+            id === selectedDeviceId &&
+            (name === 'NotFoundError' || name === 'OverconstrainedError')
+          ) {
+            staleRemembered = true;
+          }
+          lastError = caught;
+          return null;
+        }
+      };
+
+      let stream: MediaStream | null;
+      if (picked) {
+        // A deliberate pick: try that camera only, so the preview never
+        // silently comes from the other one. On failure the selector stays
+        // visible, so staff can try the other camera right away.
+        stream = await tryCamera(picked);
+      } else {
+        // No pick: remembered camera first, then every listed camera, then
+        // the browser default. A remembered id the browser no longer lists
+        // is stale (camera unplugged / id changed) — skip and forget it.
+        if (selectedDeviceId && camerasBefore.length > 0 && !knownIds.has(selectedDeviceId)) {
+          staleRemembered = true;
+        }
+        const attempts: (string | null)[] = [];
+        const queue = (id: string | null) => {
+          if (!attempts.includes(id)) attempts.push(id);
+        };
+        if (selectedDeviceId && !staleRemembered) queue(selectedDeviceId);
+        camerasBefore.forEach((device) => queue(device.deviceId));
+        queue(null);
+        stream = null;
+        for (const id of attempts) {
+          stream = await tryCamera(id);
+          if (stream) break;
+        }
+      }
+      if (!stream) {
+        if (staleRemembered) forgetDevice();
+        throw lastError ?? new DOMException('No camera found', 'NotFoundError');
+      }
+
       streamRef.current = stream;
-      setActiveDeviceId(activeTrackDeviceId(stream) ?? explicit ?? null);
+      let activeId = activeTrackDeviceId(stream) ?? picked ?? null;
       const cameras = await listCameras();
       if (cameras.length > 0) setDevices(cameras);
-      const integrated = cameras.find((device) => isIntegratedCameraLabel(device.label));
-      if (!explicit && integrated && integrated.deviceId !== activeTrackDeviceId(stream)) {
-        // The default was not the integrated webcam: restart on it.
-        stream.getTracks().forEach((track) => track.stop());
-        stream = await requestCamera(integrated.deviceId);
-        streamRef.current = stream;
-        setActiveDeviceId(activeTrackDeviceId(stream) ?? integrated.deviceId);
-        rememberDevice(integrated.deviceId);
-      } else if (explicit) {
-        rememberDevice(explicit);
+      if (!picked) {
+        const integrated = cameras.find((device) => isIntegratedCameraLabel(device.label));
+        if (integrated && integrated.deviceId !== activeId && !tried.has(integrated.deviceId)) {
+          try {
+            const switched = await requestCamera(integrated.deviceId);
+            stream.getTracks().forEach((track) => track.stop());
+            stream = switched;
+            streamRef.current = switched;
+            activeId = activeTrackDeviceId(switched) ?? integrated.deviceId;
+          } catch {
+            // The integrated webcam would not start: keep the camera that
+            // is already previewing instead of failing the capture.
+          }
+        }
       }
+      if (staleRemembered) forgetDevice();
+      setActiveDeviceId(activeId);
+      if (activeId) rememberDevice(activeId);
       // The <video> mounts from this state change; the effect above
       // attaches the stream once it exists.
       setVideoReady(false);
@@ -407,9 +513,10 @@ export function PhotoCapture({
         </Button>
       )}
 
-      {/* Camera choice: the browser only names cameras after permission is
-          granted, so this appears once Start camera has listed them. With
-          one camera, show which one it is — e.g. the integrated webcam. */}
+      {/* Camera choice: the list is filled when the form opens, so both the
+          laptop camera and a plugged-in webcam can be picked before (or
+          after) Start — including after a failed start, when the other
+          camera may still work. With one camera, show which one it is. */}
       {!photo && devices.length > 1 && (
         <div className="grid gap-1">
           <label htmlFor="applicant-camera-select" className="text-fg-muted text-xs font-medium">
