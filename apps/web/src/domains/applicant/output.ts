@@ -79,7 +79,11 @@ export const applicantProfileSchema = z.object({
       addressLine: z.string(),
       cityCode: z.string(),
       areaCode: z.string().nullable(),
-      location: geoPointSchema,
+      // Location is optional at registration, so it can be null in the DB.
+      // A strict schema here caused a 500 after the applicant was already saved.
+      // Location is optional at registration, so it can be null in the DB.
+      // A strict schema here caused a 500 after the applicant was already saved.
+      location: geoPointSchema.nullable(),
     })
     .nullable(),
   permanentAddress: z
