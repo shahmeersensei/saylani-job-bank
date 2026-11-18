@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarDays } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { ddMmYyyyToIso, isoToDdMmYyyy } from '@/lib/format/date';
 import type { DateInputProps } from './dateInput.types';
@@ -41,6 +41,10 @@ export function DateInput({
 }: DateInputProps) {
   const [text, setText] = useState(() => isoToDdMmYyyy(value ?? ''));
   const [focused, setFocused] = useState(false);
+  // Hidden native date input: only used to open the browser's calendar
+  // picker from the calendar button. Typing still goes through the
+  // DD/MM/YYYY text field, so the visible format never follows the locale.
+  const pickerRef = useRef<HTMLInputElement>(null);
 
   // Keep the visible text in step when the parent value changes elsewhere
   // (form reset, prefilled token data) — but never while the user is typing.
@@ -59,7 +63,45 @@ export function DateInput({
       maxLength={10}
       placeholder={placeholder}
       value={text}
-      startAdornment={<CalendarDays aria-hidden="true" />}
+      startAdornment={
+        <span className="relative flex items-center">
+          <button
+            type="button"
+            aria-label="Open calendar"
+            disabled={props.disabled}
+            className="hover:text-fg flex cursor-pointer items-center disabled:cursor-not-allowed"
+            onClick={() => {
+              const picker = pickerRef.current;
+              if (!picker) return;
+              picker.value = value ?? '';
+              try {
+                picker.showPicker();
+              } catch {
+                picker.focus();
+                picker.click();
+              }
+            }}
+          >
+            <CalendarDays aria-hidden="true" />
+          </button>
+          <input
+            ref={pickerRef}
+            type="date"
+            tabIndex={-1}
+            aria-hidden="true"
+            min={min}
+            max={max}
+            className="pointer-events-none absolute top-full left-0 h-px w-px opacity-0"
+            onChange={(event) => {
+              const iso = event.target.value;
+              if (!iso) return;
+              if (!inRange(iso)) return;
+              setText(isoToDdMmYyyy(iso));
+              onChange?.(iso);
+            }}
+          />
+        </span>
+      }
       className="numeric tracking-wide"
       {...props}
       onFocus={(event) => {
