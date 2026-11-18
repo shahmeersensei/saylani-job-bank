@@ -341,7 +341,7 @@ describe('verifier creates companies', () => {
       jar: secondVerifierJar,
     });
     expect(otherRes.status, JSON.stringify(otherRes.body)).toBe(201);
-    const res = await call(listCompanies, '/api/v1/companies', {
+    const res = await call(listCompanies, '/api/v1/companies?pageSize=100', {
       method: 'GET',
       jar: verifierJar,
     });

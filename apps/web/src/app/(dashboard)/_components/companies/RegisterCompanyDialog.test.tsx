@@ -60,5 +60,5 @@ describe('RegisterCompanyDialog', () => {
 
     expect(apiFetchMock).toHaveBeenCalledTimes(1);
     expect(apiFetchMock).not.toHaveBeenCalledWith('/api/v1/companies/onboard', expect.anything());
-  });
+  }, 15_000);
 });

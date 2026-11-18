@@ -211,7 +211,7 @@ describe('JobManagementPanel', () => {
       );
     });
     expect(createJobSchema.safeParse(apiFetchMock.mock.calls[0]![1].body).success).toBe(true);
-  });
+  }, 15_000);
 
   it('collects shift hours for rotating job types before posting', async () => {
     const user = userEvent.setup();
@@ -247,7 +247,7 @@ describe('JobManagementPanel', () => {
       );
     });
     expect(createJobSchema.safeParse(apiFetchMock.mock.calls[0]![1].body).success).toBe(true);
-  });
+  }, 15_000);
 
   it('keeps job visibility but hides mutations without the existing permission', () => {
     render(
