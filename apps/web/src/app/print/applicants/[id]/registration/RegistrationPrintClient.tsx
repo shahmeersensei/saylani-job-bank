@@ -75,7 +75,8 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
   // fresh signed URL. `photoSettled` starts true (no photo) and only goes
   // false while a photo URL/image is still loading.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [photoSettled, setPhotoSettled] = useState(true);
+  // Only the setter is still used (header photo removed).
+  const [, setPhotoSettled] = useState(true);
   const photoRef = useRef<HTMLImageElement>(null);
   const photoDocIdRef = useRef<string | null>(null);
 
