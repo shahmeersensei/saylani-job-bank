@@ -74,9 +74,9 @@ export async function ApplicantListPage({
       ? '/staff/applicants'
       : role === 'BRANCH_ADMIN'
         ? '/branch-admin/applicants'
-        : role === 'SUPER_ADMIN'
-          ? '/super-admin/applicants'
-          : null;
+        : // Super Admin does not register applicants, so no Register-from-token button.
+          // Super Admin does not register applicants, so no Register-from-token button.
+          null;
 
   return (
     <div className="grid w-full gap-6">
