@@ -20,12 +20,14 @@ export function BranchListControls({
   meta,
   statuses,
   label,
+  themeAware = false,
 }: {
   action: string;
   params: URLSearchParams;
   meta: PaginationMeta;
   statuses: readonly { value: string; label: string }[];
   label: string;
+  themeAware?: boolean;
 }) {
   return (
     <div className="grid gap-3">
@@ -35,6 +37,7 @@ export function BranchListControls({
         label={label}
         statuses={statuses}
         allowAllStatuses
+        themeAware={themeAware}
       />
       <BranchListPagination action={action} params={params} meta={meta} label={label} />
     </div>

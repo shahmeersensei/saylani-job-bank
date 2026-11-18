@@ -54,6 +54,29 @@ describe('DateInput', () => {
     expect(input).toHaveValue('12/04/1998');
   });
 
+  it('places the native date picker over the calendar icon', () => {
+    renderDateInput();
+    const datePicker = screen.getByLabelText('Open calendar');
+
+    expect(datePicker).toHaveAttribute('type', 'date');
+    expect(datePicker).not.toHaveClass('pointer-events-none');
+    expect(datePicker).toHaveClass('absolute', 'size-full');
+    expect(datePicker.parentElement?.parentElement?.previousElementSibling).toBe(
+      screen.getByLabelText('Date of birth'),
+    );
+  });
+
+  it('updates the displayed date when selected from the calendar', () => {
+    const { input, onChange } = renderDateInput();
+    const datePicker = document.querySelector<HTMLInputElement>('input[type="date"]');
+    expect(datePicker).not.toBeNull();
+
+    fireEvent.change(datePicker!, { target: { value: '2026-11-17' } });
+
+    expect(input).toHaveValue('17/11/2026');
+    expect(onChange).toHaveBeenLastCalledWith('2026-11-17');
+  });
+
   it('drops an impossible date on blur instead of reporting it', async () => {
     const { input, onChange } = renderDateInput();
     await userEvent.type(input, '31022026');

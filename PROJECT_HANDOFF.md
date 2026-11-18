@@ -41,7 +41,7 @@ Related documents:
    - **Docker issues:**
      - `minio/minio` images are no longer published, so we switched to **SeaweedFS** for local S3.
      - Docker Desktop hung on a macOS folder-permission prompt, so all config files are now **inlined** in `docker-compose.yml` (no bind mounts).
-     - Ports: **Postgres 5433** and **Redis 6380**, because the owner has a local Redis on 6379.
+     - Ports: **Postgres 5434** and **Redis 6380**, to avoid conflicts with local services.
    - **The `!` command box:** it couldn't find `pnpm`. pnpm was then installed globally (`npm i -g pnpm`) at `/usr/local/bin`; the Terminal panel always worked.
 3. **M1 Design system.**
    - **Built:** tokens, light/dark/system theme, 16 atoms, 15 molecules, 7 organisms, 4 templates, and a dev-only gallery at `/dev/components`.
@@ -304,7 +304,7 @@ See `IMPLEMENTATION_PLAN.md` § M7: companies, contacts, locations (geography), 
 ## 7. How to run and verify
 
 ```bash
-pnpm infra:up                 # Postgres :5433, SeaweedFS S3 :8333, Redis :6380, Mailpit :8025
+pnpm infra:up                 # Postgres :5434, SeaweedFS S3 :8333, Redis :6380, Mailpit :8025
 pnpm db:migrate && pnpm db:seed
 pnpm dev                      # http://localhost:3000
 pnpm test                     # unit + component + integration (Docker must be running)

@@ -37,6 +37,7 @@ export function DateInput({
   placeholder = 'DD/MM/YYYY',
   onBlur,
   onFocus,
+  disabled,
   ...props
 }: DateInputProps) {
   const [text, setText] = useState(() => isoToDdMmYyyy(value ?? ''));
@@ -59,8 +60,29 @@ export function DateInput({
       maxLength={10}
       placeholder={placeholder}
       value={text}
-      startAdornment={<CalendarDays aria-hidden="true" />}
+      endAdornment={
+        <span className="text-fg-muted relative inline-flex items-center">
+          <CalendarDays aria-hidden="true" />
+          <input
+            type="date"
+            aria-label="Open calendar"
+            value={value ?? ''}
+            min={min}
+            max={max}
+            disabled={disabled}
+            className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+            onChange={(event) => {
+              const iso = event.target.value;
+              if (!inRange(iso)) return;
+              setText(isoToDdMmYyyy(iso));
+              onChange?.(iso);
+            }}
+          />
+        </span>
+      }
       className="numeric tracking-wide"
+      wrapperClassName="relative"
+      disabled={disabled}
       {...props}
       onFocus={(event) => {
         setFocused(true);

@@ -4,12 +4,14 @@ import { eq } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { POST as acceptInvite } from '@/app/api/v1/auth/invitations/accept/route';
 import { POST as claim } from '@/app/api/v1/companies/[id]/claim/route';
-import { PATCH as reviewDoc } from '@/app/api/v1/companies/[id]/documents/[docId]/review/route';
 import { PUT as uploadCompanyDoc } from '@/app/api/v1/companies/[id]/documents/[docId]/upload/route';
 import { POST as confirmCompanyDoc } from '@/app/api/v1/companies/[id]/documents/[docId]/confirm/route';
 import { POST as presignCompanyDoc } from '@/app/api/v1/companies/[id]/documents/route';
-import { POST as setHeadOffice } from '@/app/api/v1/companies/[id]/head-office/route';
+import { PATCH as reviewCompanyDoc } from '@/app/api/v1/companies/[id]/documents/[docId]/review/route';
+import { POST as setCompanyHeadOffice } from '@/app/api/v1/companies/[id]/head-office/route';
+import { POST as requestCompanyInfo } from '@/app/api/v1/companies/[id]/request-info/route';
 import { POST as markVerifiedSigned } from '@/app/api/v1/companies/[id]/registration-form/verified-signed/route';
+import { POST as resubmitCompany } from '@/app/api/v1/companies/[id]/resubmit/route';
 import { POST as onboard } from '@/app/api/v1/companies/onboard/route';
 import { POST as verify } from '@/app/api/v1/companies/[id]/verify/route';
 import { GET as listCompanies } from '@/app/api/v1/companies/route';
@@ -33,6 +35,7 @@ const branchId = async (code: string) =>
   )[0]!.id;
 
 let khi: string;
+let lhr: string;
 let verifierJar: Jar;
 /** A second in-branch actor: M9 forbids the onboarder marking their own form. */
 let colleagueJar: Jar;
@@ -73,6 +76,7 @@ async function inviteAndActivateVerifier(adminJar: Jar) {
 
 beforeAll(async () => {
   khi = await branchId('KHI-GULSHAN');
+  lhr = await branchId('LHR-JOHAR');
   verifierJar = await signIn('verifier.khi@jobbank.local');
   // Round 2: plain signIn cannot pass the 2FA step — other files leave
   // Branch Admin enrolled in the shared DB, so this file must enrol too.
@@ -85,13 +89,17 @@ beforeEach(() => resetMemoryRateLimits());
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 
 /** Presign → PUT → confirm, mirroring the applicant document upload helper. */
-async function uploadCompanyDocument(companyId: string, jar: Jar) {
+async function uploadCompanyDocument(
+  companyId: string,
+  jar: Jar,
+  typeCode = 'AUTHORISED_PERSON_CNIC_FRONT',
+) {
   const presigned = await call(presignCompanyDoc, `/api/v1/companies/${companyId}/documents`, {
     method: 'POST',
     params: { id: companyId },
     body: {
-      typeCode: 'AUTHORISED_PERSON_CNIC_FRONT',
-      fileName: 'AUTHORISED_PERSON_CNIC_FRONT.png',
+      typeCode,
+      fileName: `${typeCode}.png`,
       contentType: 'image/png',
       sizeBytes: PNG.byteLength,
     },
@@ -205,52 +213,122 @@ describe('verifier creates companies', () => {
   });
 
   it('Branch Admin verifies a company the verifier onboarded', async () => {
-    const company = await onboardedCompany();
-    // VERIFY needs a head office location row: set it while still DRAFT
-    // (the head-office endpoint only accepts DRAFT / INFO_REQUESTED).
-    const hq = await call(setHeadOffice, `/api/v1/companies/${company.id}/head-office`, {
+    const onboarded = await call(onboard, '/api/v1/companies/onboard', {
       method: 'POST',
-      body: {
-        location: { lat: 24.9, lng: 67.05 },
-        addressLine: 'Plot 12, SITE Area, Karachi',
-        cityCode: 'KARACHI',
-        areaCode: null,
-      },
-      jar: colleagueJar,
-      params: { id: company.id },
+      body: onboardBody(),
+      jar: verifierJar,
     });
-    expect(hq.status, JSON.stringify(hq.body)).toBe(200);
-    // VERIFY also needs every required document accepted: the Branch Admin
-    // accepts the CNIC front the colleague uploaded.
-    const reviewed = await call(
-      reviewDoc,
-      `/api/v1/companies/${company.id}/documents/${company.documentId}/review`,
+    expect(onboarded.status, JSON.stringify(onboarded.body)).toBe(201);
+    const companyId = onboarded.body.data.id as string;
+    const res = await call(verify, `/api/v1/companies/${companyId}/verify`, {
+      method: 'POST',
+      body: { note: null },
+      jar: colleagueJar,
+      params: { id: companyId },
+      headers: { 'Idempotency-Key': key() },
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.data.status).toBe('VERIFIED');
+    expect(res.body.data.registrationVerifiedSignedAt).not.toBeNull();
+    expect(res.body.data.registrationVerifiedSignedBy).not.toBeNull();
+  });
+
+  it('returns an info-requested company to the Branch Admin for final signed approval', async () => {
+    const company = await onboardedCompany();
+    const backDocumentId = await uploadCompanyDocument(
+      company.id,
+      colleagueJar,
+      'AUTHORISED_PERSON_CNIC_BACK',
+    );
+    const headOffice = await call(
+      setCompanyHeadOffice,
+      `/api/v1/companies/${company.id}/head-office`,
       {
-        method: 'PATCH',
-        body: { decision: 'ACCEPTED', note: null },
+        method: 'POST',
+        body: {
+          location: { lat: 24.8607, lng: 67.0011 },
+          addressLine: 'Plot 12, SITE Area, Karachi',
+          cityCode: 'KARACHI',
+        },
         jar: colleagueJar,
-        params: { id: company.id, docId: company.documentId },
+        params: { id: company.id },
+      },
+    );
+    expect(headOffice.status, JSON.stringify(headOffice.body)).toBe(200);
+
+    const requested = await call(
+      requestCompanyInfo,
+      `/api/v1/companies/${company.id}/request-info`,
+      {
+        method: 'POST',
+        body: { note: 'Please confirm the head office address and required documents.' },
+        jar: colleagueJar,
+        params: { id: company.id },
         headers: { 'Idempotency-Key': key() },
       },
     );
-    expect(reviewed.status, JSON.stringify(reviewed.body)).toBe(200);
-    // The paper form is marked verified & signed by the Branch Admin
-    // colleague (M9: not the onboarder), sending it to SUBMITTED.
-    const signed = await call(
-      markVerifiedSigned,
-      `/api/v1/companies/${company.id}/registration-form/verified-signed`,
-      { method: 'POST', jar: colleagueJar, params: { id: company.id } },
-    );
-    expect(signed.status, JSON.stringify(signed.body)).toBe(200);
-    const res = await call(verify, `/api/v1/companies/${company.id}/verify`, {
+    expect(requested.status, JSON.stringify(requested.body)).toBe(200);
+    expect(requested.body.data.status).toBe('INFO_REQUESTED');
+
+    const returned = await call(resubmitCompany, `/api/v1/companies/${company.id}/resubmit`, {
+      method: 'POST',
+      body: { note: 'The requested company details have been checked and updated.' },
+      jar: secondVerifierJar,
+      params: { id: company.id },
+    });
+    expect(returned.status, JSON.stringify(returned.body)).toBe(200);
+    expect(returned.body.data.status).toBe('RESUBMITTED');
+
+    for (const documentId of [company.documentId, backDocumentId]) {
+      const accepted = await call(
+        reviewCompanyDoc,
+        `/api/v1/companies/${company.id}/documents/${documentId}/review`,
+        {
+          method: 'PATCH',
+          body: { decision: 'ACCEPTED', note: null },
+          jar: colleagueJar,
+          params: { id: company.id, docId: documentId },
+          headers: { 'Idempotency-Key': key() },
+        },
+      );
+      expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
+    }
+
+    const approved = await call(verify, `/api/v1/companies/${company.id}/verify`, {
       method: 'POST',
       body: { note: null },
       jar: colleagueJar,
       params: { id: company.id },
       headers: { 'Idempotency-Key': key() },
     });
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body.data.status).toBe('VERIFIED');
+    expect(approved.status, JSON.stringify(approved.body)).toBe(200);
+    expect(approved.body.data.status).toBe('VERIFIED');
+    expect(approved.body.data.registrationVerifiedSignedAt).not.toBeNull();
+    expect(approved.body.data.registrationVerifiedSignedBy).not.toBeNull();
+  });
+
+  it('Branch Admin cannot verify a company assigned to another branch', async () => {
+    const onboarded = await call(onboard, '/api/v1/companies/onboard', {
+      method: 'POST',
+      body: onboardBody(),
+      jar: verifierJar,
+    });
+    expect(onboarded.status, JSON.stringify(onboarded.body)).toBe(201);
+    const companyId = onboarded.body.data.id as string;
+    await db
+      .update(schema.companies)
+      .set({ branchId: lhr })
+      .where(eq(schema.companies.id, companyId));
+
+    const res = await call(verify, `/api/v1/companies/${companyId}/verify`, {
+      method: 'POST',
+      body: { note: null },
+      jar: colleagueJar,
+      params: { id: companyId },
+      headers: { 'Idempotency-Key': key() },
+    });
+
+    expect(res.status, JSON.stringify(res.body)).toBe(403);
   });
 
   it('sees every company in their city in the company list', async () => {

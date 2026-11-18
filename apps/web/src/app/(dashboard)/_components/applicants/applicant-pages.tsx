@@ -66,17 +66,14 @@ export async function ApplicantListPage({
     listMasterData(actor, { type: 'AREA' }),
   ]);
 
-  // Counter 2 entry point (2026-11-13): staff who can register applicants
-  // reach the token lookup from here. The Interviewer and Scheduler role
-  // sees this list too but cannot register, so it gets no button.
+  // Counter 2 entry point (2026-11-13): Staff and Super Admin can register
+  // applicants here. Branch Admin and non-registering staff roles get no button.
   const registerBasePath =
     role === 'STAFF'
       ? '/staff/applicants'
-      : role === 'BRANCH_ADMIN'
-        ? '/branch-admin/applicants'
-        : role === 'SUPER_ADMIN'
-          ? '/super-admin/applicants'
-          : null;
+      : role === 'SUPER_ADMIN'
+        ? '/super-admin/applicants'
+        : null;
 
   return (
     <div className="grid w-full gap-6">
@@ -96,8 +93,7 @@ export async function ApplicantListPage({
           then completes through the same form in edit mode on the
           applicant's complete page.
           Counter 2 (2026-11-13): the "Register from token" button below is
-          the only create-mode entry — it looks a token up first, then
-          opens the full form prefilled from it.
+          the create-mode entry for roles allowed to register applicants.
         */}
         {registerBasePath && (
           <Button asChild>

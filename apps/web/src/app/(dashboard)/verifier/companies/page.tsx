@@ -1,10 +1,26 @@
-import { listCompanies } from '@/domains/company';
+import { COMPANY_SORTABLE, companyFilters, listCompanies } from '@/domains/company';
 import { requireRole } from '@/domains/auth';
 import { Badge, Link } from '@/components/atoms';
 import { EmptyState } from '@/components/molecules';
 import { Building2 } from 'lucide-react';
+import { parseListQuery } from '@/domains/shared/pagination';
+import {
+  BranchListControls,
+  branchListParams,
+} from '../../branch-admin/_components/BranchListControls';
+import { z } from 'zod';
 
 export const metadata = { title: 'Companies' };
+
+const FILTER_STATUSES = [
+  { value: 'VERIFIED', label: 'Verified' },
+  { value: 'DRAFT', label: 'Draft — needs review' },
+  { value: 'SUBMITTED', label: 'Submitted' },
+  { value: 'UNDER_VERIFICATION', label: 'Under Review' },
+  { value: 'INFO_REQUESTED', label: 'Info needed' },
+  { value: 'SUSPENDED', label: 'Suspended' },
+  { value: 'REJECTED', label: 'Rejected' },
+] as const;
 
 const STATUS_BADGE: Record<
   string,
@@ -20,32 +36,69 @@ const STATUS_BADGE: Record<
   DRAFT: { label: 'Draft', tone: 'neutral' },
 };
 
-export default async function VerifierCompaniesPage() {
+export default async function VerifierCompaniesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { actor } = await requireRole('VERIFIER');
-  const { items, pagination } = await listCompanies(actor, {
-    page: 1,
-    pageSize: 100,
-    limit: 100,
-    offset: 0,
-    sort: { field: 'legalName', direction: 'asc' },
-    q: undefined,
-    filters: {},
+  const params = branchListParams(await searchParams);
+  const query = parseListQuery(params, {
+    sortable: COMPANY_SORTABLE,
+    defaultSort: { field: 'legalName', direction: 'asc' },
+    filters: {
+      ...companyFilters,
+      status: z
+        .enum([
+          'VERIFIED',
+          'DRAFT',
+          'SUBMITTED',
+          'SUSPENDED',
+          'UNDER_VERIFICATION',
+          'INFO_REQUESTED',
+          'REJECTED',
+        ])
+        .optional(),
+    },
   });
+  const [{ items, pagination }, allCompanies] = await Promise.all([
+    listCompanies(actor, query),
+    listCompanies(actor, {
+      ...query,
+      q: undefined,
+      filters: {},
+      page: 1,
+      limit: 1,
+      pageSize: 1,
+      offset: 0,
+    }),
+  ]);
 
   return (
     <div className="grid w-full gap-6">
       <header>
         <div>
           <h1 className="text-fg text-2xl font-semibold">Companies</h1>
-          <p className="text-fg-muted mt-1 text-sm">{pagination.total} companies you onboarded</p>
+          <p className="text-fg-muted mt-1 text-sm">
+            {allCompanies.pagination.total} companies you onboarded
+          </p>
         </div>
       </header>
+
+      <BranchListControls
+        action="/verifier/companies"
+        params={params}
+        meta={pagination}
+        statuses={FILTER_STATUSES}
+        label="companies"
+        themeAware
+      />
 
       {items.length === 0 ? (
         <EmptyState
           icon={Building2}
-          title="No companies yet"
-          description="Register a company you visited and onboarded — it will appear here."
+          title="No matching companies"
+          description="Try another status or search term."
         />
       ) : (
         <div className="grid gap-3">

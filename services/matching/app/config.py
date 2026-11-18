@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="MATCHING_", env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql://jobbank:jobbank@localhost:5433/jobbank"
+    database_url: str = "postgresql://jobbank:jobbank@localhost:5434/jobbank"
     # Shared secret for /internal routes (MATCHING_API_TOKEN). Empty/short
     # (< 32 chars) keeps the routes switched off (503); the worker needs no API.
     api_token: str = ""

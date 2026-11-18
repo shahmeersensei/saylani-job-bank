@@ -71,6 +71,7 @@ export function NotificationBell({ viewAllHref = '/notifications' }: { viewAllHr
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
+          id="notification-menu-trigger"
           aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ''}`}
           className="hover:bg-surface-muted focus-visible:focus-ring relative grid size-10 place-items-center rounded-lg transition-colors"
         >
@@ -89,6 +90,7 @@ export function NotificationBell({ viewAllHref = '/notifications' }: { viewAllHr
         <DropdownMenu.Content
           align="end"
           sideOffset={8}
+          aria-labelledby="notification-menu-trigger"
           className="border-border bg-surface shadow-popover z-50 w-80 rounded-xl border"
         >
           <div className="border-border flex items-center justify-between border-b px-4 py-3">

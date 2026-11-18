@@ -101,6 +101,7 @@ export function TopBar({
           <DropdownMenu.Trigger asChild>
             <button
               type="button"
+              id="account-menu-trigger"
               className="hover:bg-surface-muted focus-visible:focus-ring flex items-center gap-2 rounded-xl p-1 pr-2 transition-colors"
               aria-label={`Account menu for ${user.name}`}
             >
@@ -118,6 +119,7 @@ export function TopBar({
             <DropdownMenu.Content
               align="end"
               sideOffset={8}
+              aria-labelledby="account-menu-trigger"
               className="border-border bg-surface shadow-popover z-40 min-w-52 rounded-xl border p-1"
             >
               <div className="border-border mb-1 border-b px-3 py-2.5 md:hidden">
