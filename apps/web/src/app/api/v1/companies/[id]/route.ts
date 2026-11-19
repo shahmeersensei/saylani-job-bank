@@ -13,9 +13,9 @@ export const GET = apiHandler({
   handler: async ({ actor, params: p }) => ok(await getCompanyDetail(actor!, p.id)),
 });
 
-/** PATCH /api/v1/companies/{id} — Super Admin corrects locked company details. */
+/** PATCH /api/v1/companies/{id} — admins correct details; verifier may respond to an info request. */
 export const PATCH = apiHandler({
-  permission: 'company:manage',
+  roles: ['SUPER_ADMIN', 'BRANCH_ADMIN', 'VERIFIER'],
   // L10: a retried correction must not double-apply. The panel sends a fresh
   // key per submit (see StaffCompanyPanel).
   idempotent: true,

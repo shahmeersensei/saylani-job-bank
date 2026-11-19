@@ -33,4 +33,23 @@ describe('Branch Admin company status filter', () => {
       expect.objectContaining({ q: 'example', filters: { status: 'INFO_REQUESTED' } }),
     );
   });
+
+  it('lets the Branch Admin filter for companies returned by a verifier', async () => {
+    listCompanies.mockResolvedValue({
+      items: [],
+      pagination: { page: 1, pageSize: 20, pageCount: 0, total: 0 },
+    });
+    const page = await BranchAdminCompaniesPage({
+      searchParams: Promise.resolve({ status: 'RESUBMITTED' }),
+    });
+    render(page);
+    expect(screen.getByLabelText('Status')).toHaveValue('RESUBMITTED');
+    expect(screen.getByRole('option', { name: 'Resubmitted — ready for review' })).toHaveValue(
+      'RESUBMITTED',
+    );
+    expect(listCompanies).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ filters: { status: 'RESUBMITTED' } }),
+    );
+  });
 });

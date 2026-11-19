@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createJobSchema } from '@jobbank/shared';
 import type * as ApiClientModule from '@/lib/api/client';
 import type { JobView } from '@/domains/job';
 import { JobManagementPanel } from './JobManagementPanel';
@@ -192,6 +193,8 @@ describe('JobManagementPanel', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Add job' }));
+    expect(screen.getByRole('combobox', { name: 'Shift' })).toHaveValue('ROTATING');
+    expect(screen.queryByRole('option', { name: 'Day shift' })).not.toBeInTheDocument();
     await user.type(screen.getByRole('textbox', { name: 'Job title' }), savedJob.title);
     await user.selectOptions(screen.getByRole('combobox', { name: 'Category' }), 'RETAIL_SALES');
     await user.type(screen.getByRole('textbox', { name: 'Description' }), savedJob.description);
@@ -207,7 +210,44 @@ describe('JobManagementPanel', () => {
         }),
       );
     });
-  });
+    expect(createJobSchema.safeParse(apiFetchMock.mock.calls[0]![1].body).success).toBe(true);
+  }, 15_000);
+
+  it('collects shift hours for rotating job types before posting', async () => {
+    const user = userEvent.setup();
+    render(
+      <JobManagementPanel
+        companyId={savedJob.companyId}
+        jobs={[]}
+        categories={categories}
+        canManage
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Add job' }));
+    await user.type(screen.getByRole('textbox', { name: 'Job title' }), savedJob.title);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Category' }), 'RETAIL_SALES');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Job type' }), 'ROTATING');
+    await user.type(screen.getByRole('textbox', { name: 'Description' }), savedJob.description);
+    const submit = screen.getByRole('button', { name: 'Create job draft' });
+    expect(screen.getByRole('spinbutton', { name: 'Hours per shift' })).toBeVisible();
+    expect(submit).toBeDisabled();
+
+    await user.type(screen.getByRole('spinbutton', { name: 'Hours per shift' }), '8');
+    expect(submit).toBeEnabled();
+    await user.click(submit);
+
+    await waitFor(() => {
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        `/api/v1/companies/${savedJob.companyId}/jobs`,
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.objectContaining({ jobType: 'ROTATING', shiftHours: 8 }),
+        }),
+      );
+    });
+    expect(createJobSchema.safeParse(apiFetchMock.mock.calls[0]![1].body).success).toBe(true);
+  }, 15_000);
 
   it('keeps job visibility but hides mutations without the existing permission', () => {
     render(

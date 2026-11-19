@@ -31,6 +31,7 @@ const FILTER_STATUSES = [
   { value: 'SUBMITTED', label: 'Submitted' },
   { value: 'UNDER_VERIFICATION', label: 'Under Review' },
   { value: 'INFO_REQUESTED', label: 'Info needed' },
+  { value: 'RESUBMITTED', label: 'Resubmitted — ready for review' },
   { value: 'SUSPENDED', label: 'Suspended' },
   { value: 'REJECTED', label: 'Rejected' },
 ] as const;
@@ -55,6 +56,7 @@ export default async function BranchAdminCompaniesPage({
         'SUSPENDED',
         'UNDER_VERIFICATION',
         'INFO_REQUESTED',
+        'RESUBMITTED',
         'REJECTED',
       ]),
     },

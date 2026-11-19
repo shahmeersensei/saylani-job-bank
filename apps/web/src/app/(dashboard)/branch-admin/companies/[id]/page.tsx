@@ -25,7 +25,11 @@ export default async function BranchAdminCompanyDetailPage({
       canSuspend={actor.permissions.has('company:suspend')}
       canManage={false}
       canOnboard
-      canVerify={actor.permissions.has('company:verify')}
+      canVerify={
+        actor.permissions.has('company:verify') &&
+        company.branch !== null &&
+        actor.branchIds.includes(company.branch.id)
+      }
       jobs={jobs}
       canManageJobs={actor.permissions.has('job:manage')}
       categories={categories.map((item) => ({ code: item.code, label: item.label }))}

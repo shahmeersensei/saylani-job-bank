@@ -18,7 +18,14 @@ describe('NotificationBell', () => {
       meta: { page: 1, pageSize: 8, total: 20, pageCount: 3, unread: 2 },
     });
     render(<NotificationBell />);
-    expect(await screen.findByRole('button', { name: 'Notifications, 2 unread' })).toBeVisible();
+    const trigger = await screen.findByRole('button', { name: 'Notifications, 2 unread' });
+    expect(trigger).toHaveAttribute('id', 'notification-menu-trigger');
+    expect(trigger).toBeVisible();
+
+    await userEvent.click(trigger);
+    const menu = await screen.findByRole('menu');
+    expect(menu).toHaveAttribute('aria-labelledby', 'notification-menu-trigger');
+    expect(trigger).toHaveAttribute('aria-controls', menu.id);
   });
 
   it('shows a loading error rather than an empty success state', async () => {

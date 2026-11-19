@@ -3,9 +3,9 @@
 import {
   GENDER_PREFERENCES,
   GENDER_PREFERENCE_LABELS,
+  JOB_POSTING_SHIFT_TYPES,
   JOB_TYPES,
   JOB_TYPE_LABELS,
-  SHIFT_TYPES,
   SHIFT_TYPE_LABELS,
   type GenderPreference,
   type JobType,
@@ -16,7 +16,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Button, Input, Select, Textarea } from '@/components/atoms';
 import { FormField, toast } from '@/components/molecules';
 import type { JobView } from '@/domains/job';
-import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { ApiClientError, apiFetch, friendlyApiError } from '@/lib/api/client';
 
 export type JobFormCompany = { id: string; name: string };
 export type EditableJob = Pick<
@@ -27,6 +27,7 @@ export type EditableJob = Pick<
   | 'description'
   | 'jobType'
   | 'shift'
+  | 'shiftHours'
   | 'genderPreference'
   | 'vacancies'
   | 'salaryMin'
@@ -49,6 +50,7 @@ type FormValues = {
   description: string;
   jobType: JobType;
   shift: ShiftType;
+  shiftHours: string;
   genderPreference: GenderPreference;
   vacancies: string;
   salaryMin: string;
@@ -60,7 +62,8 @@ const EMPTY: FormValues = {
   categoryCode: '',
   description: '',
   jobType: 'FULL_TIME',
-  shift: 'DAY',
+  shift: JOB_POSTING_SHIFT_TYPES[0],
+  shiftHours: '',
   genderPreference: 'ANY',
   vacancies: '1',
   salaryMin: '',
@@ -89,6 +92,7 @@ export function StaffJobForm({
           description: job.description,
           jobType: job.jobType,
           shift: job.shift,
+          shiftHours: job.shiftHours == null ? '' : String(job.shiftHours),
           genderPreference: job.genderPreference,
           vacancies: String(job.vacancies),
           salaryMin: job.salaryMin == null ? '' : String(job.salaryMin),
@@ -103,6 +107,15 @@ export function StaffJobForm({
     value: item.code,
     label: item.label,
   }));
+  const shiftOptions = [
+    ...(job && !JOB_POSTING_SHIFT_TYPES.some((shift) => shift === job.shift)
+      ? [{ value: job.shift, label: SHIFT_TYPE_LABELS[job.shift] }]
+      : []),
+    ...JOB_POSTING_SHIFT_TYPES.map((value) => ({
+      value,
+      label: SHIFT_TYPE_LABELS[value],
+    })),
+  ];
   const companyOptions = companies.map((item) => ({
     value: item.id,
     label: item.name,
@@ -120,6 +133,7 @@ export function StaffJobForm({
       description: form.description.trim(),
       jobType: form.jobType,
       shift: form.shift,
+      shiftHours: form.shiftHours ? Number(form.shiftHours) : undefined,
       genderPreference: form.genderPreference,
       vacancies: Number(form.vacancies),
       salaryMin: form.salaryMin ? Number(form.salaryMin) : undefined,
@@ -134,7 +148,10 @@ export function StaffJobForm({
           : `/api/v1/jobs/${job.id}`;
         const { data } = await apiFetch<JobView>(path, {
           method: 'PATCH',
-          body,
+          body: {
+            ...body,
+            shift: job.shift === form.shift ? undefined : body.shift,
+          },
         });
         saved = data;
         toast.success('Job updated');
@@ -166,7 +183,9 @@ export function StaffJobForm({
         router.refresh();
       }
     } catch (reason) {
-      setError(reason instanceof ApiClientError ? reason.message : 'Could not save this job');
+      setError(
+        reason instanceof ApiClientError ? friendlyApiError(reason) : 'Could not save this job',
+      );
     } finally {
       setPending(false);
     }
@@ -177,6 +196,10 @@ export function StaffJobForm({
     Boolean(form.categoryCode) &&
     form.description.trim().length >= 10 &&
     Number(form.vacancies) >= 1 &&
+    (form.jobType !== 'ROTATING' ||
+      (Number.isInteger(Number(form.shiftHours)) &&
+        Number(form.shiftHours) >= 1 &&
+        Number(form.shiftHours) <= 24)) &&
     (Boolean(job) || Boolean(companyId) || Boolean(selectedCompanyId));
 
   return (
@@ -235,12 +258,22 @@ export function StaffJobForm({
                 shift: event.target.value as ShiftType,
               }))
             }
-            options={SHIFT_TYPES.map((value) => ({
-              value,
-              label: SHIFT_TYPE_LABELS[value],
-            }))}
+            options={shiftOptions}
           />
         </FormField>
+        {form.jobType === 'ROTATING' && (
+          <FormField label="Hours per shift" required>
+            <Input
+              type="number"
+              min="1"
+              max="24"
+              value={form.shiftHours}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, shiftHours: event.target.value }))
+              }
+            />
+          </FormField>
+        )}
         <FormField label="Gender preference">
           <Select
             value={form.genderPreference}

@@ -80,6 +80,8 @@ export function StaffCompanyPanel({
   categories: { code: string; label: string }[];
 }) {
   const pathname = usePathname();
+  const isVerifierRoute = pathname.includes('/verifier/');
+  const isBranchAdminRoute = pathname.includes('/branch-admin/');
   const backHref = pathname.includes('super-admin')
     ? '/super-admin/companies'
     : pathname.includes('/verifier/')
@@ -126,6 +128,14 @@ export function StaffCompanyPanel({
     onboarding &&
     ((company_.status === 'DRAFT' && !verifiedSigned) || company_.status === 'INFO_REQUESTED'),
   );
+  const canUploadCompanyDocuments = Boolean(company_.headOffice && company_.branch);
+  const hasRequiredDocumentForSignature =
+    company_.requiredDocuments.length === 0 ||
+    company_.requiredDocuments.some((code) =>
+      company_.documents.some(
+        (document) => document.typeCode === code && document.reviewStatus !== 'REJECTED',
+      ),
+    );
   const [industries, setIndustries] = useState<MasterDataOption[]>([]);
   const [cities, setCities] = useState<MasterDataOption[]>([]);
   // Head office form (H3): the onboard form only records the address as a
@@ -261,6 +271,46 @@ export function StaffCompanyPanel({
     'RESUBMITTED',
   ];
   const canReview = canVerify && REVIEWABLE_STATUSES.includes(company_.status);
+  const requiredDocumentsToAccept = company_.requiredDocuments.filter(
+    (code) =>
+      !company_.documents.some(
+        (document) => document.typeCode === code && document.reviewStatus === 'ACCEPTED',
+      ),
+  );
+  const paperFormSignedForCurrentRound =
+    !onboarding ||
+    Boolean(
+      company_.registrationVerifiedSignedAt &&
+      (!company_.verification ||
+        company_.registrationVerifiedSignedAt >= company_.verification.submittedAt),
+    );
+  const canFinalizeReturnedOnboarding = Boolean(
+    isBranchAdminRoute && canVerify && onboarding && company_.status === 'RESUBMITTED',
+  );
+  const canAcceptResubmission = Boolean(
+    isBranchAdminRoute && canVerify && company_.status === 'RESUBMITTED',
+  );
+  const verificationBlockers = [
+    ...(company_.contacts.some((contact) => contact.isPrimary)
+      ? []
+      : ['add a main contact person']),
+    ...(!company_.headOffice || !company_.branch
+      ? ['set the head office location and branch']
+      : []),
+    ...requiredDocumentsToAccept.map((code) => {
+      const current = company_.documents.find((document) => document.typeCode === code);
+      return current && current.reviewStatus !== 'REJECTED'
+        ? `accept ${code.replace(/_/g, ' ')}`
+        : `upload ${code.replace(/_/g, ' ')}`;
+    }),
+    ...(paperFormSignedForCurrentRound || canFinalizeReturnedOnboarding
+      ? []
+      : ['mark the paper registration form verified and signed']),
+  ];
+  const canDirectlyVerifyOnboardedDraft = Boolean(
+    isBranchAdminRoute && canVerify && onboarding && company_.status === 'DRAFT',
+  );
+  const canVerifyCompany = canDirectlyVerifyOnboardedDraft || verificationBlockers.length === 0;
   const [showInfoForm, setShowInfoForm] = useState(false);
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [infoText, setInfoText] = useState('');
@@ -278,6 +328,7 @@ export function StaffCompanyPanel({
         { method: 'POST', body, idempotencyKey: crypto.randomUUID() },
       );
       setCompany_(saved);
+      setVerifiedSigned(Boolean(saved.registrationVerifiedSignedAt));
       setShowInfoForm(false);
       setShowRejectForm(false);
       setInfoText('');
@@ -512,8 +563,23 @@ export function StaffCompanyPanel({
             <div className="mt-1">
               <StatusPill label={pill.label} tone={pill.variant} />
             </div>
+            {isVerifierRoute && company_.status === 'INFO_REQUESTED' && (
+              <p className="text-fg-muted mt-1 text-sm">
+                Save the requested information to automatically return the company to the Branch
+                Admin for review. The Branch Admin can request more information if anything is
+                missing.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
+            {canAcceptResubmission && (
+              <Button
+                loading={pending === 'verify'}
+                onClick={() => void callReviewAction('verify', { note: null })}
+              >
+                Accept resubmission
+              </Button>
+            )}
             {postJobHref && (
               <Link href={postJobHref}>
                 <Button size="sm">
@@ -522,7 +588,7 @@ export function StaffCompanyPanel({
                 </Button>
               </Link>
             )}
-            {onboarding && (
+            {onboarding && !isVerifierRoute && !isBranchAdminRoute && (
               <Button
                 variant="secondary"
                 leftIcon={<Printer />}
@@ -534,15 +600,26 @@ export function StaffCompanyPanel({
                   : 'Preparing print…'}
               </Button>
             )}
-            {canOnboard && onboarding && company_.status === 'DRAFT' && !verifiedSigned && (
-              <Button
-                loading={pending === 'verified-signed'}
-                onClick={() => void markAsVerifiedSigned()}
-              >
-                Mark as verified &amp; signed
-              </Button>
-            )}
+            {!isVerifierRoute &&
+              (!isBranchAdminRoute || canVerify) &&
+              canOnboard &&
+              onboarding &&
+              company_.status === 'DRAFT' &&
+              !verifiedSigned && (
+                <Button
+                  loading={pending === (isBranchAdminRoute ? 'verify' : 'verified-signed')}
+                  disabled={!isBranchAdminRoute && !hasRequiredDocumentForSignature}
+                  onClick={() =>
+                    isBranchAdminRoute
+                      ? void callReviewAction('verify', { note: null })
+                      : void markAsVerifiedSigned()
+                  }
+                >
+                  Mark as verified &amp; signed
+                </Button>
+              )}
             {canOnboard &&
+              !isVerifierRoute &&
               onboarding &&
               company_.status === 'INFO_REQUESTED' &&
               !showResubmitForm && (
@@ -550,11 +627,13 @@ export function StaffCompanyPanel({
                   Send back for review
                 </Button>
               )}
-            {canManage && !showCorrectForm && (
-              <Button variant="secondary" leftIcon={<Pencil />} onClick={openCorrectForm}>
-                Correct details
-              </Button>
-            )}
+            {canManage &&
+              (!isVerifierRoute || company_.status === 'INFO_REQUESTED') &&
+              !showCorrectForm && (
+                <Button variant="secondary" leftIcon={<Pencil />} onClick={openCorrectForm}>
+                  Correct details
+                </Button>
+              )}
             {canSuspend && company_.status === 'VERIFIED' && !showSuspendForm && (
               <Button
                 variant="danger"
@@ -586,7 +665,9 @@ export function StaffCompanyPanel({
 
       {verifiedSigned && (
         <div className="bg-success-soft text-success-soft-fg rounded-xl px-4 py-3 text-sm">
-          Verification and signature recorded. The company is now submitted for Branch Admin review.
+          {company_.status === 'VERIFIED'
+            ? 'The company has been verified and the registration form signed.'
+            : 'Verification and signature recorded. The company is now submitted for Branch Admin review.'}
         </div>
       )}
 
@@ -599,12 +680,15 @@ export function StaffCompanyPanel({
               : 'Review the documents below, then verify, ask for more information, or reject.'}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button
-              loading={pending === 'verify'}
-              onClick={() => void callReviewAction('verify', { note: null })}
-            >
-              Verify company
-            </Button>
+            {!canAcceptResubmission && !canFinalizeReturnedOnboarding && (
+              <Button
+                loading={pending === 'verify'}
+                disabled={!canVerifyCompany}
+                onClick={() => void callReviewAction('verify', { note: null })}
+              >
+                Verify company
+              </Button>
+            )}
             {!showInfoForm && (
               <Button variant="secondary" onClick={() => setShowInfoForm(true)}>
                 Request more info
@@ -616,6 +700,14 @@ export function StaffCompanyPanel({
               </Button>
             )}
           </div>
+          {!canVerifyCompany && !canDirectlyVerifyOnboardedDraft && (
+            <p className="text-fg-muted text-sm" role="status">
+              {canAcceptResubmission
+                ? 'Accepting this resubmission will verify the company despite:'
+                : 'Before verifying,'}{' '}
+              {verificationBlockers.join('; ')}.
+            </p>
+          )}
           {showInfoForm && (
             <div className="grid gap-2">
               <FormField label="What information do you need?" required>
@@ -655,9 +747,7 @@ export function StaffCompanyPanel({
                   options={[
                     { value: '', label: 'Choose a reason' },
                     { value: 'INVALID_DOCUMENTS', label: 'Invalid or forged documents' },
-                    { value: 'NTN_MISMATCH', label: 'NTN does not match records' },
                     { value: 'DUPLICATE_REGISTRATION', label: 'Duplicate company' },
-                    { value: 'INCOMPLETE_INFO', label: 'Incomplete information' },
                     { value: 'OTHER', label: 'Other' },
                   ]}
                 />
@@ -1053,13 +1143,22 @@ export function StaffCompanyPanel({
       </section>
 
       {(company_.documents.length > 0 || canUploadDocs) && (
-        <section className="border-border bg-surface grid gap-4 rounded-xl border p-5">
+        <section
+          id="company-documents"
+          className="border-border bg-surface grid gap-4 rounded-xl border p-5"
+        >
           <h2 className="text-fg font-semibold">Documents</h2>
           {canUploadDocs && (
             <p className="text-fg-muted text-sm">
               {company_.status === 'INFO_REQUESTED'
                 ? 'The Branch Admin asked for more — upload the missing documents here, then send the company back from the header.'
                 : 'Upload the required documents before marking the form verified & signed. PDF, JPG or PNG — the file size and type are checked on upload. Uploading a file of a type that already has one replaces it.'}
+            </p>
+          )}
+          {canUploadDocs && !canUploadCompanyDocuments && (
+            <p className="text-fg-muted text-sm" role="status">
+              Save the head office location above and make sure this company has a branch before
+              uploading documents.
             </p>
           )}
           {canUploadDocs ? (
@@ -1124,7 +1223,7 @@ export function StaffCompanyPanel({
                           id={`company-doc-upload-${code}`}
                           name={`company-doc-upload-${code}`}
                           accept="application/pdf,image/jpeg,image/png"
-                          disabled={uploadingDoc !== null}
+                          disabled={uploadingDoc !== null || !canUploadCompanyDocuments}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             e.target.value = '';

@@ -12,6 +12,7 @@ export function InstantListFilters({
   statuses,
   defaultStatus = '',
   allowAllStatuses = false,
+  themeAware = false,
 }: {
   action: string;
   query: string;
@@ -19,6 +20,7 @@ export function InstantListFilters({
   statuses: readonly { value: string; label: string }[];
   defaultStatus?: string;
   allowAllStatuses?: boolean;
+  themeAware?: boolean;
 }) {
   const router = useRouter();
   const initial = new URLSearchParams(query);
@@ -103,11 +105,19 @@ export function InstantListFilters({
             cancelSearch();
             navigate(searchRef.current, value);
           }}
-          className="border-border rounded border px-3 py-2"
+          className={`border-border rounded border px-3 py-2 ${themeAware ? 'bg-surface text-fg' : ''}`}
         >
-          {allowAllStatuses && <option value="">All statuses</option>}
+          {allowAllStatuses && (
+            <option value="" className={themeAware ? 'bg-surface text-fg' : undefined}>
+              All statuses
+            </option>
+          )}
           {statuses.map((item) => (
-            <option key={item.value} value={item.value}>
+            <option
+              key={item.value}
+              value={item.value}
+              className={themeAware ? 'bg-surface text-fg' : undefined}
+            >
               {item.label}
             </option>
           ))}

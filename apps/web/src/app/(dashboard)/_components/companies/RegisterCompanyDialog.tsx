@@ -10,7 +10,6 @@ import {
 import { Building2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
-import type { FormEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Input, Select, Textarea } from '@/components/atoms';
 import type { SelectOption } from '@/components/atoms';
@@ -291,8 +290,7 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
     }
   };
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const saveCompany = async () => {
     setAlert(null);
     const parsed = staffOnboardCompanySchema.safeParse(form);
     if (!parsed.success) {
@@ -314,7 +312,7 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
         method: 'POST',
         body: parsed.data,
         // L10: the onboard route requires an Idempotency-Key — one fresh key
-        // per submit, so a double-click replays instead of creating a second
+        // per save, so a double-click replays instead of creating a second
         // DRAFT (the F4 resumption is the backstop, not the guard).
         idempotencyKey: crypto.randomUUID(),
       });
@@ -367,7 +365,12 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
           </Button>
         }
       >
-        <form className="grid gap-5" onSubmit={submit} noValidate ref={formRef}>
+        <form
+          className="grid gap-5"
+          onSubmit={(event) => event.preventDefault()}
+          noValidate
+          ref={formRef}
+        >
           {alert && (
             <p
               role="alert"
@@ -797,9 +800,10 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
                 </Button>
               ) : (
                 <Button
-                  type="submit"
+                  type="button"
                   loading={loading}
                   disabled={branches.length === 0 || loadingOptions}
+                  onClick={() => void saveCompany()}
                 >
                   Save company
                 </Button>

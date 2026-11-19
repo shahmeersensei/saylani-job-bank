@@ -18,7 +18,14 @@ import {
   ValidationError,
 } from '@/domains/shared/errors';
 import { paginationMeta, type ListQuery } from '@/domains/shared/pagination';
-import { assertCityAccess, assertPermission, cityScope, type Actor } from '@/domains/shared/scope';
+import {
+  assertBranchAccess,
+  assertCityAccess,
+  assertPermission,
+  assertRole,
+  cityScope,
+  type Actor,
+} from '@/domains/shared/scope';
 import { db, type DbExecutor } from '@/lib/db';
 import {
   companyInfoRequestedEmail,
@@ -206,10 +213,9 @@ export async function getCompanyForReview(actor: Actor, companyId: string): Prom
  * The open verification round for a company, creating one when the company
  * has none yet. Field-visit companies are reviewed straight from DRAFT and
  * never went through SUBMIT, so no round exists for them until the Branch
- * Admin's first review action. The round's submittedAt honours a paper form
- * already marked verified & signed, preserving the old invariant (signing
- * and submitting happened in one transaction, so signedAt == submittedAt)
- * that the freshness gate in verifyCompany relies on.
+ * Admin's first review action. For a direct DRAFT verification, the company
+ * verification and paper-form attestation are recorded together; for the
+ * separate signing flow, submittedAt honours the existing attestation.
  */
 async function ensureOpenVerification(tx: DbExecutor, row: CompanyRow): Promise<VerificationRow> {
   const existing = await openVerification(tx, row.id, { forUpdate: true });
@@ -448,10 +454,11 @@ export async function reviewDocument(
   documentId: string,
   input: DocumentReviewInput,
 ): Promise<CompanyView> {
+  assertRole(ctx.actor, 'BRANCH_ADMIN');
   assertPermission(ctx.actor, 'company:verify');
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
-    await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+    assertBranchAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
     // A round must exist before a document is reviewed: DRAFT companies
     // have none until the first review action opens one.
     await ensureOpenVerification(tx, row);
@@ -576,27 +583,13 @@ export async function verifyCompany(
   companyId: string,
   input: { note: string | null },
 ): Promise<CompanyView> {
+  assertRole(ctx.actor, 'BRANCH_ADMIN');
   assertPermission(ctx.actor, 'company:verify');
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
-    await assertCityAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+    assertBranchAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
     await assertNoConflictOfInterest(ctx.actor, companyId);
-    const machineCtx: CompanyMachineContext = {
-      submissionMissing: await submissionMissing(tx, row),
-      documentsNotAccepted: await documentsNotAccepted(tx, row),
-    };
-    const to = companyMachine.transition(row.status, 'VERIFY', machineCtx, ctx.actor.roles);
-    const round = await ensureOpenVerification(tx, row);
-    // Audit 2026-11-11 (M-11): for field-visit (onboarded) companies the
-    // paper-form attestation must be fresh for THIS round. A legal
-    // correction clears it (see correctCompanyDetails), so a VERIFY on a
-    // stale attestation is blocked until a colleague marks the new form
-    // verified & signed. Employer self-registered companies have no paper
-    // form by design, so the check is scoped to onboarded companies.
-    // Resubmits reuse the same round (submittedAt unchanged), so the
-    // INFO_REQUESTED flow is unaffected; the first round sets the
-    // attestation and the round in the same transaction, so signedAt ==
-    // submittedAt there and passes.
+
     const [onboarding] = await tx
       .select({ companyId: schema.companyOnboarding.companyId })
       .from(schema.companyOnboarding)
@@ -607,7 +600,31 @@ export async function verifyCompany(
         ),
       )
       .limit(1);
-    if (onboarding) {
+    const directFieldVisitVerification = Boolean(onboarding && row.status === 'DRAFT');
+    const finalFieldVisitApproval = Boolean(onboarding && row.status === 'RESUBMITTED');
+    const acceptingResubmission = row.status === 'RESUBMITTED';
+    const outstandingSubmissionItems = acceptingResubmission
+      ? await submissionMissing(tx, row)
+      : [];
+    const outstandingDocuments = acceptingResubmission ? await documentsNotAccepted(tx, row) : [];
+    const machineCtx: CompanyMachineContext = {
+      submissionMissing:
+        directFieldVisitVerification || acceptingResubmission
+          ? []
+          : await submissionMissing(tx, row),
+      documentsNotAccepted:
+        directFieldVisitVerification || acceptingResubmission
+          ? []
+          : await documentsNotAccepted(tx, row),
+    };
+    const to = companyMachine.transition(row.status, 'VERIFY', machineCtx, ctx.actor.roles);
+    const round = await ensureOpenVerification(tx, row);
+    // A field-visit DRAFT is verified directly by its Branch Admin. A
+    // resubmitted field-visit company is signed again as part of final
+    // Branch Admin approval; other field-visit rounds need a separate,
+    // current paper-form attestation. Employer registrations have no paper
+    // form, and info-request resubmits reuse their original verification round.
+    if (onboarding && !directFieldVisitVerification && !finalFieldVisitApproval) {
       const signedAt = row.registrationVerifiedSignedAt;
       if (!signedAt || signedAt < round.submittedAt) {
         throw new ConflictError(
@@ -626,7 +643,19 @@ export async function verifyCompany(
         decidedBy: ctx.actor.userId,
       })
       .where(eq(ver.id, round.id));
-    await tx.update(c).set({ status: to, verifiedAt: now }).where(eq(c.id, row.id));
+    await tx
+      .update(c)
+      .set({
+        status: to,
+        verifiedAt: now,
+        ...(directFieldVisitVerification || finalFieldVisitApproval
+          ? {
+              registrationVerifiedSignedAt: now,
+              registrationVerifiedSignedBy: ctx.actor.userId,
+            }
+          : {}),
+      })
+      .where(eq(c.id, row.id));
     await recordTransition(tx, {
       verificationId: round.id,
       companyId: row.id,
@@ -635,6 +664,17 @@ export async function verifyCompany(
       toStatus: to,
       actorId: ctx.actor.userId,
       note: input.note,
+      ...(acceptingResubmission
+        ? {
+            metadata: {
+              acceptedWithOutstandingRequirements:
+                outstandingSubmissionItems.length > 0 || outstandingDocuments.length > 0,
+              acceptedResubmission: true,
+              submissionMissing: outstandingSubmissionItems,
+              documentsNotAccepted: outstandingDocuments,
+            },
+          }
+        : {}),
     });
     audit({
       action: 'company.verify',
@@ -643,7 +683,32 @@ export async function verifyCompany(
       branchId: row.branchId,
       before: { status: row.status },
       after: { status: to },
+      ...(acceptingResubmission
+        ? {
+            metadata: {
+              acceptedWithOutstandingRequirements:
+                outstandingSubmissionItems.length > 0 || outstandingDocuments.length > 0,
+              acceptedResubmission: true,
+              submissionMissing: outstandingSubmissionItems,
+              documentsNotAccepted: outstandingDocuments,
+            },
+          }
+        : {}),
     });
+    if (directFieldVisitVerification || finalFieldVisitApproval) {
+      audit({
+        action: 'company.registration_form_verified_signed',
+        entityType: 'company',
+        entityId: row.id,
+        branchId: row.branchId,
+        after: { verifiedSigned: true },
+        metadata: {
+          verifiedBy: ctx.actor.userId,
+          verifiedWithCompany: true,
+          finalResubmission: finalFieldVisitApproval,
+        },
+      });
+    }
   });
   const view = await getCompanyForReview(ctx.actor, companyId);
   await emailEmployers(ctx, companyId, ({ name, url }) =>

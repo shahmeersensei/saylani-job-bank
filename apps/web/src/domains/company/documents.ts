@@ -35,7 +35,7 @@ import {
   type CompanyView,
   type SignedIn,
 } from './repository';
-import { getCompanyOnboarding } from './staff';
+import { autoResubmitInfoRequestIfReady, getCompanyOnboarding } from './staff';
 
 export type { DocumentLink };
 export type PresignedCompanyDocument = PresignedDocument;
@@ -250,7 +250,13 @@ export async function confirmStaffCompanyDocument(
   documentId: string,
 ): Promise<CompanyView> {
   const row = await loadStaffOnboardedCompany(ctx, companyId);
-  return confirmDocumentForCompany(ctx, row, documentId);
+  const saved = await confirmDocumentForCompany(ctx, row, documentId);
+  const resubmitted = await autoResubmitInfoRequestIfReady(
+    ctx,
+    companyId,
+    'Verifier saved the requested document information.',
+  );
+  return resubmitted ? buildCompanyView(db, await loadCompany(db, companyId)) : saved;
 }
 
 /** Remove (supersede) a document. Required documents can only be replaced, not removed. */

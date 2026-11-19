@@ -935,20 +935,16 @@ export async function markCompanyRegistrationVerifiedSigned(
   return getCompanyDetail(ctx.actor, companyId);
 }
 
-/**
- * After "more information needed": the onboarder fixed what the verifier
- * asked for and sends a field-visit company back. Mirrors resubmitMyCompany
- * for employers — the employer has no account for these companies, and
- * without this the company could never leave INFO_REQUESTED (RESUBMIT was
- * employer-only), so the VERIFY completeness guard would strand it.
- */
+/** Return a field-visit company or a verifier's info-request response to review. */
 export async function resubmitOnboardedCompany(
   ctx: SignedIn,
   companyId: string,
   input: { note: string | null },
 ): Promise<CompanyView> {
-  assertPermission(ctx.actor, 'company:onboard');
+  const isVerifier =
+    hasRole(ctx.actor, 'VERIFIER') && !hasRole(ctx.actor, 'SUPER_ADMIN', 'BRANCH_ADMIN');
   const company = await loadCompany(db, companyId);
+  if (!isVerifier) assertPermission(ctx.actor, 'company:onboard');
   if (!isSuperAdmin(ctx.actor)) {
     assertBranchAccess(ctx.actor, company.branchId, {
       entityType: 'company',
@@ -956,17 +952,22 @@ export async function resubmitOnboardedCompany(
     });
   }
   const onboarding = await getCompanyOnboarding(ctx.actor, companyId);
-  if (!onboarding) {
+  if (!onboarding && !isVerifier) {
     throw new ConflictError(
       'Only a company registered after a field visit can be sent back this way.',
       { reason: 'NOT_ONBOARDED' },
+    );
+  }
+  if (isVerifier && company.status !== 'INFO_REQUESTED') {
+    throw new ConflictError(
+      'A verifier can only return a company after the Branch Admin requests information.',
     );
   }
   // Audit 2026-11-11 (L-08): separation of duties — the staff member who
   // onboarded the company must not single-handedly bounce it back to the
   // verifier. A colleague (or Branch/Super Admin, who hold company:onboard)
   // sends it back instead.
-  if (company.createdBy === ctx.actor.userId) {
+  if (!isVerifier && company.createdBy === ctx.actor.userId) {
     throw new ConflictError(
       'You cannot send back a company you onboarded yourself. Ask another staff member in your branch.',
       { reason: 'SELF_ATTESTATION' },
@@ -984,6 +985,15 @@ export async function resubmitOnboardedCompany(
     );
     const round = await openVerification(tx, row.id, { forUpdate: true });
     if (!round) throw new ConflictError('There is no open verification to send back');
+    if (
+      isVerifier &&
+      (round.state !== 'INFO_REQUESTED' ||
+        (round.assignedVerifierId !== null && round.assignedVerifierId !== ctx.actor.userId))
+    ) {
+      throw new ForbiddenError(
+        'Only the assigned verifier can return this company to the Branch Admin.',
+      );
+    }
     // M18 (staff mirror of resubmitMyCompany): an unchanged company cannot be
     // bounced back and burn a fresh SLA — a real note, or proof something
     // changed since the verifier asked for more.
@@ -994,8 +1004,9 @@ export async function resubmitOnboardedCompany(
       throw new ValidationError([
         {
           path: 'note',
-          message:
-            'Tell the verifier what you changed or sent (at least 10 characters), or upload the document they asked for first.',
+          message: isVerifier
+            ? 'Tell the Branch Admin what you changed or sent (at least 10 characters), or upload the document they asked for first.'
+            : 'Tell the verifier what you changed or sent (at least 10 characters), or upload the document they asked for first.',
         },
       ]);
     }
@@ -1027,21 +1038,97 @@ export async function resubmitOnboardedCompany(
   return getCompanyDetail(ctx.actor, companyId);
 }
 
+/** Auto-return a completed verifier response as soon as its last required save lands. */
+export async function autoResubmitInfoRequestIfReady(
+  ctx: SignedIn,
+  companyId: string,
+  note: string,
+): Promise<boolean> {
+  let resubmitted = false;
+  await runCommand(
+    ctx,
+    async ({ tx, audit }) => {
+      const row = await loadCompany(tx, companyId, { forUpdate: true });
+      if (row.status !== 'INFO_REQUESTED') return;
+      assertBranchAccess(ctx.actor, row.branchId, {
+        entityType: 'company',
+        entityId: row.id,
+      });
+
+      const round = await openVerification(tx, row.id, { forUpdate: true });
+      if (
+        !round ||
+        round.state !== 'INFO_REQUESTED' ||
+        (round.assignedVerifierId !== null && round.assignedVerifierId !== ctx.actor.userId) ||
+        !(await changedSinceInfoRequest(tx, row.id, round.infoRequestedAt))
+      ) {
+        return;
+      }
+
+      // Returning information to the Branch Admin is not approval; VERIFY still
+      // enforces submission completeness and accepted documents.
+      const to = companyMachine.transition(
+        row.status,
+        'RESUBMIT',
+        { submissionMissing: [], documentsNotAccepted: [] },
+        ctx.actor.roles,
+      );
+      const now = new Date();
+      const slaDueOn = await verificationDueOn(now);
+      await tx
+        .update(ver)
+        .set({
+          state: 'RESUBMITTED',
+          employerNote: note,
+          clockStartedAt: now,
+          slaDueOn,
+        })
+        .where(eq(ver.id, round.id));
+      await tx.update(c).set({ status: to }).where(eq(c.id, row.id));
+      await recordTransition(tx, {
+        verificationId: round.id,
+        companyId: row.id,
+        event: 'RESUBMIT',
+        fromStatus: row.status,
+        toStatus: to,
+        actorId: ctx.actor.userId,
+        note,
+        metadata: { slaDueOn, automatic: true },
+      });
+      audit({
+        action: 'company.resubmit',
+        entityType: 'company',
+        entityId: row.id,
+        branchId: row.branchId,
+        before: { status: row.status },
+        after: { status: to },
+        metadata: { round: round.round, slaDueOn, automatic: true },
+      });
+      resubmitted = true;
+    },
+    { audited: false },
+  );
+  return resubmitted;
+}
+
 /**
  * Set the head office of a field-visit-onboarded company. The onboard form
  * only records the address as a note, so these companies reach the verifier
  * with no location row — and the VERIFY guard now requires one. The
- * onboarder supplies it here (address search + pin), while the company is
- * a draft or waiting for more information. The city must be an active
- * master-data CITY code.
+ * onboarder supplies it while the company is a draft; a verifier may fill it
+ * in response to a Branch Admin's information request. The city must be an
+ * active master-data CITY code.
  */
 export async function setOnboardedCompanyHeadOffice(
   ctx: SignedIn,
   companyId: string,
   input: OnboardedCompanyHeadOfficeInput,
 ): Promise<CompanyView> {
-  assertPermission(ctx.actor, 'company:onboard');
+  const isVerifier =
+    hasRole(ctx.actor, 'VERIFIER') && !hasRole(ctx.actor, 'SUPER_ADMIN', 'BRANCH_ADMIN');
   const company = await loadCompany(db, companyId);
+  const verifierInfoResponse = isVerifier && company.status === 'INFO_REQUESTED';
+  if (!verifierInfoResponse) assertPermission(ctx.actor, 'company:onboard');
   if (!isSuperAdmin(ctx.actor)) {
     assertBranchAccess(ctx.actor, company.branchId, {
       entityType: 'company',
@@ -1058,7 +1145,7 @@ export async function setOnboardedCompanyHeadOffice(
   // Audit 2026-11-11 (L-08): separation of duties — the staff member who
   // onboarded the company must not single-handedly set its head office.
   // A colleague (or Branch/Super Admin, who hold company:onboard) does it.
-  if (company.createdBy === ctx.actor.userId) {
+  if (company.createdBy === ctx.actor.userId && !verifierInfoResponse) {
     throw new ConflictError(
       'You cannot set the head office of a company you onboarded yourself. Ask another staff member in your branch.',
       { reason: 'SELF_ATTESTATION' },
@@ -1072,6 +1159,19 @@ export async function setOnboardedCompanyHeadOffice(
   await assertActiveMasterData(db, 'CITY', [input.cityCode], () => 'cityCode');
   await runCommand(ctx, async ({ tx, audit }) => {
     const row = await loadCompany(tx, companyId, { forUpdate: true });
+    if (verifierInfoResponse) {
+      const round = await openVerification(tx, row.id);
+      if (
+        row.status !== 'INFO_REQUESTED' ||
+        !round ||
+        round.state !== 'INFO_REQUESTED' ||
+        (round.assignedVerifierId !== null && round.assignedVerifierId !== ctx.actor.userId)
+      ) {
+        throw new ForbiddenError(
+          'Only the assigned verifier can complete this information request.',
+        );
+      }
+    }
     const values = {
       label: 'Head office',
       addressLine: input.addressLine,
@@ -1092,6 +1192,13 @@ export async function setOnboardedCompanyHeadOffice(
       branchId: row.branchId,
     });
   });
+  if (verifierInfoResponse) {
+    await autoResubmitInfoRequestIfReady(
+      ctx,
+      companyId,
+      'Verifier saved the requested head office information.',
+    );
+  }
   return getCompanyDetail(ctx.actor, companyId);
 }
 
@@ -1103,14 +1210,12 @@ export async function correctCompanyDetails(
   companyId: string,
   input: UpdateCompanyInput & { reason: string },
 ): Promise<CompanyView> {
-  assertPermission(ctx.actor, 'company:manage');
-  // Audit 2026-11-11 (H-01): company:manage is also held by verifiers, so the
-  // permission alone does not prove Super/Branch Admin. Only Super Admin and
-  // Branch Admin may correct locked company details — a verifier must never
-  // rewrite legal fields (legalName, legalStructure, ntn, registrationNo) on
-  // a VERIFIED company. Mirrors transferCompany's role guard. Verifier
-  // callers are rejected here, so no contact-conflict check is needed.
-  assertRole(ctx.actor, 'SUPER_ADMIN', 'BRANCH_ADMIN');
+  const isVerifier =
+    hasRole(ctx.actor, 'VERIFIER') && !hasRole(ctx.actor, 'SUPER_ADMIN', 'BRANCH_ADMIN');
+  if (!isVerifier) assertPermission(ctx.actor, 'company:manage');
+  // Verifiers may correct details only while responding to a Branch Admin's
+  // information request. All other corrections remain restricted to admins.
+  assertRole(ctx.actor, 'SUPER_ADMIN', 'BRANCH_ADMIN', 'VERIFIER');
   const { reason, ...requested } = input;
   if (Object.keys(requested).length === 0) {
     throw new ValidationError([{ path: 'root', message: 'Change at least one field' }]);
@@ -1122,6 +1227,21 @@ export async function correctCompanyDetails(
       // branch too, but only after this transaction commits — without this
       // line a cross-branch correction would silently land.
       assertBranchAccess(ctx.actor, row.branchId, { entityType: 'company', entityId: row.id });
+      if (isVerifier) {
+        if (row.status !== 'INFO_REQUESTED') {
+          throw new ForbiddenError(
+            'Verifiers can only correct details after the Branch Admin requests information.',
+          );
+        }
+        const round = await openVerification(tx, row.id);
+        if (
+          !round ||
+          round.state !== 'INFO_REQUESTED' ||
+          (round.assignedVerifierId !== null && round.assignedVerifierId !== ctx.actor.userId)
+        ) {
+          throw new ForbiddenError('Only the assigned verifier can correct this company.');
+        }
+      }
       // L16: only genuinely changed fields count — a "" that optionalText
       // mapped to null on an already-null field (tradeName, website, …) is
       // no change, not a correction. (Same diff as updateMyCompany.)
@@ -1246,6 +1366,9 @@ export async function correctCompanyDetails(
   } catch (error) {
     if (isUniqueViolation(error, ACTIVE_NTN_CONSTRAINT)) throw ntnTaken();
     throw error;
+  }
+  if (isVerifier) {
+    await autoResubmitInfoRequestIfReady(ctx, companyId, input.reason);
   }
   return getCompanyDetail(ctx.actor, companyId);
 }
