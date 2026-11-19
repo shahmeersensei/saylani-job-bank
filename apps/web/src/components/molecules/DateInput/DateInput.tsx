@@ -76,6 +76,9 @@ export function DateInput({
             className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
             onChange={(event) => {
               const iso = event.target.value;
+              // A cleared native picker (e.g. the mobile Clear button) sends "". Ignore it so
+              // the parent only ever gets a real ISO date, the same as from typing.
+              if (!iso) return;
               if (!inRange(iso)) return;
               setText(isoToDdMmYyyy(iso));
               onChange?.(iso);
