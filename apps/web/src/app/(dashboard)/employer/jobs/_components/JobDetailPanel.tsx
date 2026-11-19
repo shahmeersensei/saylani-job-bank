@@ -74,6 +74,10 @@ export function JobDetailPanel({ job, basePath = '/employer' }: Props) {
 
   const transitions = allowedTransitions(job.status);
   const pill = STATUS_BADGE[job.status] ?? { tone: 'neutral' as const };
+  // Mirrors jobEditability() on the server (DRAFT / OPEN / PAUSED). Edit used to show for DRAFT
+  // only, so a company could not fix a live job, e.g. one a verifier posted for it.
+  // rules.ts is server-only, so the check is repeated here.
+  const canEdit = job.status === 'DRAFT' || job.status === 'OPEN' || job.status === 'PAUSED';
 
   function handleTransition(transition: string) {
     startTransition(async () => {
@@ -129,24 +133,25 @@ export function JobDetailPanel({ job, basePath = '/employer' }: Props) {
                 Shortlist
               </Button>
             </Link>
-            {job.status === 'DRAFT' && (
-              <>
-                <Link href={`${basePath}/jobs/${job.id}/edit`}>
-                  <Button size="sm" variant="secondary">
-                    <Pencil className="mr-1.5 size-4" />
-                    Edit
-                  </Button>
-                </Link>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  disabled={pending}
-                >
-                  <Trash2 className="text-danger mr-1.5 size-4" />
-                  Delete
+            {canEdit && (
+              <Link href={`${basePath}/jobs/${job.id}/edit`}>
+                <Button size="sm" variant="secondary">
+                  <Pencil className="mr-1.5 size-4" />
+                  Edit
                 </Button>
-              </>
+              </Link>
+            )}
+            {/* Delete stays draft-only, as deleteJob enforces on the server. */}
+            {job.status === 'DRAFT' && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={pending}
+              >
+                <Trash2 className="text-danger mr-1.5 size-4" />
+                Delete
+              </Button>
             )}
           </div>
         </header>
