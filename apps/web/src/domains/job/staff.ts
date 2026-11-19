@@ -364,6 +364,17 @@ export async function listCompanyJobs(actor: Actor, companyId: string): Promise<
 
 // ─── Staff job creation ───────────────────────────────────────────────────
 
+/**
+ * A Verifier posts only for companies registered in one of their own branches (decided
+ * 2026-11-19), not the whole city. This is the same exact-branch rule staffUpdateJob and
+ * staffChangeJobStatus use, so a verifier can always edit and archive what they post.
+ * Staff keep the wider city scope.
+ */
+function assertVerifierCompanyBranch(actor: Actor, companyId: string, branchId: string): void {
+  if (!hasRole(actor, 'VERIFIER') || isSuperAdmin(actor)) return;
+  assertBranchAccess(actor, branchId, { entityType: 'company', entityId: companyId });
+}
+
 /** Staff or Verifier posts a job on behalf of a verified company. Branch Admin can no longer post jobs (2026-11-12); Super Admin never could (no job:manage). */
 export async function staffCreateJob(
   ctx: SignedIn,
@@ -391,6 +402,7 @@ export async function staffCreateJob(
     entityType: 'company',
     entityId: company.id,
   });
+  assertVerifierCompanyBranch(ctx.actor, company.id, company.branchId);
 
   return runCommand(ctx, async ({ tx, audit }) => {
     // Merge (2026-11-10): Rafeh's in-transaction re-check — re-read the
@@ -409,6 +421,8 @@ export async function staffCreateJob(
     if (lockedCompany.status !== 'VERIFIED')
       throw new ForbiddenError('Jobs can only be posted for verified companies');
     if (!lockedCompany.branchId) throw new ForbiddenError('Company has no branch assigned');
+    // Re-checked on the locked row, like VERIFIED above: the branch could change in between.
+    assertVerifierCompanyBranch(ctx.actor, lockedCompany.id, lockedCompany.branchId);
     // C4/H13: the category must be a real, active master-data code.
     await assertActiveMasterData(tx, 'JOB_CATEGORY', [input.categoryCode], () => 'categoryCode');
     // Salary must correspond to the designation, when a range is stored for it.

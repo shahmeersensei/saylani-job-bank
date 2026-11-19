@@ -11,18 +11,27 @@ export default async function VerifierPostJobPage({
   searchParams: Promise<{ companyId?: string }>;
 }) {
   const [{ actor }, { companyId }] = await Promise.all([requireRole('VERIFIER'), searchParams]);
-  const [{ items: companies }, categories] = await Promise.all([
-    listCompanies(actor, {
-      page: 1,
-      pageSize: 200,
-      limit: 200,
-      offset: 0,
-      sort: { field: 'legalName', direction: 'asc' },
-      q: undefined,
-      filters: { status: 'VERIFIED' },
-    }),
+  // Only VERIFIED companies in the verifier's own branch(es), matching the server rule in
+  // staffCreateJob. listCompanies alone is city-scoped, so it is asked once per branch.
+  const [branchLists, categories] = await Promise.all([
+    Promise.all(
+      actor.branchIds.map((branchId) =>
+        listCompanies(actor, {
+          page: 1,
+          pageSize: 200,
+          limit: 200,
+          offset: 0,
+          sort: { field: 'legalName', direction: 'asc' },
+          q: undefined,
+          filters: { status: 'VERIFIED', branchId },
+        }),
+      ),
+    ),
     listMasterData(actor, { type: 'JOB_CATEGORY' }),
   ]);
+  const companies = branchLists
+    .flatMap((list) => list.items)
+    .sort((a, b) => a.legalName.localeCompare(b.legalName));
 
   return (
     <div className="grid w-full gap-6">
