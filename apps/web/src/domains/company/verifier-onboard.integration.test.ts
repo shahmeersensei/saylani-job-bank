@@ -11,7 +11,7 @@ import { PATCH as reviewCompanyDoc } from '@/app/api/v1/companies/[id]/documents
 import { POST as setCompanyHeadOffice } from '@/app/api/v1/companies/[id]/head-office/route';
 import { POST as requestCompanyInfo } from '@/app/api/v1/companies/[id]/request-info/route';
 import { POST as markVerifiedSigned } from '@/app/api/v1/companies/[id]/registration-form/verified-signed/route';
-import { POST as resubmitCompany } from '@/app/api/v1/companies/[id]/resubmit/route';
+import { GET as getCompany, PATCH as correctCompany } from '@/app/api/v1/companies/[id]/route';
 import { POST as onboard } from '@/app/api/v1/companies/onboard/route';
 import { POST as verify } from '@/app/api/v1/companies/[id]/verify/route';
 import { GET as listCompanies } from '@/app/api/v1/companies/route';
@@ -270,14 +270,36 @@ describe('verifier creates companies', () => {
     expect(requested.status, JSON.stringify(requested.body)).toBe(200);
     expect(requested.body.data.status).toBe('INFO_REQUESTED');
 
-    const returned = await call(resubmitCompany, `/api/v1/companies/${company.id}/resubmit`, {
-      method: 'POST',
-      body: { note: 'The requested company details have been checked and updated.' },
+    const corrected = await call(correctCompany, `/api/v1/companies/${company.id}`, {
+      method: 'PATCH',
+      body: {
+        tradeName: 'Updated by Verifier',
+        reason: 'Completed the details requested by the Branch Admin.',
+      },
       jar: secondVerifierJar,
+      params: { id: company.id },
+      headers: { 'Idempotency-Key': key() },
+    });
+    expect(corrected.status, JSON.stringify(corrected.body)).toBe(200);
+    expect(corrected.body.data.status).toBe('RESUBMITTED');
+    expect(corrected.body.data.details.tradeName).toBe('Updated by Verifier');
+
+    const returned = await call(getCompany, `/api/v1/companies/${company.id}`, {
+      method: 'GET',
+      jar: colleagueJar,
       params: { id: company.id },
     });
     expect(returned.status, JSON.stringify(returned.body)).toBe(200);
     expect(returned.body.data.status).toBe('RESUBMITTED');
+
+    const branchAdminQueue = await call(listCompanies, '/api/v1/companies?status=RESUBMITTED', {
+      method: 'GET',
+      jar: colleagueJar,
+    });
+    expect(branchAdminQueue.status, JSON.stringify(branchAdminQueue.body)).toBe(200);
+    expect((branchAdminQueue.body.data.items as { id: string }[]).map((item) => item.id)).toContain(
+      company.id,
+    );
 
     for (const documentId of [company.documentId, backDocumentId]) {
       const accepted = await call(
@@ -305,6 +327,54 @@ describe('verifier creates companies', () => {
     expect(approved.body.data.status).toBe('VERIFIED');
     expect(approved.body.data.registrationVerifiedSignedAt).not.toBeNull();
     expect(approved.body.data.registrationVerifiedSignedBy).not.toBeNull();
+  });
+
+  it('returns the verifier response even when the Branch Admin may need more information', async () => {
+    const company = await onboardedCompany();
+    const requested = await call(
+      requestCompanyInfo,
+      `/api/v1/companies/${company.id}/request-info`,
+      {
+        method: 'POST',
+        body: { note: 'Please update the company details.' },
+        jar: colleagueJar,
+        params: { id: company.id },
+        headers: { 'Idempotency-Key': key() },
+      },
+    );
+    expect(requested.status, JSON.stringify(requested.body)).toBe(200);
+
+    const corrected = await call(correctCompany, `/api/v1/companies/${company.id}`, {
+      method: 'PATCH',
+      body: {
+        tradeName: 'Updated before completing every requirement',
+        reason: 'Updated the company details requested by the Branch Admin.',
+      },
+      jar: secondVerifierJar,
+      params: { id: company.id },
+      headers: { 'Idempotency-Key': key() },
+    });
+    expect(corrected.status, JSON.stringify(corrected.body)).toBe(200);
+    expect(corrected.body.data.status).toBe('RESUBMITTED');
+
+    const branchAdminQueue = await call(listCompanies, '/api/v1/companies?status=RESUBMITTED', {
+      method: 'GET',
+      jar: colleagueJar,
+    });
+    expect(branchAdminQueue.status, JSON.stringify(branchAdminQueue.body)).toBe(200);
+    expect((branchAdminQueue.body.data.items as { id: string }[]).map((item) => item.id)).toContain(
+      company.id,
+    );
+
+    const accepted = await call(verify, `/api/v1/companies/${company.id}/verify`, {
+      method: 'POST',
+      body: { note: null },
+      jar: colleagueJar,
+      params: { id: company.id },
+      headers: { 'Idempotency-Key': key() },
+    });
+    expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
+    expect(accepted.body.data.status).toBe('VERIFIED');
   });
 
   it('Branch Admin cannot verify a company assigned to another branch', async () => {
@@ -341,7 +411,7 @@ describe('verifier creates companies', () => {
       jar: secondVerifierJar,
     });
     expect(otherRes.status, JSON.stringify(otherRes.body)).toBe(201);
-    const res = await call(listCompanies, '/api/v1/companies?pageSize=100', {
+    const res = await call(listCompanies, '/api/v1/companies', {
       method: 'GET',
       jar: verifierJar,
     });

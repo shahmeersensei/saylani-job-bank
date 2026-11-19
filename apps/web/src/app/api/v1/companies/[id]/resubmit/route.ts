@@ -3,9 +3,9 @@ import { resubmitOnboardedCompany } from '@/domains/company';
 import { apiHandler, ok } from '@/domains/shared/http';
 import { z } from 'zod';
 
-/** POST /api/v1/companies/{id}/resubmit — onboarder sends a field-visit company back after an info request. */
+/** POST /api/v1/companies/{id}/resubmit — verifier returns requested information to Branch Admin review. */
 export const POST = apiHandler({
-  permission: 'company:onboard',
+  roles: ['SUPER_ADMIN', 'BRANCH_ADMIN', 'VERIFIER'],
   params: z.object({ id: z.uuid() }),
   body: resubmitSchema,
   handler: async ({ ctx, actor, params, body }) =>

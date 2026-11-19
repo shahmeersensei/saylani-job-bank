@@ -602,9 +602,20 @@ export async function verifyCompany(
       .limit(1);
     const directFieldVisitVerification = Boolean(onboarding && row.status === 'DRAFT');
     const finalFieldVisitApproval = Boolean(onboarding && row.status === 'RESUBMITTED');
+    const acceptingResubmission = row.status === 'RESUBMITTED';
+    const outstandingSubmissionItems = acceptingResubmission
+      ? await submissionMissing(tx, row)
+      : [];
+    const outstandingDocuments = acceptingResubmission ? await documentsNotAccepted(tx, row) : [];
     const machineCtx: CompanyMachineContext = {
-      submissionMissing: directFieldVisitVerification ? [] : await submissionMissing(tx, row),
-      documentsNotAccepted: directFieldVisitVerification ? [] : await documentsNotAccepted(tx, row),
+      submissionMissing:
+        directFieldVisitVerification || acceptingResubmission
+          ? []
+          : await submissionMissing(tx, row),
+      documentsNotAccepted:
+        directFieldVisitVerification || acceptingResubmission
+          ? []
+          : await documentsNotAccepted(tx, row),
     };
     const to = companyMachine.transition(row.status, 'VERIFY', machineCtx, ctx.actor.roles);
     const round = await ensureOpenVerification(tx, row);
@@ -653,6 +664,17 @@ export async function verifyCompany(
       toStatus: to,
       actorId: ctx.actor.userId,
       note: input.note,
+      ...(acceptingResubmission
+        ? {
+            metadata: {
+              acceptedWithOutstandingRequirements:
+                outstandingSubmissionItems.length > 0 || outstandingDocuments.length > 0,
+              acceptedResubmission: true,
+              submissionMissing: outstandingSubmissionItems,
+              documentsNotAccepted: outstandingDocuments,
+            },
+          }
+        : {}),
     });
     audit({
       action: 'company.verify',
@@ -661,6 +683,17 @@ export async function verifyCompany(
       branchId: row.branchId,
       before: { status: row.status },
       after: { status: to },
+      ...(acceptingResubmission
+        ? {
+            metadata: {
+              acceptedWithOutstandingRequirements:
+                outstandingSubmissionItems.length > 0 || outstandingDocuments.length > 0,
+              acceptedResubmission: true,
+              submissionMissing: outstandingSubmissionItems,
+              documentsNotAccepted: outstandingDocuments,
+            },
+          }
+        : {}),
     });
     if (directFieldVisitVerification || finalFieldVisitApproval) {
       audit({

@@ -287,6 +287,9 @@ export function StaffCompanyPanel({
   const canFinalizeReturnedOnboarding = Boolean(
     isBranchAdminRoute && canVerify && onboarding && company_.status === 'RESUBMITTED',
   );
+  const canAcceptResubmission = Boolean(
+    isBranchAdminRoute && canVerify && company_.status === 'RESUBMITTED',
+  );
   const verificationBlockers = [
     ...(company_.contacts.some((contact) => contact.isPrimary)
       ? []
@@ -560,8 +563,23 @@ export function StaffCompanyPanel({
             <div className="mt-1">
               <StatusPill label={pill.label} tone={pill.variant} />
             </div>
+            {isVerifierRoute && company_.status === 'INFO_REQUESTED' && (
+              <p className="text-fg-muted mt-1 text-sm">
+                Save the requested information to automatically return the company to the Branch
+                Admin for review. The Branch Admin can request more information if anything is
+                missing.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
+            {canAcceptResubmission && (
+              <Button
+                loading={pending === 'verify'}
+                onClick={() => void callReviewAction('verify', { note: null })}
+              >
+                Accept resubmission
+              </Button>
+            )}
             {postJobHref && (
               <Link href={postJobHref}>
                 <Button size="sm">
@@ -586,15 +604,11 @@ export function StaffCompanyPanel({
               (!isBranchAdminRoute || canVerify) &&
               canOnboard &&
               onboarding &&
-              ((company_.status === 'DRAFT' && !verifiedSigned) ||
-                canFinalizeReturnedOnboarding) && (
+              company_.status === 'DRAFT' &&
+              !verifiedSigned && (
                 <Button
                   loading={pending === (isBranchAdminRoute ? 'verify' : 'verified-signed')}
-                  disabled={
-                    canFinalizeReturnedOnboarding
-                      ? !canVerifyCompany
-                      : !isBranchAdminRoute && !hasRequiredDocumentForSignature
-                  }
+                  disabled={!isBranchAdminRoute && !hasRequiredDocumentForSignature}
                   onClick={() =>
                     isBranchAdminRoute
                       ? void callReviewAction('verify', { note: null })
@@ -605,6 +619,7 @@ export function StaffCompanyPanel({
                 </Button>
               )}
             {canOnboard &&
+              !isVerifierRoute &&
               onboarding &&
               company_.status === 'INFO_REQUESTED' &&
               !showResubmitForm && (
@@ -612,11 +627,13 @@ export function StaffCompanyPanel({
                   Send back for review
                 </Button>
               )}
-            {canManage && !showCorrectForm && (
-              <Button variant="secondary" leftIcon={<Pencil />} onClick={openCorrectForm}>
-                Correct details
-              </Button>
-            )}
+            {canManage &&
+              (!isVerifierRoute || company_.status === 'INFO_REQUESTED') &&
+              !showCorrectForm && (
+                <Button variant="secondary" leftIcon={<Pencil />} onClick={openCorrectForm}>
+                  Correct details
+                </Button>
+              )}
             {canSuspend && company_.status === 'VERIFIED' && !showSuspendForm && (
               <Button
                 variant="danger"
@@ -663,7 +680,7 @@ export function StaffCompanyPanel({
               : 'Review the documents below, then verify, ask for more information, or reject.'}
           </p>
           <div className="flex flex-wrap gap-2">
-            {!canFinalizeReturnedOnboarding && (
+            {!canAcceptResubmission && !canFinalizeReturnedOnboarding && (
               <Button
                 loading={pending === 'verify'}
                 disabled={!canVerifyCompany}
@@ -685,7 +702,10 @@ export function StaffCompanyPanel({
           </div>
           {!canVerifyCompany && !canDirectlyVerifyOnboardedDraft && (
             <p className="text-fg-muted text-sm" role="status">
-              Before verifying, {verificationBlockers.join('; ')}.
+              {canAcceptResubmission
+                ? 'Accepting this resubmission will verify the company despite:'
+                : 'Before verifying,'}{' '}
+              {verificationBlockers.join('; ')}.
             </p>
           )}
           {showInfoForm && (
