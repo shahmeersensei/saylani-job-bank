@@ -563,7 +563,9 @@
        an A4 sheet the roll cannot fit. 80mm paper has ~72mm printable
        width; the roll feeds the 297mm height and the printer cuts it. */
     @page token-slip {
-      size: 80mm auto;
+      /* The BlackCopper driver paper is 72.1mm wide (Printer 80(72.1)),
+         so the page must be 72mm too; an 80mm page shifted the slip off-centre. */
+      size: 72mm auto;
       margin: 0;
     }
 
@@ -620,15 +622,77 @@
        `page` property puts it on the named 80mm page above. Compact
        like the Epson reference slip: tight padding, small logo, and the
        roll cuts right after the footer — no long blank feed. */
+    /* Measured on a real print (2026-11-19): the BlackCopper cut off the
+       right border of a 72mm slip and printed it ~1.2mm right of centre,
+       so the slip is 64mm wide and nudged left. Top/bottom gaps come from
+       the printer (cutter distance + driver Feed Paper), not from CSS. */
     .token-slip {
       page: token-slip;
-      width: 72mm !important;
-      max-width: 72mm !important;
+      position: relative !important;
+      left: -1.2mm !important;
+      width: 64mm !important;
+      max-width: 64mm !important;
       margin: 0 auto !important;
+      border-color: #000 !important;
       padding: 4px 8px 3px !important;
       box-shadow: none !important;
       break-inside: avoid !important;
       page-break-inside: avoid !important;
+    }
+
+    /* Thermal heads print only black: greys came out faded and 6-7px text
+       was too small. On paper everything is pure black, larger and bolder,
+       and the faint watermark is dropped. */
+    .token-slip,
+    .token-slip * {
+      color: #000 !important;
+    }
+
+    .token-slip__watermark {
+      display: none !important;
+    }
+
+    .token-slip__badge {
+      background: #000 !important;
+      color: #fff !important;
+      font-size: 8px !important;
+    }
+
+    .token-slip__title h1 {
+      font-size: 14px !important;
+    }
+
+    .token-slip__title p,
+    .token-slip__number-label,
+    .token-slip__footer p,
+    .token-slip__footer small {
+      font-size: 8px !important;
+      font-weight: 700 !important;
+    }
+
+    .token-slip__number-value {
+      font-size: 32px !important;
+    }
+
+    .token-slip__key {
+      font-size: 9px !important;
+      font-weight: 700 !important;
+    }
+
+    .token-slip__value {
+      font-size: 10px !important;
+    }
+
+    .token-slip__divider {
+      background: #000 !important;
+    }
+
+    .token-slip__row {
+      border-bottom-color: #000 !important;
+    }
+
+    .token-slip__footer {
+      border-top-color: #000 !important;
     }
 
     /* At 72mm the header row (logo + badge) only fits with a smaller logo. */
