@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationBell } from './NotificationBell';
 
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }));
-vi.mock('@/lib/api/client', () => ({ apiFetch: apiFetchMock }));
+vi.mock('@/lib/api/client', () => ({
+  apiFetch: apiFetchMock,
+  friendlyApiError: (err: unknown) =>
+    err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+}));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 describe('NotificationBell', () => {
@@ -32,7 +36,7 @@ describe('NotificationBell', () => {
     apiFetchMock.mockRejectedValue(new Error('Network error'));
     render(<NotificationBell />);
     await userEvent.click(screen.getByRole('button', { name: 'Notifications' }));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not load'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Network error'));
     expect(screen.queryByText('No notifications yet.')).not.toBeInTheDocument();
   });
 });

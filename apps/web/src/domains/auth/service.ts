@@ -21,6 +21,7 @@ import { normalizePkMobile } from '@/lib/format/phone';
 import { ACTIVE_BRANCH_COOKIE, loadActor, type SessionUser } from './actor';
 import { getAuth, isPlaceholderEmail, SESSION_TTL_SECONDS } from './auth';
 import { issueOtp, OTP_TTL_SECONDS } from './otp';
+import { betterAuthUserMessage } from './auth-messages';
 import { createTwoFactorSetupToken } from './setup-token';
 
 export const RESEND_AFTER_SECONDS = 60;
@@ -273,7 +274,7 @@ export async function loginWithPassword(
       entityId: user?.id ?? null,
       metadata: { method: 'password', reason, emailMasked: maskEmail(email) },
     });
-    return new UnauthenticatedError('Incorrect email or password');
+    return new UnauthenticatedError(betterAuthUserMessage(reason, 'Incorrect email or password'));
   };
 
   // Blocked accounts are only revealed to someone who knows the password.
@@ -464,10 +465,9 @@ export async function verifySecondFactor(
         reason: apiErrorCode(error) ?? 'INVALID',
       },
     });
-    if (apiErrorCode(error) === 'INVALID_TWO_FACTOR_COOKIE') {
-      throw new UnauthenticatedError('Your sign-in expired. Enter your password again.');
-    }
-    throw new UnauthenticatedError('That code is not correct.');
+    throw new UnauthenticatedError(
+      betterAuthUserMessage(apiErrorCode(error), 'That code is not correct.'),
+    );
   }
   const userId = (result.response as { user: { id: string } }).user.id;
   const cookies = result.headers.getSetCookie();

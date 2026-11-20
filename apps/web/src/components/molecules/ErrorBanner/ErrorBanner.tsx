@@ -1,6 +1,6 @@
 'use client';
 
-import type { FieldIssue } from '@jobbank/shared';
+import { messageNamesField, type FieldIssue } from '@jobbank/shared';
 import { AlertTriangle, CircleAlert, CircleCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { describeApiError, humanizePath } from '@/lib/api/client';
@@ -35,6 +35,13 @@ const STYLES: Record<ErrorBannerVariant, { box: string; icon: typeof AlertTriang
   validation: { box: 'bg-warning-soft text-warning-soft-fg', icon: CircleAlert },
   success: { box: 'bg-success-soft text-success-soft-fg', icon: CircleCheck },
 };
+
+/** Field label plus the reason, without repeating a label the message already starts with. */
+function issueLine(path: string, message: string): string {
+  if (path === '(root)' || path === 'root') return message;
+  if (messageNamesField(path, message)) return message;
+  return `${label(path)} — ${message}`;
+}
 
 /** "salary min" → "Salary min". */
 function label(path: string): string {
@@ -104,14 +111,10 @@ export function ErrorBanner({
                   className="cursor-pointer text-left underline underline-offset-2 hover:opacity-80"
                   onClick={() => onIssueClick(issue.path)}
                 >
-                  {label(issue.path)} — {issue.message}
+                  {issueLine(issue.path, issue.message)}
                 </button>
               ) : (
-                <span>
-                  {issue.path === '(root)' || issue.path === 'root'
-                    ? issue.message
-                    : `${label(issue.path)} — ${issue.message}`}
-                </span>
+                <span>{issueLine(issue.path, issue.message)}</span>
               )}
             </li>
           ))}

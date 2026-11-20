@@ -13,7 +13,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/atoms';
 import { APPLICANT_STATUS_PILL } from '@/app/(dashboard)/_components/applicants/labels';
 import type { DocumentLink, RegistrationFormData } from '@/domains/applicant';
-import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { apiFetch, friendlyApiError } from '@/lib/api/client';
 import { formatCnic } from '@/lib/format/cnic';
 import { formatDate } from '@/lib/format/date';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
@@ -96,11 +96,7 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
       );
       setForm(data);
     } catch (cause) {
-      setError(
-        cause instanceof ApiClientError
-          ? cause.message
-          : 'Unable to load the latest applicant registration details.',
-      );
+      setError(friendlyApiError(cause));
     } finally {
       setLoading(false);
     }
@@ -117,11 +113,7 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
         if (active) setForm(data);
       } catch (cause) {
         if (active) {
-          setError(
-            cause instanceof ApiClientError
-              ? cause.message
-              : 'Unable to load the latest applicant registration details.',
-          );
+          setError(friendlyApiError(cause));
         }
       } finally {
         if (active) setLoading(false);
@@ -195,7 +187,7 @@ export function RegistrationPrintClient({ applicantId }: { applicantId: string }
       });
       await loadForm();
     } catch (cause) {
-      setError(cause instanceof ApiClientError ? cause.message : 'Unable to replace the QR code.');
+      setError(friendlyApiError(cause));
     } finally {
       setWorking(false);
     }

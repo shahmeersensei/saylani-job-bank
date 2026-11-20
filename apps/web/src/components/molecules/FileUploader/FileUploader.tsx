@@ -3,6 +3,7 @@
 import { CircleCheck, FileText, RotateCcw, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, type DragEvent } from 'react';
 import { Button } from '@/components/atoms/Button';
+import { friendlyApiError } from '@/lib/api/client';
 import { formatBytes, validateFile } from '@/lib/upload/validate-file';
 import { cn } from '@/lib/utils/cn';
 import type { FileUploaderProps, UploadItem, UploadResult } from './fileUploader.types';
@@ -66,7 +67,7 @@ export function FileUploader({
         if (controller.signal.aborted) return;
         patch(item.id, {
           status: 'error',
-          error: error instanceof Error ? error.message : 'Upload failed',
+          error: friendlyApiError(error),
         });
       } finally {
         controllers.current.delete(item.id);

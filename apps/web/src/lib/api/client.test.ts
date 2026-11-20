@@ -82,7 +82,7 @@ describe('friendlyApiError (H15)', () => {
         correlation_id: 'x',
       },
     });
-    expect(friendlyApiError(err)).toBe('Something went wrong on our side.');
+    expect(friendlyApiError(err)).toBe('Something went wrong on our side. Reference: x.');
     expect(friendlyApiError(new ApiClientError(0, null))).toBe(
       'Something went wrong. Please try again.',
     );

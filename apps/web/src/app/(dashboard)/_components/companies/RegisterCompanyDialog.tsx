@@ -335,7 +335,7 @@ export function RegisterCompanyDialog({ branches, placement = 'default' }: Props
         // A duplicate NTN is a field problem, not a page-level one: show it
         // on the NTN field instead of the generic alert.
         goToStep(0);
-        setErrors({ ntn: error.message });
+        setErrors({ ntn: error.message, ...toFieldErrors(error.issues) });
         requestErrorFocus();
       } else {
         // A non-field server error supersedes any stale field errors.

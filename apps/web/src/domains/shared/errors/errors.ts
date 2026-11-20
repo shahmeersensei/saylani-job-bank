@@ -1,4 +1,6 @@
-import type { ErrorCode, FieldIssue } from '@jobbank/shared';
+import { fieldLabel, messageNamesField, type ErrorCode, type FieldIssue } from '@jobbank/shared';
+
+export { fieldLabel };
 
 /**
  * Base class for expected, user-facing failures. Anything that is NOT a DomainError
@@ -27,33 +29,19 @@ export class BadRequestError extends DomainError {
   }
 }
 
-/** Human label for a field path: "salaryMin" → "Salary min", "items.0.skillCode" → "Skill code". */
-export function fieldLabel(path: string): string {
-  if (path === '(root)' || path === 'root') return 'Form';
-  const leaf = path.split('.').pop() ?? path;
-  const words = leaf
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/_/g, ' ')
-    .trim()
-    .toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 /**
- * Top-level message for a validation failure, derived from the issues
- * themselves — never the bare "Some fields are invalid" when the server
- * knows exactly which field failed and why. A single issue speaks for
- * itself (e.g. "Password: must be at least 10 characters"); several are counted
- * and the first is named so the user knows where to start.
+ * Top-level message for a validation failure. Every issue is named, not
+ * only the first, so a person sees each field and the reason it failed.
+ * A message that already starts with the field label is not prefixed again.
  */
 export function validationMessage(issues: FieldIssue[]): string {
-  const [first] = issues;
-  if (!first) return 'Some fields are invalid';
-  if (issues.length === 1) {
-    if (first.path === '(root)' || first.path === 'root') return first.message;
-    return `${fieldLabel(first.path)}: ${first.message}`;
-  }
-  return `Please fix ${issues.length} fields: ${fieldLabel(first.path)} — ${first.message}`;
+  if (issues.length === 0) return 'Some fields are invalid';
+  const parts = issues.map((issue) => {
+    if (issue.path === '(root)' || issue.path === 'root' || issue.path === '') return issue.message;
+    if (messageNamesField(issue.path, issue.message)) return issue.message;
+    return `${fieldLabel(issue.path)}: ${issue.message}`;
+  });
+  return [...new Set(parts)].join('; ');
 }
 
 export class ValidationError extends DomainError {

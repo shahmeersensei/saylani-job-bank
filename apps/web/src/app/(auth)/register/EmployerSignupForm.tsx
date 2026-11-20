@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { TwoFactorSetup } from '@/app/(dashboard)/account/security/TwoFactorSetup';
 import { Button, Input } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
-import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { ApiClientError, apiFetch, friendlyApiError } from '@/lib/api/client';
 
 type Step = 'email' | 'code';
 
@@ -29,7 +29,7 @@ function issueFor(err: unknown, path: string): string | undefined {
 }
 
 function fallbackMessage(err: unknown): string {
-  return err instanceof ApiClientError ? err.message : 'Something went wrong.';
+  return friendlyApiError(err);
 }
 
 export function EmployerSignupForm() {
@@ -121,7 +121,15 @@ export function EmployerSignupForm() {
         Object.entries(errors).filter(([, value]) => value !== undefined),
       ) as FieldErrors;
       setFieldErrors(shown);
-      if (Object.keys(shown).length === 0) setAlert(fallbackMessage(err));
+      if (err instanceof ApiClientError) {
+        const leftover = err.issues.filter(
+          (issue) => shown[issue.path as keyof FieldErrors] === undefined,
+        );
+        if (leftover.length > 0) setAlert(leftover.map((issue) => issue.message).join(' '));
+        else if (Object.keys(shown).length === 0) setAlert(fallbackMessage(err));
+      } else if (Object.keys(shown).length === 0) {
+        setAlert(fallbackMessage(err));
+      }
     } finally {
       setPending(false);
     }

@@ -204,7 +204,7 @@ function DetailsStep({
       ) {
         // A duplicate NTN is a field problem, not a page-level one: show it
         // on the NTN field instead of the generic alert.
-        setErrors({ ntn: err.message });
+        setErrors({ ntn: err.message, ...toFieldErrors(err.issues) });
         requestErrorFocus();
       } else {
         setErrors({});
