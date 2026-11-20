@@ -30,6 +30,7 @@ import {
 } from '@/domains/shared/scope';
 import { db } from '@/lib/db';
 import { cnicTakenError } from './profile';
+import { registrationReferenceForToken } from './registration-reference';
 import { cnicOwner, type SignedIn } from './repository';
 
 const tokens = schema.branchApplicantTokens;
@@ -41,19 +42,23 @@ const tokens = schema.branchApplicantTokens;
  * registration happens at a later step and links back through `applicantId`
  * on the token row.
  *
- * Step 2 (2026-11-08, revised 2026-11-17): tokens now expire exactly 24
- * hours after issue (`expires_at`, migration 0035), can be looked up and
+ * Step 2 (2026-11-08, revised 2026-11-17, expiry revised 2026-11-20):
+ * tokens expire at midnight Pakistan time at the end of the day they were
+ * issued (`expires_at`, migration 0035). They can be looked up and
  * reprinted, can be cancelled (which frees the CNIC for a new token), and are
  * completed — ISSUED → COMPLETED with the applicant linked — by the full
- * registration in the same transaction.
+ * registration in the same transaction. The applicant ID is reserved on the
+ * token at issue (migration 0050) and reused if the same CNIC comes back
+ * before anyone registers it.
  *
  * Fresh number per visit (2026-11-17, user decision — reverses the
  * one-live-token hand-back): every issue mints a new token number, even if
  * the same CNIC already has a live token at this branch. The previous live
  * token(s) are cancelled in the same transaction (reason 'superseded'), so
  * exactly one live token per CNIC + branch remains and the old slip stops
- * working. The CNIC lookup still finds live tokens across days, because the
- * 24-hour validity spans midnight.
+ * working. The CNIC lookup still finds tokens across days: expiry is an
+ * instant on the row (end of the Pakistan issue day; older rows may still
+ * carry a 24-hour expiry and are not rewritten).
  */
 
 /** Retries for the daily-number race (N2): 10 attempts, then a 409 to retry. */
@@ -87,6 +92,7 @@ function toView(
     expired: row.expiresAt.getTime() <= Date.now(),
     status: row.status,
     applicantId: row.applicantId,
+    registrationReference: row.registrationReference,
   };
 }
 
@@ -94,7 +100,7 @@ function toView(
  * Cancel one ISSUED token (guarded by status = ISSUED) so the (branch, day,
  * cnic) partial unique index frees the CNIC for a fresh issue. No-op if the
  * token was already completed or cancelled in between. Reason 'expired' for
- * a token past its 24 hours (audit 2026-11-11, M-06); 'superseded' when a
+ * a token past its expiry (audit 2026-11-11, M-06); 'superseded' when a
  * new visit replaces it (2026-11-17 fresh-number-per-visit rule).
  */
 async function cancelLiveToken(
@@ -149,7 +155,7 @@ export async function issueApplicantToken(
 
   // N3: one instant drives the whole issue — the Pakistan day, `issued_at`
   // and `expires_at` can never disagree across a midnight rollover. Expiry
-  // is exactly 24 hours after issue (APPLICANT_TOKEN_TTL_MINUTES = 1440),
+  // is midnight Pakistan time at the end of that day (`tokenExpiresAt`),
   // calculated on the backend — never trusted from the frontend.
   const now = new Date();
   const today = karachiDay(now);
@@ -175,8 +181,9 @@ export async function issueApplicantToken(
         // this branch + CNIC does NOT block a new issue — it is cancelled
         // in this same transaction, so exactly one live token remains and
         // the (branch, day, cnic) partial unique index never blocks the
-        // insert. No day filter: a 24-hour token issued yesterday is still
-        // live today and is superseded the same way. An expired ISSUED row
+        // insert. No day filter: a token issued yesterday can still be the
+        // live row (older tokens may carry a 24-hour expiry) and is
+        // superseded the same way. An expired ISSUED row
         // is cancelled with reason 'expired' instead. The new token carries
         // the freshly entered name/phone, so no correction write is needed.
         const liveRows = await tx
@@ -212,6 +219,8 @@ export async function issueApplicantToken(
           });
         }
 
+        const registrationReference = await registrationReferenceForToken(tx, input.cnic);
+
         const [highest] = await tx
           .select({ value: max(tokens.tokenNumber) })
           .from(tokens)
@@ -235,6 +244,7 @@ export async function issueApplicantToken(
             issuedBy: ctx.actor.userId,
             issuedAt: now,
             expiresAt,
+            registrationReference,
           })
           .returning();
         if (!created) throw new Error('Token could not be saved.');
@@ -249,6 +259,7 @@ export async function issueApplicantToken(
             cnic: input.cnic,
             applicantName: input.applicantName,
             phone: input.phone,
+            registrationReference,
           },
           metadata: { issuedBy: ctx.actor.userId },
         });
@@ -405,8 +416,8 @@ export async function lookupApplicantTokens(
 
   if (query.cnic) {
     const cnic = query.cnic.replace(/[\s-]/g, '');
-    // No explicit day: a 24-hour token issued yesterday can still be live
-    // today, so the CNIC lookup must find it — search across days, most
+    // No explicit day: expiry is an instant on the row, so a token issued
+    // yesterday can still be the one staff need. Search across days, most
     // recent first. An explicit day keeps its exact-day meaning (the
     // branch-day list below, and staff checking a specific day).
     const conditions = [eq(tokens.branchId, branchId), eq(tokens.cnic, cnic)];
@@ -503,7 +514,9 @@ export async function completeTokenForRegistration(
     throw new ConflictError(`This token is already ${row.status}.`);
   }
   if (row.expiresAt.getTime() <= now.getTime()) {
-    throw new ConflictError('This token expired 24 hours after it was issued. Issue a new token.');
+    throw new ConflictError(
+      'This token expired at the end of the day it was issued. Issue a new token.',
+    );
   }
   const [updated] = await tx
     .update(tokens)

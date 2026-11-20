@@ -1,4 +1,5 @@
 import { schema } from '@jobbank/db';
+import { tokenExpiresAt } from '@jobbank/shared';
 import { and, eq } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GET as lookupTokens, POST as issueToken } from '@/app/api/v1/applicants/tokens/route';
@@ -68,13 +69,16 @@ describe('first-counter applicant tokens', () => {
     expect(second.body.data.tokenCode).toBe(
       `KHI-GULSHAN-${String(firstNumber + 1).padStart(3, '0')}`,
     );
-    // N11: every token carries its 24-hour expiry (issued + 1440 minutes).
-    expect(second.body.data.expiresAt).toEqual(expect.any(String));
+    // Expiry is midnight Pakistan time at the end of the issue day.
+    expect(second.body.data.expiresAt).toBe(
+      tokenExpiresAt(new Date(second.body.data.issuedAt as string)).toISOString(),
+    );
     expect(second.body.data.expired).toBe(false);
-    expect(
-      new Date(second.body.data.expiresAt as string).getTime() -
-        new Date(second.body.data.issuedAt as string).getTime(),
-    ).toBe(24 * 60 * 60 * 1000);
+    expect(first.body.data.registrationReference).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/);
+    expect(second.body.data.registrationReference).toMatch(
+      /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/,
+    );
+    expect(second.body.data.registrationReference).not.toBe(first.body.data.registrationReference);
   });
 
   it('issues a fresh token number with 201 when the same CNIC visits again', async () => {
@@ -86,6 +90,7 @@ describe('first-counter applicant tokens', () => {
     expect(again.body.data.id).not.toBe(first.body.data.id);
     expect(again.body.data.tokenNumber).toBe(first.body.data.tokenNumber + 1);
     expect(again.body.data.supersededTokenCodes).toEqual([first.body.data.tokenCode]);
+    expect(again.body.data.registrationReference).toBe(first.body.data.registrationReference);
 
     // The morning token is cancelled: looking it up by code shows CANCELLED.
     const byCode = await lookup(
@@ -139,6 +144,9 @@ describe('first-counter applicant tokens', () => {
         ),
       );
     expect(audit).toMatchObject({ branchId: khi });
+    expect(audit?.after).toMatchObject({
+      registrationReference: response.body.data.registrationReference,
+    });
   });
 
   it('looks a token up by code, by CNIC + branch, and as a branch-day list', async () => {
@@ -254,6 +262,11 @@ describe('first-counter applicant tokens', () => {
       jar: staffJar,
     });
     expect(registered.status, JSON.stringify(registered.body)).toBe(201);
+    const [saved] = await db
+      .select({ registrationReference: schema.applicants.registrationReference })
+      .from(schema.applicants)
+      .where(eq(schema.applicants.id, registered.body.data.id as string));
+    expect(saved?.registrationReference).toBe(issued.body.data.registrationReference);
 
     const after = await lookup(`?tokenCode=${issued.body.data.tokenCode}`);
     expect(after.body.data[0]).toMatchObject({
@@ -372,5 +385,58 @@ describe('first-counter applicant tokens', () => {
     expect(found.body.data).toContainEqual(
       expect.objectContaining({ id: issued.body.data.id, status: 'ISSUED', expired: true }),
     );
+  });
+
+  it('reuses an unregistered applicant ID from another branch', async () => {
+    const cnic = randomCnic();
+    const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    const reserved = Array.from(
+      { length: 8 },
+      () => alphabet[Math.floor(Math.random() * alphabet.length)]!,
+    ).join('');
+    await owner`DELETE FROM branch_applicant_tokens WHERE branch_id = ${lhr} AND registration_day = CURRENT_DATE - 1 AND token_number = 9999`;
+    await owner`
+      INSERT INTO branch_applicant_tokens (
+        branch_id, registration_day, token_number, cnic, applicant_name, phone,
+        status, issued_at, expires_at, registration_reference
+      ) VALUES (
+        ${lhr}, CURRENT_DATE - 1, 9999, ${cnic}, 'Cross Branch', '+923001234567',
+        'CANCELLED', now() - interval '2 days', now() - interval '1 day', ${reserved}
+      )
+    `;
+
+    const issued = await issue(khi, cnic);
+    expect(issued.status, JSON.stringify(issued.body)).toBe(201);
+    expect(issued.body.data.registrationReference).toBe(reserved);
+  });
+
+  it('registers an old token that has no reserved applicant ID', async () => {
+    const cnic = randomCnic();
+    const issued = await issue(khi, cnic);
+    expect(issued.status).toBe(201);
+    await owner`UPDATE branch_applicant_tokens SET registration_reference = NULL WHERE id = ${issued.body.data.id}`;
+
+    const registered = await call(staffRegister, '/api/v1/applicants', {
+      method: 'POST',
+      body: {
+        fullName: 'Ahmed Raza',
+        fatherName: 'Imran Raza',
+        cnic,
+        dateOfBirth: '1998-04-12',
+        gender: 'MALE',
+        email: '',
+        phone: issued.body.data.phone,
+        branchId: khi,
+        tokenId: issued.body.data.id,
+      },
+      jar: staffJar,
+    });
+    expect(registered.status, JSON.stringify(registered.body)).toBe(201);
+    const [saved] = await db
+      .select({ registrationReference: schema.applicants.registrationReference })
+      .from(schema.applicants)
+      .where(eq(schema.applicants.id, registered.body.data.id as string));
+    expect(saved?.registrationReference).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/);
+    expect(saved?.registrationReference).not.toBe(issued.body.data.registrationReference);
   });
 });

@@ -1,5 +1,4 @@
 import 'server-only';
-import { randomBytes } from 'node:crypto';
 import { schema, type GeoPoint } from '@jobbank/db';
 import {
   computeCompleteness,
@@ -37,9 +36,7 @@ export const pref = schema.applicantPreferences;
 export const docs = schema.applicantDocuments;
 export const idv = schema.identityVerifications;
 
-export function createRegistrationReference(now = new Date()): string {
-  return `SJB-${now.getUTCFullYear()}-${randomBytes(8).toString('hex').toUpperCase()}`;
-}
+export { createRegistrationReference } from './registration-reference';
 
 export type ApplicantRow = typeof a.$inferSelect;
 

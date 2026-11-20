@@ -1,5 +1,4 @@
 import {
-  APPLICANT_TOKEN_TTL_MINUTES,
   cancelApplicantTokenSchema,
   issueApplicantTokenSchema,
   karachiDay,
@@ -53,14 +52,15 @@ describe('karachiDay', () => {
 });
 
 describe('tokenExpiresAt', () => {
-  it('is exactly 24 hours (1440 minutes) after issue, across midnight', () => {
-    expect(APPLICANT_TOKEN_TTL_MINUTES).toBe(1440);
-    // 19:39 PKT on the 7th expires at 19:39 PKT on the 8th — not at midnight.
+  it('is midnight Pakistan time at the end of the issue day', () => {
+    // 19:39 PKT on the 7th expires as the date changes to the 8th.
     expect(tokenExpiresAt(new Date('2026-11-07T14:39:20.000Z')).toISOString()).toBe(
-      '2026-11-08T14:39:20.000Z',
+      '2026-11-07T19:00:00.000Z',
     );
+    // 00:30 PKT on the 8th expires at the end of the 8th, not 24 hours later.
     const issuedAt = new Date('2026-11-07T19:30:00.000Z');
-    expect(tokenExpiresAt(issuedAt).getTime() - issuedAt.getTime()).toBe(24 * 60 * 60 * 1000);
+    expect(tokenExpiresAt(issuedAt).toISOString()).toBe('2026-11-08T19:00:00.000Z');
+    expect(tokenExpiresAt(issuedAt).toISOString()).toBe(karachiDayEnd(issuedAt).toISOString());
   });
 });
 

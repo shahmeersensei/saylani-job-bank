@@ -25,6 +25,7 @@ import {
 import { assertPermission, type Actor } from '@/domains/shared/scope';
 import { db, type DbExecutor } from '@/lib/db';
 import { applicantMachine } from './machine';
+import { withRegistrationReference } from './registration-reference';
 import {
   a,
   addr,
@@ -33,7 +34,6 @@ import {
   cert,
   cnicOwner,
   completenessFor,
-  createRegistrationReference,
   edu,
   exp,
   findApplicantForUser,
@@ -140,20 +140,22 @@ export async function registerApplicant(
       const owner = await cnicOwner(tx, input.cnic);
       if (owner) throw await cnicTakenError(tx, owner);
       if (input.email) await assertEmailFree(tx, input.email);
-      const [row] = await tx
-        .insert(a)
-        .values({
-          userId: ctx.actor.userId,
-          registrationReference: createRegistrationReference(),
-          fullName: input.fullName,
-          fatherName: input.fatherName,
-          cnic: input.cnic,
-          dateOfBirth: input.dateOfBirth,
-          gender: input.gender,
-          email: input.email ?? null,
-          activatedAt: new Date(),
-        })
-        .returning();
+      const [row] = await withRegistrationReference(tx, {}, (registrationReference) =>
+        tx
+          .insert(a)
+          .values({
+            userId: ctx.actor.userId,
+            registrationReference,
+            fullName: input.fullName,
+            fatherName: input.fatherName,
+            cnic: input.cnic,
+            dateOfBirth: input.dateOfBirth,
+            gender: input.gender,
+            email: input.email ?? null,
+            activatedAt: new Date(),
+          })
+          .returning(),
+      );
       // The account was created by phone sign-in with a placeholder name.
       await tx
         .update(schema.users)

@@ -114,7 +114,7 @@ export function TokenRegistrationFlow({
       setSelected(null);
       if (data.length === 0) {
         setAlert(
-          'No token found. Check the code and try again — tokens are valid for 24 hours from issue.',
+          'No token found. Check the code and try again — a token is valid until the end of the day it was issued.',
         );
       }
     } catch (error) {
