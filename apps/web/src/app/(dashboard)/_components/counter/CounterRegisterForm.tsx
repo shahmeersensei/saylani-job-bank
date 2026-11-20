@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Button, Checkbox, Input, Select } from '@/components/atoms';
 import { DateTimePicker, FormField, PhoneInput, toast } from '@/components/molecules';
-import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { ApiClientError, apiFetch, friendlyApiError } from '@/lib/api/client';
 import { zodFieldErrors, type FieldErrors } from '../applicants/form';
 
 const EMPTY = { fullName: '', fatherName: '', cnic: '', dateOfBirth: '', gender: '' };
@@ -71,7 +71,7 @@ export function CounterRegisterForm({ basePath }: { basePath: string }) {
           setAlert(otherIssues.map((i) => i.message).join(' '));
         }
       } else {
-        setAlert(err instanceof ApiClientError ? err.message : 'Could not register. Try again.');
+        setAlert(friendlyApiError(err));
       }
       setSaving(false);
     }

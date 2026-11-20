@@ -13,3 +13,4 @@ export {
   type GeoPoint,
 } from './types/geography';
 export * as schema from './schema';
+export { CHECK_CONSTRAINT_MESSAGES } from './check-messages';

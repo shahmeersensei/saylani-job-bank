@@ -1,6 +1,11 @@
 'use client';
 
-import type { ApiError, FieldIssue, PaginationMeta } from '@jobbank/shared';
+import {
+  messageNamesField,
+  type ApiError,
+  type FieldIssue,
+  type PaginationMeta,
+} from '@jobbank/shared';
 
 /** Error thrown by apiFetch for any non-2xx response, carrying the PRD §8 error envelope. */
 export class ApiClientError extends Error {
@@ -102,17 +107,26 @@ export function humanizePath(path: string): string {
 export function friendlyApiError(err: unknown): string {
   if (err instanceof ApiClientError) {
     if (err.issues.length > 0) {
-      const parts = err.issues.map((issue) =>
-        issue.path === '(root)' ? issue.message : `${humanizePath(issue.path)}: ${issue.message}`,
-      );
+      const parts = err.issues.map((issue) => {
+        if (issue.path === '(root)' || issue.path === 'root' || issue.path === '')
+          return issue.message;
+        if (messageNamesField(issue.path, issue.message)) return issue.message;
+        return `${humanizePath(issue.path)}: ${issue.message}`;
+      });
       const unique = [...new Set(parts)];
       const shown = unique.slice(0, 5);
       const extra = unique.length - shown.length;
-      return shown.join(' · ') + (extra > 0 ? ` · (+${extra} more)` : '');
+      return withReference(shown.join(' · ') + (extra > 0 ? ` · (+${extra} more)` : ''), err);
     }
-    return err.message;
+    return withReference(err.message, err);
   }
   return err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+}
+
+/** A 500 keeps its generic wording and adds the reference id staff can quote. */
+function withReference(message: string, err: ApiClientError): string {
+  if (err.status < 500 || !err.correlationId || message.includes(err.correlationId)) return message;
+  return `${message} Reference: ${err.correlationId}.`;
 }
 
 /** How an API failure should be shown: a validation list, a network problem, or a system error. */

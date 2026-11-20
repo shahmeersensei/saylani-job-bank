@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Badge, Button } from '@/components/atoms';
 import { ConfirmDialog, Modal, toast } from '@/components/molecules';
-import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { apiFetch, friendlyApiError } from '@/lib/api/client';
 import { StaffJobForm, type EditableJob, type JobFormCompany } from './StaffJobForm';
 
 type ManagedJob = EditableJob & {
@@ -87,7 +87,7 @@ export function JobManagementPanel({
       router.refresh();
       toast.success('Job archived');
     } catch (reason) {
-      toast.error(reason instanceof ApiClientError ? reason.message : 'Could not archive this job');
+      toast.error(friendlyApiError(reason));
     } finally {
       setArchivingId(null);
     }

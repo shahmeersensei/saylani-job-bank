@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { DropdownMenu } from 'radix-ui';
 import { formatDate } from '@/lib/format/date';
-import { apiFetch } from '@/lib/api/client';
+import { apiFetch, friendlyApiError } from '@/lib/api/client';
 
 interface NotificationItem {
   id: string;
@@ -33,8 +33,8 @@ export function NotificationBell({ viewAllHref = '/notifications' }: { viewAllHr
         if (meta?.unread !== undefined) setUnread(meta.unread);
         setError(null);
       })
-      .catch(() => {
-        if (active) setError('Could not load notifications. Please try again.');
+      .catch((err: unknown) => {
+        if (active) setError(friendlyApiError(err));
       });
     return () => {
       active = false;
@@ -50,8 +50,8 @@ export function NotificationBell({ viewAllHref = '/notifications' }: { viewAllHr
       );
       setUnread((u) => Math.max(0, u - 1));
       router.refresh();
-    } catch {
-      setError('Could not mark the notification as read. Please try again.');
+    } catch (err) {
+      setError(friendlyApiError(err));
     }
   }
 
@@ -61,8 +61,8 @@ export function NotificationBell({ viewAllHref = '/notifications' }: { viewAllHr
       await apiFetch('/api/v1/notifications/read-all', { method: 'POST' });
       setItems((prev) => prev.map((i) => ({ ...i, readAt: new Date().toISOString() })));
       setUnread(0);
-    } catch {
-      setError('Could not mark notifications as read. Please try again.');
+    } catch (err) {
+      setError(friendlyApiError(err));
     }
   }
 

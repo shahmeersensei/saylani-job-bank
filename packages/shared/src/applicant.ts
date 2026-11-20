@@ -622,22 +622,20 @@ export function karachiDay(date: Date = new Date()): string {
 }
 
 /**
- * Applicant token validity: exactly 24 hours (1440 minutes) from issue.
- * Tokens are derived from the issue instant, never from the calendar day.
+ * The instant a token issued at `issuedAt` expires: midnight Pakistan time
+ * at the start of the next calendar day. A token issued any time on
+ * 20/11/2026 expires as the date changes to 21/11/2026, not 24 hours later.
  */
-export const APPLICANT_TOKEN_TTL_MINUTES = 1440;
-
-/** The instant a token issued at `issuedAt` expires: issuedAt + 24 hours. */
 export function tokenExpiresAt(issuedAt: Date = new Date()): Date {
-  return new Date(issuedAt.getTime() + APPLICANT_TOKEN_TTL_MINUTES * 60 * 1000);
+  return karachiDayEnd(issuedAt);
 }
 
 /**
  * End of the Pakistan day containing `date`, as an instant: midnight at the
- * start of the next Pakistan day. Retained for day-boundary helpers (token
- * numbers still reset on the Pakistan day); it is no longer token expiry —
- * tokens now expire 24 hours after issue via `tokenExpiresAt` (migration
- * 0035 `expires_at`).
+ * start of the next Pakistan day. Token numbers reset on this boundary, and
+ * a token issued on this day expires at this instant (`tokenExpiresAt`).
+ * Stored on the row as `expires_at` (migration 0035); existing rows are not
+ * rewritten when the rule changes.
  */
 export function karachiDayEnd(date: Date = new Date()): Date {
   const day = karachiDay(date);
@@ -658,12 +656,18 @@ export const applicantTokenSchema = z.object({
   applicantName: z.string(),
   phone: z.string(),
   issuedAt: z.string(),
-  /** 24 hours after issue; the token is expired after this. */
+  /** Midnight Pakistan time at the end of the issue day. */
   expiresAt: z.string(),
   /** True once `expiresAt` has passed (derived server-side, so lookups show it). */
   expired: z.boolean(),
   status: z.enum(APPLICANT_TOKEN_STATUSES),
   applicantId: z.string().nullable(),
+  /**
+   * Applicant ID reserved when the token was issued (8-character
+   * registration reference). Null on tokens issued before that ID existed;
+   * the slip then shows the token code.
+   */
+  registrationReference: z.string().nullable(),
   /**
    * Token codes cancelled when this token was issued (a previous live token
    * for the same CNIC + branch, superseded by this visit — 2026-11-17

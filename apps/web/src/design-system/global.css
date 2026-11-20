@@ -10,19 +10,14 @@
   display: none;
 }
 
-/* Token slip — styled exactly like the approved demo (Saylani logo top-left,
-   TOKEN SLIP badge, big two-digit number, detail rows, Job Bank logo
-   watermark). Compact thermal-ticket sizing, modelled on a short Epson
-   ePOS slip (centred title, divider, a few detail lines, feed, cut):
-   same design and same details, just literally half the original slip —
-   ~53mm tall instead of the original ~110mm. The width stays 80mm:
-   that is the thermal roll's paper width, halving it to 40mm would not
-   fit the details. Screen preview is the real 80mm paper width, so what
-   staff see in the dialog is what the roll prints. On paper the @media
-   print rules below re-lay it for the counter's BlackCopper 80mm thermal
-   roll (72mm printable width, its own named page) — do not put it back
-   on A4: an 86mm slip cannot fit 80mm paper and prints clipped/blank
-   on the roll. */
+/* Token slip — centred title, big token number, detail rows, Job Bank
+   logo watermark. Compact thermal-ticket sizing, modelled on a short
+   Epson ePOS slip (centred title, divider, a few detail lines, feed,
+   cut). The width stays 80mm: that is the thermal roll's paper width.
+   Screen preview is the real 80mm paper width, so what staff see in the
+   dialog is what the roll prints. On paper the @media print rules below
+   re-lay it for the counter's BlackCopper 80mm thermal roll (72mm
+   printable width, its own named page) — do not put it back on A4. */
 .token-slip {
   position: relative;
   width: 100%;
@@ -53,30 +48,6 @@
 .token-slip__content {
   position: relative;
   z-index: 1;
-}
-
-.token-slip__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.token-slip__logo {
-  display: block;
-  height: 18px;
-  width: auto;
-}
-
-.token-slip__badge {
-  margin-top: 1px;
-  border-radius: 999px;
-  background: #0f3557;
-  padding: 2px 6px;
-  color: #fff;
-  font-size: 6px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  white-space: nowrap;
 }
 
 .token-slip__title {
@@ -620,8 +591,8 @@
     /* Token slip: the demo-styled slip, centred, on one page — laid out
        for the 80mm thermal roll (72mm printable width), not A4. The
        `page` property puts it on the named 80mm page above. Compact
-       like the Epson reference slip: tight padding, small logo, and the
-       roll cuts right after the footer — no long blank feed. */
+       like the Epson reference slip: tight padding, and the roll cuts
+       right after the footer — no long blank feed. */
     /* Measured on a real print (2026-11-19): the BlackCopper cut off the
        right border of a 72mm slip and printed it ~1.2mm right of centre,
        so the slip is 64mm wide and nudged left. Top/bottom gaps come from
@@ -650,12 +621,6 @@
 
     .token-slip__watermark {
       display: none !important;
-    }
-
-    .token-slip__badge {
-      background: #000 !important;
-      color: #fff !important;
-      font-size: 8px !important;
     }
 
     .token-slip__title h1 {
@@ -693,11 +658,6 @@
 
     .token-slip__footer {
       border-top-color: #000 !important;
-    }
-
-    /* At 72mm the header row (logo + badge) only fits with a smaller logo. */
-    .token-slip__logo {
-      height: 18px !important;
     }
 
     .registration-form-print-sheet {

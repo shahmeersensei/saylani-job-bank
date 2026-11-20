@@ -28,6 +28,7 @@ const token: ApplicantTokenView = {
   expired: false,
   status: 'ISSUED',
   applicantId: null,
+  registrationReference: 'K7M2X9QP',
 };
 
 const json = (status: number, body: unknown) =>

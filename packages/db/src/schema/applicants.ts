@@ -366,6 +366,13 @@ export const branchApplicantTokens = pgTable(
     status: text({ enum: APPLICANT_TOKEN_STATUSES }).notNull().default('ISSUED'),
     /** Linked once the full registration is completed for this token. */
     applicantId: uuid().references(() => applicants.id, { onDelete: 'set null' }),
+    /**
+     * Applicant ID reserved at issue (8-character registration reference).
+     * Null on tokens issued before this column existed. Copied onto
+     * `applicants.registration_reference` when the token is registered, and
+     * reused on later tokens for the same CNIC until one is registered.
+     */
+    registrationReference: text(),
     issuedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
     issuedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     /**
@@ -392,6 +399,9 @@ export const branchApplicantTokens = pgTable(
       .on(t.branchId, t.registrationDay, t.cnic)
       .where(sql`"status" = 'ISSUED'`),
     index('branch_applicant_tokens_cnic_idx').on(t.cnic),
+    index('branch_applicant_tokens_registration_reference_idx')
+      .on(t.registrationReference)
+      .where(sql`"registration_reference" is not null`),
     check('branch_applicant_tokens_number_positive', sql`${t.tokenNumber} > 0`),
     // N6 cap (MAX_TOKEN_NUMBER in @jobbank/shared): no 5-digit token numbers.
     check('branch_applicant_tokens_number_max', sql`${t.tokenNumber} <= 9999`),

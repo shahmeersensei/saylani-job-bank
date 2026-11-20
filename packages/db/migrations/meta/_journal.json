@@ -351,6 +351,13 @@
       "when": 1794846188839,
       "tag": "0049_applicant_address_location_optional",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1795187000000,
+      "tag": "0050_branch_applicant_tokens_registration_reference",
+      "breakpoints": true
     }
   ]
 }

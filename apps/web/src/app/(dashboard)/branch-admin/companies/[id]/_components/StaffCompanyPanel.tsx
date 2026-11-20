@@ -225,8 +225,8 @@ export function StaffCompanyPanel({
         `/api/v1/companies/${company_.id}/documents/${docId}/url`,
       );
       window.open(data.url, '_blank');
-    } catch {
-      setError('Could not get document link.');
+    } catch (err) {
+      setError(friendlyApiError(err));
     }
   }
 

@@ -1,6 +1,7 @@
 import { schema } from '@jobbank/db';
 import { getSeedDevPassword } from '@jobbank/db/seed/dev-data';
-import { and, eq } from 'drizzle-orm';
+import { hashPassword } from 'better-auth/crypto';
+import { and, eq, like } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { POST as confirm2fa } from '@/app/api/v1/account/2fa/confirm/route';
 import { POST as disable2fa } from '@/app/api/v1/account/2fa/disable/route';
@@ -430,7 +431,10 @@ describe('staff invitations', () => {
       body: { token, password: 'Strong-pass-123' },
     });
     expect(ok.status).toBe(200);
-    expect(ok.body.data).toMatchObject({ kind: 'signed_in', homePath: '/staff' });
+    // Staff must enrol before they hold a session (same rule as inviteAndActivate).
+    expect(ok.body.data.kind).toBe('two_factor_setup_required');
+    jar.setupToken = ok.body.data.setupToken as string;
+    await enrollTwoFactor(email, jar, 'Strong-pass-123');
     expect(
       (await call(me, '/api/v1/auth/me', { jar })).body.data.branches.map(
         (b: { id: string }) => b.id,
@@ -821,6 +825,17 @@ describe('password reset', () => {
       (await call(reset, '/x', { method: 'POST', body: { token, password: 'Another-pass-99' } }))
         .status,
     ).toBe(400);
+
+    // This file shares the seeded employer. Put the password back so later
+    // tests (and other files) can still sign in with SEED_DEV_PASSWORD.
+    const [employerUser] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, email));
+    await db
+      .update(schema.accounts)
+      .set({ password: await hashPassword(getSeedDevPassword()) })
+      .where(eq(schema.accounts.userId, employerUser!.id));
   });
 });
 
@@ -837,8 +852,8 @@ describe('two-factor for Staff and Employer (extended 2026-11-15)', () => {
     await enrollTwoFactor(email, jar);
     expect((await call(me, '/api/v1/auth/me', { jar })).body.data.twoFactorPending).toBe(false);
 
-    // Next sign-in: password alone is not enough, and trust-this-device is
-    // never offered for a 2FA-required role.
+    // Next sign-in: password alone is not enough. Trust-this-device is offered;
+    // leaving it unchecked still asks for a code next time.
     const step1 = new Jar();
     const pw = await call(login, '/x', {
       method: 'POST',
@@ -848,7 +863,7 @@ describe('two-factor for Staff and Employer (extended 2026-11-15)', () => {
     expect(pw.body.data).toMatchObject({
       kind: 'two_factor_required',
       methods: ['totp'],
-      trustDeviceAllowed: false,
+      trustDeviceAllowed: true,
     });
     expect((await call(me, '/api/v1/auth/me', { jar: step1 })).status).toBe(401);
     const ok = await call(verify2fa, '/api/v1/auth/2fa/verify', {
@@ -864,6 +879,63 @@ describe('two-factor for Staff and Employer (extended 2026-11-15)', () => {
       body: { password: getSeedDevPassword() },
     });
     expect(refused.status).toBe(403);
+  });
+
+  it('trusts this browser for 30 days when the 2FA step checks trust this device', async () => {
+    const email = 'staff.khi@jobbank.local';
+    await resetTwoFactor(email);
+    const enrolled = await signIn(email);
+    await enrollTwoFactor(email, enrolled);
+
+    const jar = new Jar();
+    const challenge = await call(login, '/x', {
+      method: 'POST',
+      body: { email, password: getSeedDevPassword() },
+      jar,
+    });
+    expect(challenge.body.data).toMatchObject({
+      kind: 'two_factor_required',
+      trustDeviceAllowed: true,
+    });
+    const verified = await call(verify2fa, '/api/v1/auth/2fa/verify', {
+      method: 'POST',
+      jar,
+      body: { code: totpCode(email), trustDevice: true },
+    });
+    expect(verified.status, JSON.stringify(verified.body)).toBe(200);
+
+    const [user] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, email));
+    const trusted = await db
+      .select({ identifier: schema.verifications.identifier })
+      .from(schema.verifications)
+      .where(
+        and(
+          eq(schema.verifications.value, user!.id),
+          like(schema.verifications.identifier, 'trust-device-%'),
+        ),
+      );
+    expect(trusted.length).toBeGreaterThan(0);
+
+    // Same browser (the jar still holds the trust cookie): password alone.
+    const again = await call(login, '/x', {
+      method: 'POST',
+      body: { email, password: getSeedDevPassword() },
+      jar,
+    });
+    expect(again.status, JSON.stringify(again.body)).toBe(200);
+    expect(again.body.data.kind).toBe('signed_in');
+
+    // A browser without the cookie is still challenged.
+    const fresh = new Jar();
+    const untrusted = await call(login, '/x', {
+      method: 'POST',
+      body: { email, password: getSeedDevPassword() },
+      jar: fresh,
+    });
+    expect(untrusted.body.data.kind).toBe('two_factor_required');
   });
 
   it('Employer is blocked until enrolment and cannot turn two-factor off', async () => {

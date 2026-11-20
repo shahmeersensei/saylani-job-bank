@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, Checkbox, Input } from '@/components/atoms';
 import { ErrorBanner, FormField, OTPInput, PhoneInput } from '@/components/molecules';
 import { ApiClientError, apiFetch, safeNextPath } from '@/lib/api/client';
@@ -27,7 +27,7 @@ interface SignedIn {
 interface TwoFactorRequired {
   kind: 'two_factor_required';
   methods: string[];
-  /** False for 2FA-required roles: they never get a trusted device. */
+  /** False only when the server could not resolve the account. */
   trustDeviceAllowed: boolean;
 }
 interface TwoFactorSetupRequired {
@@ -233,14 +233,16 @@ function AuthenticatorStep({
   const [trustDevice, setTrustDevice] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  // The code field submits itself on the 6th digit. Keep the checkbox in a ref
+  // so that submit reads the box the user just ticked, not a stale render.
+  const trustRef = useRef(false);
+  trustRef.current = trustDeviceAllowed && trustDevice;
 
   const verify = async (value?: string) => {
     setPending(true);
     setError(null);
     try {
-      // The server strips trust for 2FA-required roles too; the flag here only
-      // decides whether the option is offered at all.
-      const trust = trustDeviceAllowed && trustDevice;
+      const trust = trustRef.current;
       const body = useBackup
         ? { backupCode: backupCode.trim(), trustDevice: trust }
         : { code: value ?? code, trustDevice: trust };
@@ -270,6 +272,16 @@ function AuthenticatorStep({
           ? 'Enter one of your saved backup codes.'
           : 'Open your authenticator app and enter the 6-digit code for Saylani Job Bank.'}
       </div>
+      <Checkbox
+        label="Trust this device for 30 days"
+        checked={trustDevice}
+        onCheckedChange={(v) => {
+          const next = v === true;
+          trustRef.current = trustDeviceAllowed && next;
+          setTrustDevice(next);
+        }}
+        disabled={!trustDeviceAllowed}
+      />
       {useBackup ? (
         <FormField label="Backup code" required>
           <Input
@@ -291,17 +303,6 @@ function AuthenticatorStep({
           label="Authenticator code"
         />
       )}
-      <Checkbox
-        label="Trust this device for 30 days"
-        checked={trustDevice}
-        onCheckedChange={(v) => setTrustDevice(v === true)}
-        disabled={!trustDeviceAllowed}
-        description={
-          trustDeviceAllowed
-            ? undefined
-            : 'Required for your role: you will enter a code on every sign-in.'
-        }
-      />
       <Alert error={error} />
       <Button
         type="submit"

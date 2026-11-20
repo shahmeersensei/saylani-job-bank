@@ -6,13 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Select, Textarea } from '@/components/atoms';
 import { EmptyState, FormField, Modal, toast } from '@/components/molecules';
-import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { apiFetch, friendlyApiError } from '@/lib/api/client';
 import { formatDateTime } from '@/lib/format/date';
 import { formatPkMobileDisplay } from '@/lib/format/phone';
 import type { CallListItem } from '@/domains/placement';
 
-const message = (err: unknown, fallback: string) =>
-  err instanceof ApiClientError ? err.message : fallback;
+const message = (err: unknown) => friendlyApiError(err);
 
 /** Staff must have spoken to the candidate before recording their answer. */
 function OfferAnswer({
@@ -57,7 +56,7 @@ function OfferAnswer({
       setMode(null);
       router.refresh();
     } catch (err) {
-      toast.error(message(err, 'Could not save the answer'));
+      toast.error(message(err));
     } finally {
       setBusy(false);
     }
@@ -129,7 +128,7 @@ function MarkCalled({ applicationId }: { applicationId: string }) {
           await apiFetch(`/api/v1/applications/${applicationId}/called`, { method: 'POST' });
           router.refresh();
         } catch (err) {
-          toast.error(message(err, 'Could not save'));
+          toast.error(message(err));
         } finally {
           setBusy(false);
         }

@@ -1,0 +1,45 @@
+/**
+ * User-facing sentences for Postgres check constraints (SQLSTATE 23514).
+ * Names match the `check('…')` calls in `src/schema`. The value that failed
+ * is never included. Unknown names fall back to the column, in plain words.
+ */
+export const CHECK_CONSTRAINT_MESSAGES: Record<string, string> = {
+  applicants_cnic_format: 'CNIC must be 13 digits with no dashes.',
+  applicants_status_valid: 'Status is not an allowed applicant status.',
+  applicants_identity_status_valid: 'Identity status is not an allowed value.',
+  applicants_gender_valid: 'Gender must be one of the listed options.',
+  applicants_registration_source_valid: 'Registration source is not an allowed value.',
+  applicants_completeness_range: 'Profile completeness must be between 0 and 100.',
+  applicant_skills_level_valid: 'Skill level is not an allowed value.',
+  applicant_skills_years_range: 'Years of experience must be between 0 and 50.',
+  applicant_preferences_salary: 'Minimum salary cannot be negative.',
+  applicant_documents_size_positive: 'Document size must be greater than zero.',
+  identity_verifications_method_valid: 'Verification method is not an allowed value.',
+  identity_verifications_outcome_valid: 'Verification outcome is not an allowed value.',
+  branch_applicant_tokens_number_positive: 'Token number must be greater than zero.',
+  branch_applicant_tokens_number_max: 'Token number must be at most 9999.',
+  branch_applicant_tokens_expires_after_issued:
+    'Expiry must be after the time the token was issued.',
+  branch_applicant_tokens_cnic_format: 'CNIC must be 13 digits with no dashes.',
+  branch_applicant_tokens_status_valid: 'Token status is not an allowed value.',
+  jobs_salary_order: 'Minimum salary cannot be higher than maximum salary.',
+  jobs_salary_min_floor: 'Minimum salary must be at least Rs 41,700.',
+  jobs_salary_max_floor: 'Maximum salary must be at least Rs 41,700.',
+  jobs_shift_hours_range: 'Shift hours must be between 1 and 24.',
+  jobs_vacancies_positive: 'Vacancies must be greater than zero.',
+  jobs_filled_lte_vacancies: 'Filled vacancies cannot be more than the number of openings.',
+  job_matches_score_range: 'Match score must be between 0 and 100.',
+  notifications_type_format: 'Notification type is not in the right format.',
+  master_data_type_valid: 'Master data type is not an allowed value.',
+  master_data_code_format: 'Code must use uppercase letters, numbers and underscores.',
+  master_data_meta_object: 'Extra details must be a set of fields.',
+  branches_code_format: 'Branch code must use uppercase letters, numbers and hyphens.',
+  companies_status_valid: 'Company status is not an allowed value.',
+  companies_size_band_valid: 'Company size is not an allowed value.',
+  company_members_role_valid: 'Company role is not an allowed value.',
+  company_locations_kind_valid: 'Location kind is not an allowed value.',
+  company_locations_hq_not_archived: 'The head office cannot be archived.',
+  company_documents_size_positive: 'Document size must be greater than zero.',
+  company_verifications_state_valid: 'Verification state is not an allowed value.',
+  verification_history_event_valid: 'Verification event is not an allowed value.',
+};

@@ -75,7 +75,7 @@ describe('applicant registration form and QR verification', () => {
       params: { id },
     });
     expect(first.status, JSON.stringify(first.body)).toBe(200);
-    expect(first.body.data.registrationReference).toMatch(/^SJB-\d{4}-[A-F0-9]{16}$/);
+    expect(first.body.data.registrationReference).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/);
     expect(first.body.data.personal.fullName).toBe('Verification Test Applicant');
     expect(first.body.data.personal.email).toBeNull();
     expect(first.body.data.hasNoExperience).toBe(true);

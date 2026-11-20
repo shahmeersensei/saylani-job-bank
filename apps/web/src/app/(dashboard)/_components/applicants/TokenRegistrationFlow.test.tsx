@@ -33,6 +33,7 @@ const issuedToken: ApplicantTokenView = {
   expired: false,
   status: 'ISSUED',
   applicantId: null,
+  registrationReference: 'K7M2X9QP',
 };
 
 const props = {

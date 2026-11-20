@@ -70,7 +70,6 @@ import {
   cert,
   cnicOwner,
   currentDocuments,
-  createRegistrationReference,
   completenessFor,
   docs,
   edu,
@@ -86,6 +85,7 @@ import {
   type ApplicantRow,
   type SignedIn,
 } from './repository';
+import { withRegistrationReference } from './registration-reference';
 import { completeTokenForRegistration } from './tokens';
 import type { DbExecutor } from '@/lib/db';
 
@@ -203,21 +203,23 @@ export async function registerApplicantAtCounter(
         })
         .returning({ id: schema.users.id });
       await tx.insert(schema.userRoles).values({ userId: user!.id, roleCode: 'APPLICANT' });
-      const [row] = await tx
-        .insert(a)
-        .values({
-          ...personal,
-          email: null,
-          userId: user!.id,
-          branchId,
-          status: 'ACTIVE',
-          registrationSource: 'STAFF_ASSISTED',
-          registrationReference: createRegistrationReference(),
-          registeredBy: ctx.actor.userId,
-          counterRegisteredBy: ctx.actor.userId,
-          consentConfirmedAt: new Date(),
-        })
-        .returning({ id: a.id });
+      const [row] = await withRegistrationReference(tx, {}, (registrationReference) =>
+        tx
+          .insert(a)
+          .values({
+            ...personal,
+            email: null,
+            userId: user!.id,
+            branchId,
+            status: 'ACTIVE',
+            registrationSource: 'STAFF_ASSISTED',
+            registrationReference,
+            registeredBy: ctx.actor.userId,
+            counterRegisteredBy: ctx.actor.userId,
+            consentConfirmedAt: new Date(),
+          })
+          .returning({ id: a.id }),
+      );
       audit({
         action: 'applicant.counter_register',
         entityType: 'applicant',
@@ -352,24 +354,26 @@ export async function registerApplicantForStaff(
         grantedBy: ctx.actor.userId,
       });
 
-      const [row] = await tx
-        .insert(a)
-        .values({
-          userId: user!.id,
-          branchId: branch.id,
-          registrationSource: 'STAFF_ASSISTED',
-          registrationReference: createRegistrationReference(),
-          registeredBy: ctx.actor.userId,
-          contactConfirmedBy: ctx.actor.userId,
-          contactConfirmedAt: new Date(),
-          fullName: input.fullName,
-          fatherName: input.fatherName,
-          cnic: input.cnic,
-          dateOfBirth: input.dateOfBirth,
-          gender: input.gender,
-          email: input.email ?? null,
-        })
-        .returning({ id: a.id });
+      const [row] = await withRegistrationReference(tx, {}, (registrationReference) =>
+        tx
+          .insert(a)
+          .values({
+            userId: user!.id,
+            branchId: branch.id,
+            registrationSource: 'STAFF_ASSISTED',
+            registrationReference,
+            registeredBy: ctx.actor.userId,
+            contactConfirmedBy: ctx.actor.userId,
+            contactConfirmedAt: new Date(),
+            fullName: input.fullName,
+            fatherName: input.fatherName,
+            cnic: input.cnic,
+            dateOfBirth: input.dateOfBirth,
+            gender: input.gender,
+            email: input.email ?? null,
+          })
+          .returning({ id: a.id }),
+      );
       applicantId = row!.id;
 
       // Audit 2026-11-11 (L-23): the city must be active and the area must
@@ -1078,22 +1082,35 @@ export async function staffRegisterApplicant(
         .returning({ id: schema.users.id });
       await tx.insert(schema.userRoles).values({ userId: user!.id, roleCode: 'APPLICANT' });
 
-      const [row] = await tx
-        .insert(a)
-        .values({
-          userId: user!.id,
-          branchId: input.branchId,
-          registrationReference: createRegistrationReference(),
-          fullName: input.fullName,
-          fatherName: input.fatherName,
-          cnic: input.cnic,
-          dateOfBirth: input.dateOfBirth,
-          gender: input.gender,
-          email: input.email ?? null,
-          additionalNotes: input.additionalNotes ?? null,
-          activatedAt: new Date(),
-        })
-        .returning();
+      let reservedReference: string | null = null;
+      if (input.tokenId) {
+        const [tokenRow] = await tx
+          .select({ registrationReference: schema.branchApplicantTokens.registrationReference })
+          .from(schema.branchApplicantTokens)
+          .where(eq(schema.branchApplicantTokens.id, input.tokenId));
+        reservedReference = tokenRow?.registrationReference ?? null;
+      }
+      const [row] = await withRegistrationReference(
+        tx,
+        { reserved: reservedReference },
+        (reference) =>
+          tx
+            .insert(a)
+            .values({
+              userId: user!.id,
+              branchId: input.branchId,
+              registrationReference: reference,
+              fullName: input.fullName,
+              fatherName: input.fatherName,
+              cnic: input.cnic,
+              dateOfBirth: input.dateOfBirth,
+              gender: input.gender,
+              email: input.email ?? null,
+              additionalNotes: input.additionalNotes ?? null,
+              activatedAt: new Date(),
+            })
+            .returning(),
+      );
       applicantId = row!.id;
 
       if (input.address) {

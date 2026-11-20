@@ -18,9 +18,10 @@ import { enforceRateLimit, enforceRateLimitByIp } from '@/domains/shared/rate-li
 import type { Actor } from '@/domains/shared/scope';
 import { db } from '@/lib/db';
 import { normalizePkMobile } from '@/lib/format/phone';
-import { ACTIVE_BRANCH_COOKIE, loadActor, requiresTwoFactor, type SessionUser } from './actor';
+import { ACTIVE_BRANCH_COOKIE, loadActor, type SessionUser } from './actor';
 import { getAuth, isPlaceholderEmail, SESSION_TTL_SECONDS } from './auth';
 import { issueOtp, OTP_TTL_SECONDS } from './otp';
+import { betterAuthUserMessage } from './auth-messages';
 import { createTwoFactorSetupToken } from './setup-token';
 
 export const RESEND_AFTER_SECONDS = 60;
@@ -53,9 +54,9 @@ export interface TwoFactorChallenge {
   methods: string[];
   cookies: string[];
   /**
-   * Whether the client may offer "trust this device". False for 2FA-required
-   * roles: their TOTP is mandatory and a trusted device must never buy a
-   * bypass. Enforced server-side too (verifySecondFactor).
+   * Whether the client may offer "trust this device". Always true: a checked
+   * box trusts this browser for 30 days. 2FA stays mandatory on every other
+   * browser, and disabling the account or resetting 2FA clears the trust.
    */
   trustDeviceAllowed: boolean;
 }
@@ -273,7 +274,7 @@ export async function loginWithPassword(
       entityId: user?.id ?? null,
       metadata: { method: 'password', reason, emailMasked: maskEmail(email) },
     });
-    return new UnauthenticatedError('Incorrect email or password');
+    return new UnauthenticatedError(betterAuthUserMessage(reason, 'Incorrect email or password'));
   };
 
   // Blocked accounts are only revealed to someone who knows the password.
@@ -317,9 +318,9 @@ export async function loginWithPassword(
       entityId: user?.id ?? null,
       metadata: { method: 'password' },
     });
-    // 2FA-required roles never get a trusted device (see verifySecondFactor).
-    // Fail closed when the user row is somehow missing.
-    const trustDeviceAllowed = user ? !requiresTwoFactor((await loadActor(user.id)).roles) : false;
+    // A checked "trust this device" box is honored for every role. Fail closed
+    // only when the user row is somehow missing.
+    const trustDeviceAllowed = Boolean(user);
     return {
       kind: 'two_factor_required',
       methods: response.twoFactorMethods ?? ['totp'],
@@ -406,21 +407,6 @@ export async function clearTrustedDevices(userId: string): Promise<void> {
     );
 }
 
-/** Replaces any trust-device Set-Cookie entries with expired ones. */
-function expireTrustDeviceCookies(cookies: string[]): string[] {
-  const kept: string[] = [];
-  const expired: string[] = [];
-  for (const entry of cookies) {
-    const name = entry.split('=')[0]?.trim() ?? '';
-    if (name.endsWith('trust_device')) {
-      expired.push(`${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
-    } else {
-      kept.push(entry);
-    }
-  }
-  return [...kept, ...expired];
-}
-
 /** Second step after a password: authenticator-app code, or a one-time backup code. */
 export async function verifySecondFactor(
   ctx: RequestContext,
@@ -479,22 +465,19 @@ export async function verifySecondFactor(
         reason: apiErrorCode(error) ?? 'INVALID',
       },
     });
-    if (apiErrorCode(error) === 'INVALID_TWO_FACTOR_COOKIE') {
-      throw new UnauthenticatedError('Your sign-in expired. Enter your password again.');
-    }
-    throw new UnauthenticatedError('That code is not correct.');
+    throw new UnauthenticatedError(
+      betterAuthUserMessage(apiErrorCode(error), 'That code is not correct.'),
+    );
   }
   const userId = (result.response as { user: { id: string } }).user.id;
-  let cookies = result.headers.getSetCookie();
+  const cookies = result.headers.getSetCookie();
   const actor = await loadActor(userId);
-  if (requiresTwoFactor(actor.roles)) {
-    // Trusted devices are disabled for 2FA-required roles: a ticked box must
-    // never buy a 30-day TOTP bypass for an admin. Better Auth already wrote
-    // the trust record + cookie during verify, so delete the record in this
-    // same request (the cookie is then useless) and expire the cookie.
-    await clearTrustedDevices(userId);
-    cookies = expireTrustDeviceCookies(cookies);
-  }
+  // trustDevice is passed through to Better Auth above. When it is true, the
+  // plugin writes a signed trust-device cookie (Secure when the public URL is
+  // https) plus a verification row. Production terminates TLS at Cloudflare
+  // and reaches this process over HTTP via Caddy; the browser still stores
+  // the Secure cookie because the page is https. The next password sign-in
+  // reads that cookie and skips 2FA until the row expires or is cleared.
   return signedIn(
     ctx,
     userId,

@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Input, Textarea } from '@/components/atoms';
 import { DateTimePicker, FormField, toast } from '@/components/molecules';
-import { ApiClientError, apiFetch } from '@/lib/api/client';
+import { apiFetch, friendlyApiError } from '@/lib/api/client';
 import { formatDateTime } from '@/lib/format/date';
 import type { ApplicationView } from '@/domains/placement';
 
@@ -68,7 +68,7 @@ export function EmployerInterviewScheduler({
       toast.success(success);
       router.refresh();
     } catch (err) {
-      const message = err instanceof ApiClientError ? err.message : 'Could not save the interview';
+      const message = friendlyApiError(err);
       setError(message);
       toast.error(message);
     } finally {

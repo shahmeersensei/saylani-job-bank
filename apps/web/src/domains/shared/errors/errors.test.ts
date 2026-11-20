@@ -75,7 +75,9 @@ describe('toErrorResponse', () => {
       ]),
       CID,
     );
-    expect(multi.body.error.message).toBe('Please fix 2 fields: Email — Enter a valid email');
+    expect(multi.body.error.message).toBe(
+      'Email: Enter a valid email; Password: Use at least 8 characters',
+    );
 
     // An explicit message still wins.
     const explicit = toErrorResponse(
@@ -89,6 +91,7 @@ describe('toErrorResponse', () => {
     const zod = toErrorResponse(parsed.error, CID);
     expect(zod.body.error.message).not.toBe('Some fields are invalid');
     expect(zod.body.error.message).toContain('Age');
+    expect(zod.body.error.message).toContain('at least 18');
   });
 
   it('names the field for Postgres duplicate / missing-reference errors', () => {
@@ -115,6 +118,47 @@ describe('toErrorResponse', () => {
     expect(toErrorResponse(bare, CID).body.error.message).toContain(
       'A record with these details already exists',
     );
+  });
+
+  it('names the check constraint and a missing required column', () => {
+    const check = Object.assign(new Error('check violation'), {
+      code: '23514',
+      constraint: 'applicants_cnic_format',
+      detail: 'Failing row contains (secret-cnic-value).',
+    });
+    const checkRes = toErrorResponse(check, CID);
+    expect(checkRes.status).toBe(422);
+    expect(checkRes.body.error.message).toBe('CNIC must be 13 digits with no dashes.');
+    expect(checkRes.body.error.message).not.toContain('secret-cnic-value');
+
+    const wrapped = new Error('Failed query', {
+      cause: Object.assign(new Error('check'), {
+        code: '23514',
+        constraint_name: 'jobs_vacancies_positive',
+      }),
+    });
+    expect(toErrorResponse(wrapped, CID).body.error.message).toBe(
+      'Vacancies must be greater than zero.',
+    );
+
+    const unknown = Object.assign(new Error('check'), {
+      code: '23514',
+      constraint: 'widgets_colour_format',
+    });
+    expect(toErrorResponse(unknown, CID).body.error.message).toBe(
+      'Colour is not in the right format.',
+    );
+
+    const missing = Object.assign(
+      new Error(
+        'null value in column "father_name" of relation "applicants" violates not-null constraint',
+      ),
+      { code: '23502', column: 'father_name' },
+    );
+    const missingRes = toErrorResponse(missing, CID);
+    expect(missingRes.status).toBe(422);
+    expect(missingRes.body.error.message).toBe('Father name is required.');
+    expect(missingRes.body.error.message).not.toContain('applicants');
   });
 
   it('keeps the 500 message generic but always includes the correlation id', () => {

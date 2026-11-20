@@ -13,17 +13,21 @@ import NextLink from 'next/link';
  * 404/forbidden pages, with a retry.
  */
 export default function DashboardError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const reference = error.digest
+    ? `This page couldn't be loaded. Quote reference ${error.digest} if you report it. Try again, or go back to your dashboard.`
+    : "This page couldn't be loaded. Try again, or go back to your dashboard.";
   return (
     <main className="page-gutter flex min-h-dvh items-center justify-center">
       <EmptyState
         icon={TriangleAlert}
         title="Something went wrong"
-        description="This page couldn't be loaded. Try again, or go back to your dashboard."
+        description={reference}
         action={
           <div className="flex gap-2">
             <Button onClick={() => reset()}>Try again</Button>
