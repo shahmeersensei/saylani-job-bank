@@ -74,9 +74,10 @@ function createAuth() {
         issuer: 'Saylani Job Bank',
         backupCodeOptions: { amount: 10, length: 10 },
         twoFactorCookieMaxAge: 600,
-        // 30 days — but only for roles that may skip 2FA. 2FA-required roles
-        // never get a trusted device: verifySecondFactor deletes the trust
-        // record in the same request, and LoginForm hides the option.
+        // 30 days. The cookie is Secure whenever NEXT_PUBLIC_APP_URL is https
+        // (useSecureCookies above), which is how production is published
+        // through the Cloudflare tunnel. No extra proxy setting is required:
+        // the browser stores the cookie on the https page and sends it back.
         trustDeviceMaxAge: 30 * 24 * 60 * 60,
       }),
       phoneNumber({
