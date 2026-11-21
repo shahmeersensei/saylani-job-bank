@@ -365,6 +365,20 @@
       "when": 1795268865596,
       "tag": "0051_interviewer_scheduler_branch_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1795275297092,
+      "tag": "0052_interview_outcome",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1795276539700,
+      "tag": "0053_interview_outcome_status_check",
+      "breakpoints": true
     }
   ]
 }
