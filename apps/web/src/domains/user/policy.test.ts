@@ -26,6 +26,13 @@ describe('canGrantRole', () => {
     expect(canGrantRole(branchAdmin, 'SUPER_ADMIN', null)).toMatch(/Only a Super Admin/);
   });
 
+  it('Super Admin and Branch Admin can grant Interviewer and Scheduler in a branch', () => {
+    expect(canGrantRole(superAdmin, 'INTERVIEWER_SCHEDULER', KHI)).toBe(true);
+    expect(canGrantRole(superAdmin, 'INTERVIEWER_SCHEDULER', null)).toMatch(/Choose the branch/);
+    expect(canGrantRole(branchAdmin, 'INTERVIEWER_SCHEDULER', KHI)).toBe(true);
+    expect(canGrantRole(branchAdmin, 'INTERVIEWER_SCHEDULER', LHR)).toMatch(/own branch/);
+  });
+
   it('staff cannot manage accounts at all', () => {
     expect(canGrantRole(staff, 'STAFF', KHI)).toMatch(/cannot manage/);
   });

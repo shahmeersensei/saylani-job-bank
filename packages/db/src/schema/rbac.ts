@@ -40,8 +40,9 @@ export const rolePermissions = pgTable(
 );
 
 /**
- * A user's roles. Branch-scoped roles (Branch Admin, Verifier, Staff) MUST name a branch;
- * global/self-scoped roles (Super Admin, Employer, Applicant) must NOT — enforced in SQL.
+ * A user's roles. Branch-scoped roles (Branch Admin, Verifier, Interviewer
+ * and Scheduler, Staff) MUST name a branch; global/self-scoped roles (Super
+ * Admin, Employer, Applicant) must NOT — enforced in SQL.
  */
 export const userRoles = pgTable(
   'user_roles',
@@ -63,7 +64,7 @@ export const userRoles = pgTable(
     index('user_roles_branch_idx').on(t.branchId, t.roleCode),
     check(
       'user_roles_branch_scope',
-      sql`(${t.roleCode} in ('BRANCH_ADMIN', 'VERIFIER', 'STAFF')) = (${t.branchId} is not null)`,
+      sql`(${t.roleCode} in ('BRANCH_ADMIN', 'VERIFIER', 'INTERVIEWER_SCHEDULER', 'STAFF')) = (${t.branchId} is not null)`,
     ),
   ],
 );
