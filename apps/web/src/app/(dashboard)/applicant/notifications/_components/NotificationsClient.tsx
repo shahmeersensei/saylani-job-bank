@@ -243,6 +243,8 @@ export function NotificationsClient({ items, unread, offers, refusalReasons }: P
                             INTERVIEW_POSTPONED: { label: 'Postponed', tone: 'warning' as const },
                             INTERVIEW_CANCELLED: { label: 'Cancelled', tone: 'neutral' as const },
                             INTERVIEW_RESCHEDULED: { label: 'Rescheduled', tone: 'info' as const },
+                            INTERVIEW_PASSED: { label: 'Passed', tone: 'success' as const },
+                            INTERVIEW_FAILED: { label: 'Not passed', tone: 'danger' as const },
                             APPLICANT_REFERRED: { label: 'Referred', tone: 'success' as const },
                             JOB_REFERRED_TO_APPLICANT: {
                               label: 'Job referred',

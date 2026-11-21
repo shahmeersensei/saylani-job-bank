@@ -41,6 +41,10 @@ export const PERMISSIONS = {
 
   'interview:schedule_jobbank': 'Schedule and record Job Bank interviews',
 
+  /** 0052 — record what happened in a scheduled Job Bank interview:
+      attendance (Attended / No-show), result (Passed / Failed) and feedback. */
+  'interview:record_outcome': 'Record a Job Bank interview outcome',
+
   'decision:employer': 'Hold / select / reject referred candidates',
   'decision:applicant': 'Accept / refuse / counteroffer own offers',
   'decision:proxy': 'Record a decision on behalf of an actor (off by default)',
@@ -106,6 +110,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'match_case:manage',
     'match_case:refer',
     'interview:schedule_jobbank',
+    'interview:record_outcome',
     'placement:manage',
     'blacklist:request',
     'blacklist:decide',
@@ -137,19 +142,24 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'match_case:manage',
     'match_case:refer',
     'interview:schedule_jobbank',
+    'interview:record_outcome',
     'placement:manage',
     'blacklist:request',
   ],
-  /** One combined role (2026-11-12): schedules Job Bank interviews and
-      records their outcomes for referred/shortlisted candidates in their
-      branch(es). Read-only on the interview pipeline — no referring, no
-      employer decisions, no job/company/staff management. */
+  /** One combined role (2026-11-12), end-to-end for the Job Bank interview
+      stage (Option B, 0052): schedules Job Bank interviews, records their
+      outcomes, and refers candidates he passed to the employer. He still
+      cannot shortlist (match_case:manage), manage jobs/companies/staff,
+      or decide for employers — and his referral is pass-only, enforced in
+      referApplicantToEmployer, not just by this list. */
   INTERVIEWER_SCHEDULER: [
     'branch:read',
     'applicant:read',
     'job:read',
     'match_case:read',
+    'match_case:refer',
     'interview:schedule_jobbank',
+    'interview:record_outcome',
   ],
   EMPLOYER: [
     'company:register',
