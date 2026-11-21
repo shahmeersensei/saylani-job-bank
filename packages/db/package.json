@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
+    "./check-messages": "./src/check-messages.ts",
     "./migrate": "./src/scripts/migrate.ts",
     "./seed": "./src/scripts/seed.ts",
     "./seed/dev-data": "./src/seed/dev-data.ts"

@@ -1,4 +1,4 @@
-import { CHECK_CONSTRAINT_MESSAGES } from '@jobbank/db';
+import { CHECK_CONSTRAINT_MESSAGES } from '@jobbank/db/check-messages';
 import { fieldLabel, type ApiError, type ErrorCode, type FieldIssue } from '@jobbank/shared';
 import { ZodError } from 'zod';
 import { DomainError, RateLimitedError, ValidationError, validationMessage } from './errors';
