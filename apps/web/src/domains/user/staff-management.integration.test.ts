@@ -66,7 +66,11 @@ beforeAll(async () => {
 beforeEach(() => resetMemoryRateLimits());
 
 /** Invites + activates a staff member through the real flow; returns their id and session. */
-async function inviteAndActivate(adminJar: Jar, role: 'STAFF' | 'VERIFIER', branch: string) {
+async function inviteAndActivate(
+  adminJar: Jar,
+  role: 'STAFF' | 'VERIFIER' | 'INTERVIEWER_SCHEDULER',
+  branch: string,
+) {
   const email = uniqueEmail('staff');
   const invited = await call(inviteRoute, '/api/v1/users', {
     method: 'POST',
@@ -83,9 +87,9 @@ async function inviteAndActivate(adminJar: Jar, role: 'STAFF' | 'VERIFIER', bran
     jar,
   });
   expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
-  // Staff must enrol an authenticator before use, so activation returns a
-  // setup token instead of a session — enrol here so the caller gets a live
-  // session. Verifiers sign straight in (2FA is optional for them).
+  // Staff, Verifiers and Interviewer-Schedulers must enrol an authenticator
+  // before use, so activation returns a setup token instead of a session —
+  // enrol here so the caller gets a live session.
   if (accepted.body.data.kind === 'two_factor_setup_required') {
     jar.setupToken = accepted.body.data.setupToken as string;
     await enrollTwoFactor(email, jar);
@@ -231,7 +235,34 @@ describe('two-factor authentication', () => {
     expect((await call(me, '/api/v1/auth/me', { jar: adminJar })).body.data.user.email).toBe(email);
   });
 
-  it('admins cannot turn two-factor off; other staff can opt in and out', async () => {
+  it('invited Verifier and Interviewer-Scheduler must enrol an authenticator before use', async () => {
+    // Regression 2026-11-23: both roles used to sign straight in after
+    // accepting an invite (2FA was optional for them), so the setup screen
+    // never appeared for them.
+    const adminJar = await signInAdmin('superadmin@jobbank.local');
+    for (const role of ['VERIFIER', 'INTERVIEWER_SCHEDULER'] as const) {
+      const email = uniqueEmail('invitee2fa');
+      const invited = await call(inviteRoute, '/api/v1/users', {
+        method: 'POST',
+        jar: adminJar,
+        headers: { 'idempotency-key': crypto.randomUUID() },
+        body: { name: 'Test Invitee', email, title: 'Officer', role, branchId: KHI },
+      });
+      expect(invited.status, JSON.stringify(invited.body)).toBe(201);
+      const token = tokenFrom(lastMailTo(email).text);
+      const accepted = await call(acceptInvite, '/api/v1/auth/invitations/accept', {
+        method: 'POST',
+        body: { token, password: getSeedDevPassword() },
+      });
+      expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
+      expect(accepted.body.data.kind).toBe('two_factor_setup_required');
+    }
+  });
+
+  it('no password role can turn two-factor off', async () => {
+    // Branch Admin and Verifier alike: enrolment is mandatory, so disabling
+    // is forbidden for both. (Before the 2026-11-23 extension, Verifiers
+    // could opt in and out.)
     const admin = await signInAdmin('branchadmin.khi@jobbank.local');
     const refused = await call(disable2fa, '/api/v1/account/2fa/disable', {
       method: 'POST',
@@ -240,25 +271,13 @@ describe('two-factor authentication', () => {
     });
     expect(refused.status).toBe(403);
 
-    const email = 'verifier.khi@jobbank.local';
-    await resetTwoFactor(email);
-    const jar = await signIn(email);
-    expect((await call(me, '/api/v1/auth/me', { jar })).body.data.twoFactorPending).toBe(false);
-    await enrollTwoFactor(email, jar);
-    expect(
-      (
-        await call(disable2fa, '/api/v1/account/2fa/disable', {
-          method: 'POST',
-          jar,
-          body: { password: getSeedDevPassword() },
-        })
-      ).status,
-    ).toBe(200);
-    const after = await call(login, '/api/v1/auth/login', {
+    const verifier = await signInAdmin('verifier.khi@jobbank.local');
+    const refusedVerifier = await call(disable2fa, '/api/v1/account/2fa/disable', {
       method: 'POST',
-      body: { email, password: getSeedDevPassword() },
+      jar: verifier,
+      body: { password: getSeedDevPassword() },
     });
-    expect(after.body.data.kind).toBe('signed_in');
+    expect(refusedVerifier.status).toBe(403);
   });
 });
 
@@ -748,7 +767,10 @@ describe('managing staff accounts', () => {
   it('resetting a lost authenticator signs them out and makes them enrol again', async () => {
     const sa = await signInAdmin('superadmin@jobbank.local');
     const person = await inviteAndActivate(sa, 'VERIFIER', LHR);
-    await enrollTwoFactor(person.email, person.jar);
+    // inviteAndActivate already enrolled the verifier (2FA is mandatory for
+    // them). Enrolling again here would fail: the setup token on the jar
+    // died once the first enrolment completed, and a setup token wins over
+    // the live session on the enrol route.
     // Audit 2026-11-11 (M-28): the acting admin's password is required — a
     // wrong password refuses the reset and leaves 2FA in place.
     const wrongPassword = await call(reset2faRoute, '/x', {
@@ -770,7 +792,9 @@ describe('managing staff accounts', () => {
       method: 'POST',
       body: { email: person.email, password: getSeedDevPassword() },
     });
-    expect(relogin.body.data.kind).toBe('signed_in');
+    // Verifiers are 2FA-required now: after the reset there is no
+    // authenticator left, so sign-in ends in enrolment, not a session.
+    expect(relogin.body.data.kind).toBe('two_factor_setup_required');
   });
 });
 

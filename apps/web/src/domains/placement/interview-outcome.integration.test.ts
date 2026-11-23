@@ -104,8 +104,8 @@ async function inviteInterviewer(adminJar: Jar, branchId: string): Promise<Jar> 
     jar,
   });
   expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
-  // Interviewers are not 2FA-required; if that ever changes, enrol here
-  // the same way Staff does in staff-management.integration.test.ts.
+  // Interviewers are 2FA-required, so activation returns a setup token —
+  // enrol here the same way Staff does in staff-management.integration.test.ts.
   if (accepted.body.data.kind === 'two_factor_setup_required') {
     jar.setupToken = accepted.body.data.setupToken as string;
     await enrollTwoFactor(email, jar);

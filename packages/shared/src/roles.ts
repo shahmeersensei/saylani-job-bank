@@ -29,10 +29,12 @@ export const ROLE_LABELS: Record<Role, string> = {
   APPLICANT: 'Applicant',
 };
 
-/** Must enrol an authenticator app before using the system (decided in M4, extended to Staff and Employer 2026-11-15: every password sign-in is now TOTP-protected, so the emailed employer sign-in code — which would bypass it — is retired). */
+/** Must enrol an authenticator app before using the system (decided in M4, extended to Staff and Employer 2026-11-15, and to Verifier and Interviewer-Scheduler 2026-11-23: every password sign-in is now TOTP-protected, so the emailed employer sign-in code — which would bypass it — is retired). Applicants are the only exception: they sign in with a phone SMS code, never a password. */
 export const TWO_FACTOR_REQUIRED_ROLES: readonly Role[] = [
   'SUPER_ADMIN',
   'BRANCH_ADMIN',
+  'VERIFIER',
+  'INTERVIEWER_SCHEDULER',
   'STAFF',
   'EMPLOYER',
 ];

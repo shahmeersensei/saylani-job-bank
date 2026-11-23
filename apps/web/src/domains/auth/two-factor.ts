@@ -185,7 +185,7 @@ export async function confirmTwoFactorEnrollment(
   }
 }
 
-/** Optional for Verifier / Interviewer-Scheduler; 2FA-required roles must keep it on. */
+/** Every password role must keep 2FA on once enrolled — applicants sit outside this only because they sign in with a phone SMS code, never a password. */
 export async function disableTwoFactor(
   ctx: SignedIn,
   password: string,
