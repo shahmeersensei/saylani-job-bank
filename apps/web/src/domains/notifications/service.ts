@@ -36,6 +36,14 @@ export const KNOWN_NOTIFICATION_TYPES = [
   // 0052 — interview outcome notifications (see recordInterviewOutcome).
   'INTERVIEW_PASSED',
   'INTERVIEW_FAILED',
+  // Audit 2026-11-23 (LOW-3): the employer's own interview used the Job
+  // Bank interview types, so the applicant's list showed two
+  // indistinguishable "Interview scheduled" entries. Employer interviews
+  // now have their own types.
+  'EMPLOYER_INTERVIEW_SCHEDULED',
+  'EMPLOYER_INTERVIEW_POSTPONED',
+  'EMPLOYER_INTERVIEW_RESCHEDULED',
+  'EMPLOYER_INTERVIEW_CANCELLED',
   'APPLICANT_REFERRED',
   'JOB_REFERRED_TO_APPLICANT',
   'APPLICATION_ON_HOLD',

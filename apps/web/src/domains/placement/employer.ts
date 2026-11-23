@@ -522,10 +522,13 @@ async function notifyApplicantOfEmployerInterview(
   if (!applicantRow) return;
   const type = (
     {
-      SCHEDULED: 'INTERVIEW_SCHEDULED',
-      RESCHEDULED: 'INTERVIEW_RESCHEDULED',
-      POSTPONED: 'INTERVIEW_POSTPONED',
-      CANCELLED: 'INTERVIEW_CANCELLED',
+      // Audit 2026-11-23 (LOW-3): employer interviews get their own
+      // types — reusing INTERVIEW_SCHEDULED made the applicant's list
+      // show two indistinguishable "Interview scheduled" entries.
+      SCHEDULED: 'EMPLOYER_INTERVIEW_SCHEDULED',
+      RESCHEDULED: 'EMPLOYER_INTERVIEW_RESCHEDULED',
+      POSTPONED: 'EMPLOYER_INTERVIEW_POSTPONED',
+      CANCELLED: 'EMPLOYER_INTERVIEW_CANCELLED',
     } as const
   )[kind];
   const when = view.employerInterviewAt ? formatDateTime(view.employerInterviewAt) : '';
@@ -540,7 +543,7 @@ async function notifyApplicantOfEmployerInterview(
   await createNotification(db, {
     userId: applicantRow.userId,
     type,
-    title: `Interview ${kind === 'CANCELLED' ? 'cancelled' : kind === 'POSTPONED' ? 'postponed' : 'scheduled'} — ${view.jobTitle}`,
+    title: `Employer interview ${kind === 'CANCELLED' ? 'cancelled' : kind === 'POSTPONED' ? 'postponed' : 'scheduled'} — ${view.jobTitle}`,
     body: `${view.companyName} ${verb} for ${view.jobTitle}${when ? ` — ${when}` : ''}.`,
     data: { applicationId: view.id, jobTitle: view.jobTitle, companyName: view.companyName },
   });

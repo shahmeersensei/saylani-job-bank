@@ -1,7 +1,7 @@
 'server-only';
 import { schema } from '@jobbank/db';
 import type { PaginationMeta } from '@jobbank/shared';
-import { and, count, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { runCommand } from '@/domains/shared/audit';
 import { formatDateTime } from '@/lib/format/date';
@@ -15,6 +15,7 @@ import {
   ValidationError,
 } from '@/domains/shared/errors';
 import {
+  assertBranchAccess,
   assertCityAccess,
   assertPermission,
   assertRole,
@@ -434,6 +435,16 @@ export async function scheduleInterview(
   input: ScheduleInterviewInput,
 ): Promise<ApplicationView> {
   assertPermission(ctx.actor, 'interview:schedule_jobbank');
+  // Audit 2026-11-23 (MEDIUM-1): scheduling writes audit rows and fires
+  // an applicant notification, so it gets the same 30/hr budget as the
+  // shortlist/refer commands — without it one account could spam an
+  // applicant with "interview scheduled" notifications.
+  await enforceRateLimit(
+    'interview-schedule',
+    ctx.actor.userId,
+    { limit: 30, windowSeconds: 3600 },
+    'Too many interview updates. Try again in an hour.',
+  );
 
   const [row] = await db.select().from(ap).where(eq(ap.id, applicationId));
   if (!row) throw new NotFoundError('Application', applicationId);
@@ -450,10 +461,22 @@ export async function scheduleInterview(
   // direct callers bypass it.
   assertFutureInterviewAt(input.interviewAt);
 
-  await assertCityAccess(ctx.actor, row.branchId, {
-    entityType: 'application',
-    entityId: row.id,
-  });
+  // Audit 2026-11-23 (HIGH-1): the interviewer's own lists are
+  // branch-exact, so his commands must be too. A city check here would
+  // let one branch's interviewer act on another same-city branch's
+  // applications via a direct API call. Staff/BA keep the established
+  // city-wide rule; only the interviewer-only actor is branch-pinned.
+  if (isInterviewerOnlyReferrer(ctx.actor)) {
+    assertBranchAccess(ctx.actor, row.branchId, {
+      entityType: 'application',
+      entityId: row.id,
+    });
+  } else {
+    await assertCityAccess(ctx.actor, row.branchId, {
+      entityType: 'application',
+      entityId: row.id,
+    });
+  }
 
   const view = await runCommand(ctx, async ({ tx, audit }) => {
     assertJobLive(
@@ -502,14 +525,34 @@ export async function updateInterviewStatus(
   input: UpdateInterviewStatusInput,
 ): Promise<ApplicationView> {
   assertPermission(ctx.actor, 'interview:schedule_jobbank');
+  // Audit 2026-11-23 (MEDIUM-1): same budget as scheduleInterview —
+  // reschedules and postponements notify the applicant too.
+  await enforceRateLimit(
+    'interview-schedule',
+    ctx.actor.userId,
+    { limit: 30, windowSeconds: 3600 },
+    'Too many interview updates. Try again in an hour.',
+  );
 
   const [row] = await db.select().from(ap).where(eq(ap.id, applicationId));
   if (!row) throw new NotFoundError('Application', applicationId);
 
-  await assertCityAccess(ctx.actor, row.branchId, {
-    entityType: 'application',
-    entityId: row.id,
-  });
+  // Audit 2026-11-23 (HIGH-1): the interviewer's own lists are
+  // branch-exact, so his commands must be too. A city check here would
+  // let one branch's interviewer act on another same-city branch's
+  // applications via a direct API call. Staff/BA keep the established
+  // city-wide rule; only the interviewer-only actor is branch-pinned.
+  if (isInterviewerOnlyReferrer(ctx.actor)) {
+    assertBranchAccess(ctx.actor, row.branchId, {
+      entityType: 'application',
+      entityId: row.id,
+    });
+  } else {
+    await assertCityAccess(ctx.actor, row.branchId, {
+      entityType: 'application',
+      entityId: row.id,
+    });
+  }
 
   const interviewStatuses: ApplicationStatus[] = [
     'INTERVIEW_SCHEDULED',
@@ -600,6 +643,15 @@ export async function recordInterviewOutcome(
   input: RecordInterviewOutcomeInput,
 ): Promise<ApplicationView> {
   assertPermission(ctx.actor, 'interview:record_outcome');
+  // Audit 2026-11-23 (MEDIUM-1): outcomes write audit rows and notify
+  // the applicant, so they get the same 30/hr budget as the other
+  // interview commands.
+  await enforceRateLimit(
+    'interview-outcome',
+    ctx.actor.userId,
+    { limit: 30, windowSeconds: 3600 },
+    'Too many interview outcomes. Try again in an hour.',
+  );
 
   const [row] = await db.select().from(ap).where(eq(ap.id, applicationId));
   if (!row) throw new NotFoundError('Application', applicationId);
@@ -611,10 +663,22 @@ export async function recordInterviewOutcome(
   // is moot. Re-checked under the job lock inside the transaction.
   assertJobLive(await loadJob(db, row.jobId), 'record an interview outcome for this application');
 
-  await assertCityAccess(ctx.actor, row.branchId, {
-    entityType: 'application',
-    entityId: row.id,
-  });
+  // Audit 2026-11-23 (HIGH-1): the interviewer's own lists are
+  // branch-exact, so his commands must be too. A city check here would
+  // let one branch's interviewer act on another same-city branch's
+  // applications via a direct API call. Staff/BA keep the established
+  // city-wide rule; only the interviewer-only actor is branch-pinned.
+  if (isInterviewerOnlyReferrer(ctx.actor)) {
+    assertBranchAccess(ctx.actor, row.branchId, {
+      entityType: 'application',
+      entityId: row.id,
+    });
+  } else {
+    await assertCityAccess(ctx.actor, row.branchId, {
+      entityType: 'application',
+      entityId: row.id,
+    });
+  }
 
   const event = input.result === 'PASSED' ? 'RECORD_INTERVIEW_PASS' : 'RECORD_INTERVIEW_FAIL';
   const view = await runCommand(ctx, async ({ tx, audit }) => {
@@ -701,7 +765,7 @@ async function notifyApplicantOfInterviewUpdate(
     },
     INTERVIEW_PASSED: {
       title: `Interview passed — ${view.jobTitle}`,
-      body: `You passed your Job Bank interview for ${view.jobTitle}. Your profile will now be forwarded to ${view.companyName}.`,
+      body: `You passed your Job Bank interview for ${view.jobTitle}. Staff will contact you about the next step.`,
     },
     INTERVIEW_FAILED: {
       title: `Interview outcome — ${view.jobTitle}`,
@@ -767,10 +831,22 @@ export async function referApplicantToEmployer(
   const [row] = await db.select().from(ap).where(eq(ap.id, applicationId));
   if (!row) throw new NotFoundError('Application', applicationId);
 
-  await assertCityAccess(ctx.actor, row.branchId, {
-    entityType: 'application',
-    entityId: row.id,
-  });
+  // Audit 2026-11-23 (HIGH-1): the interviewer's own lists are
+  // branch-exact, so his commands must be too. A city check here would
+  // let one branch's interviewer act on another same-city branch's
+  // applications via a direct API call. Staff/BA keep the established
+  // city-wide rule; only the interviewer-only actor is branch-pinned.
+  if (isInterviewerOnlyReferrer(ctx.actor)) {
+    assertBranchAccess(ctx.actor, row.branchId, {
+      entityType: 'application',
+      entityId: row.id,
+    });
+  } else {
+    await assertCityAccess(ctx.actor, row.branchId, {
+      entityType: 'application',
+      entityId: row.id,
+    });
+  }
 
   const referable = referableStatusesFor(ctx.actor);
   if (!referable.includes(row.status)) {
@@ -1177,12 +1253,16 @@ const INTERVIEW_PIPELINE_STATUSES: ApplicationStatus[] = [
 ];
 
 /**
- * Dashboard funnel: candidates this branch's interviewer passed and then
- * referred to the employer. interviewResult PASSED + a status only
- * reachable after a referral (REFERRED_STATUSES) is the precise shape —
- * Staff can also refer straight from SHORTLISTED, and those rows carry no
- * interview result, so they are not the interviewer's referrals and must
- * not be counted here. Counting FORWARDED alone lost referrals the moment
+ * Dashboard funnel: passed candidates this branch referred to the
+ * employer. interviewResult PASSED + a status only reachable after a
+ * referral (REFERRED_STATUSES) is the precise shape — Staff can also
+ * refer straight from SHORTLISTED, and those rows carry no interview
+ * result, so they are not counted here. Note the count is about the
+ * candidates, not who clicked refer: Staff/BA may also refer from
+ * INTERVIEW_PASSED, and the row records no referrer, so a staff-referred
+ * passed candidate counts here too (audit 2026-11-23, LOW-2). If the bar
+ * must mean "referred by the interviewer", record referredBy on referral
+ * and filter on it. Counting FORWARDED alone lost referrals the moment
  * the employer moved the application onward (employer interview, hold,
  * offer, hire): the referral already happened, so the count must not
  * depend on the current status. Same branch-scoped guard as
@@ -1228,7 +1308,14 @@ export async function monthlyInterviewCounts(actor: Actor, year: number): Promis
     .select({ month: monthExpr, value: count() })
     .from(ap)
     .where(
-      and(branchScope(actor, ap.branchId), gte(ap.interviewAt, start), lt(ap.interviewAt, end)),
+      and(
+        branchScope(actor, ap.branchId),
+        gte(ap.interviewAt, start),
+        lt(ap.interviewAt, end),
+        // Audit 2026-11-23 (LOW-1): a cancelled interview is not a
+        // scheduled one — the chart label is "Interviews Scheduled".
+        ne(ap.status, 'INTERVIEW_CANCELLED'),
+      ),
     )
     .groupBy(monthExpr);
 
@@ -1239,10 +1326,16 @@ export async function monthlyInterviewCounts(actor: Actor, year: number): Promis
   return values;
 }
 
-export async function listInterviews(actor: Actor): Promise<InterviewListItem[]> {
+export async function listInterviews(actor: Actor, limit = 500): Promise<InterviewListItem[]> {
   assertPermission(actor, 'interview:schedule_jobbank');
   // Same staff-only, branch-scoped guard as listApplicationsForApplicant.
   assertRole(actor, 'STAFF', 'BRANCH_ADMIN', 'INTERVIEWER_SCHEDULER');
+  // Audit 2026-11-23 (MEDIUM-2): bounded — the old query had no limit
+  // and terminal rows (FAILED, CANCELLED) never leave the list, so the
+  // row set grew forever while the dashboard reloaded it every 30s.
+  // The dashboard now takes its numbers from interviewPipelineCounts
+  // and only needs 5 rows for Recent Activity; the Interviews page uses
+  // the 500 most recently updated rows.
   const rows = await db
     .select()
     .from(ap)
@@ -1252,7 +1345,8 @@ export async function listInterviews(actor: Actor): Promise<InterviewListItem[]>
         branchScope(actor, ap.branchId),
       ),
     )
-    .orderBy(desc(ap.updatedAt));
+    .orderBy(desc(ap.updatedAt))
+    .limit(limit);
   if (rows.length === 0) return [];
   const [views, applicants] = await Promise.all([
     buildViews(rows),
@@ -1288,6 +1382,54 @@ export async function listInterviews(actor: Actor): Promise<InterviewListItem[]>
       updatedAt: row.updatedAt.toISOString(),
     };
   });
+}
+
+/**
+ * Dashboard pipeline numbers in two aggregate queries — no row loading.
+ * The dashboard used to derive these from listInterviews rows, which
+ * meant every 30s refresh loaded the whole (unbounded) pipeline. Same
+ * branch-scoped guard as listInterviews.
+ */
+export interface InterviewPipelineCounts {
+  toSchedule: number;
+  scheduled: number;
+  upcomingToday: number;
+  passed: number;
+  failed: number;
+  total: number;
+}
+
+export async function interviewPipelineCounts(actor: Actor): Promise<InterviewPipelineCounts> {
+  assertPermission(actor, 'interview:schedule_jobbank');
+  assertRole(actor, 'STAFF', 'BRANCH_ADMIN', 'INTERVIEWER_SCHEDULER');
+  const where = and(
+    or(...INTERVIEW_PIPELINE_STATUSES.map((s) => eq(ap.status, s))),
+    branchScope(actor, ap.branchId),
+  );
+  const [byStatus, [today]] = await Promise.all([
+    db.select({ status: ap.status, value: count() }).from(ap).where(where).groupBy(ap.status),
+    db
+      .select({ value: count() })
+      .from(ap)
+      .where(
+        and(
+          inArray(ap.status, ['INTERVIEW_SCHEDULED', 'INTERVIEW_POSTPONED'] as ApplicationStatus[]),
+          branchScope(actor, ap.branchId),
+          sql`${ap.interviewAt} > now()`,
+          sql`(${ap.interviewAt} at time zone 'Asia/Karachi')::date = (now() at time zone 'Asia/Karachi')::date`,
+        ),
+      ),
+  ]);
+  const byStatusMap = new Map<ApplicationStatus, number>(byStatus.map((r) => [r.status, r.value]));
+  const pick = (s: ApplicationStatus) => byStatusMap.get(s) ?? 0;
+  return {
+    toSchedule: pick('SHORTLISTED'),
+    scheduled: pick('INTERVIEW_SCHEDULED') + pick('INTERVIEW_POSTPONED'),
+    upcomingToday: today?.value ?? 0,
+    passed: pick('INTERVIEW_PASSED'),
+    failed: pick('INTERVIEW_FAILED'),
+    total: byStatus.reduce((sum, r) => sum + r.value, 0),
+  };
 }
 
 /**
