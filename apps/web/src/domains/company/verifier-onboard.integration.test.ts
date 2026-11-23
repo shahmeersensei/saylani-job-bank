@@ -19,7 +19,15 @@ import { POST as inviteRoute } from '@/app/api/v1/users/route';
 import { resetMemoryRateLimits } from '@/domains/shared/rate-limit';
 import { db } from '@/lib/db';
 import { mailOutbox } from '@/lib/mail/mailer';
-import { BASE, call, Jar, randomPhone, signIn, signInAdmin, uniqueEmail } from '@/test/api-client';
+import {
+  BASE,
+  call,
+  enrollTwoFactor,
+  Jar,
+  randomPhone,
+  signInAdmin,
+  uniqueEmail,
+} from '@/test/api-client';
 
 const randomNtn = () =>
   `${String(Math.floor(1000000 + Math.random() * 9000000))}-${Math.floor(Math.random() * 10)}`;
@@ -71,13 +79,19 @@ async function inviteAndActivateVerifier(adminJar: Jar) {
     jar,
   });
   expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
+  // Verifiers are 2FA-required, so activation returns a setup token instead
+  // of a session — enrol here so the caller gets a live session.
+  if (accepted.body.data.kind === 'two_factor_setup_required') {
+    jar.setupToken = accepted.body.data.setupToken as string;
+    await enrollTwoFactor(email, jar);
+  }
   return { id: invited.body.data.user.id as string, email, jar };
 }
 
 beforeAll(async () => {
   khi = await branchId('KHI-GULSHAN');
   lhr = await branchId('LHR-JOHAR');
-  verifierJar = await signIn('verifier.khi@jobbank.local');
+  verifierJar = await signInAdmin('verifier.khi@jobbank.local');
   // Round 2: plain signIn cannot pass the 2FA step — other files leave
   // Branch Admin enrolled in the shared DB, so this file must enrol too.
   colleagueJar = await signInAdmin('branchadmin.khi@jobbank.local');
