@@ -1,6 +1,10 @@
-import { redirect } from 'next/navigation';
+import { WelcomePanel } from '../_components/WelcomePanel';
 
-/** The interviews list is this role's landing view. */
+export const metadata = { title: 'Interviewer Dashboard — Saylani Job Bank' };
+
+/** Live data on every load — dashboards are never statically cached. */
+export const dynamic = 'force-dynamic';
+
 export default function InterviewerSchedulerHomePage() {
-  redirect('/interviewer-scheduler/interviews');
+  return <WelcomePanel role="INTERVIEWER_SCHEDULER" />;
 }

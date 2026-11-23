@@ -31,6 +31,8 @@ const STAGES: Record<string, Stage> = {
   INTERVIEW_SCHEDULED: { label: 'Interview Scheduled', icon: CalendarCheck, tone: 'warning' },
   INTERVIEW_POSTPONED: { label: 'Interview Postponed', icon: Clock, tone: 'warning' },
   INTERVIEW_CANCELLED: { label: 'Interview Cancelled', icon: CalendarX, tone: 'neutral' },
+  INTERVIEW_PASSED: { label: 'Interview Passed', icon: CheckCircle2, tone: 'success' },
+  INTERVIEW_FAILED: { label: 'Interview Not Passed', icon: XCircle, tone: 'danger' },
   FORWARDED: { label: 'Referred to Employer', icon: TrendingUp, tone: 'info' },
   EMPLOYER_INTERVIEW_SCHEDULED: {
     label: 'Interview with Employer',

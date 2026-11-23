@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { NotFoundError, ValidationError } from '@/domains/shared/errors';
+import { InvalidTransitionError, NotFoundError, ValidationError } from '@/domains/shared/errors';
+import { makeActor } from '@/test/factories';
 import {
+  applicationMachine,
   assertFutureInterviewAt,
+  isInterviewerOnlyReferrer,
+  recordInterviewOutcomeSchema,
+  referableStatusesFor,
   scheduleInterviewSchema,
   updateInterviewStatusSchema,
 } from './index';
@@ -88,5 +93,139 @@ describe('H19 reschedule + refusal guards', () => {
     expect(refuseJobOfferSchema.safeParse({ reasonCode: 'LOW_SALARY' }).success).toBe(true);
     expect(refuseJobOfferSchema.safeParse({ reason: 'Salary is too low' }).success).toBe(false);
     expect(refuseJobOfferSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+// 0052 — interview outcome recording (Option B). Pure schema + machine
+// checks; no DB needed. The DB-backed refer guard is exercised by the
+// same pure helpers below (referableStatusesFor) plus the integration test
+// in staff-management.integration.test.ts — see the note there.
+describe('0052 recordInterviewOutcomeSchema', () => {
+  it('attended + passed needs no feedback', () => {
+    expect(
+      recordInterviewOutcomeSchema.safeParse({ attendance: 'ATTENDED', result: 'PASSED' }).success,
+    ).toBe(true);
+  });
+
+  it('attended + failed needs feedback of at least 5 characters', () => {
+    expect(
+      recordInterviewOutcomeSchema.safeParse({ attendance: 'ATTENDED', result: 'FAILED' }).success,
+    ).toBe(false);
+    expect(
+      recordInterviewOutcomeSchema.safeParse({
+        attendance: 'ATTENDED',
+        result: 'FAILED',
+        feedback: 'weak',
+      }).success,
+    ).toBe(false);
+    expect(
+      recordInterviewOutcomeSchema.safeParse({
+        attendance: 'ATTENDED',
+        result: 'FAILED',
+        feedback: 'Weak communication',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('a no-show is always a fail, never a pass', () => {
+    expect(
+      recordInterviewOutcomeSchema.safeParse({
+        attendance: 'NO_SHOW',
+        result: 'PASSED',
+        feedback: 'Did not attend',
+      }).success,
+    ).toBe(false);
+    expect(
+      recordInterviewOutcomeSchema.safeParse({
+        attendance: 'NO_SHOW',
+        result: 'FAILED',
+        feedback: 'Did not attend',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('feedback over 500 characters is rejected', () => {
+    expect(
+      recordInterviewOutcomeSchema.safeParse({
+        attendance: 'ATTENDED',
+        result: 'PASSED',
+        feedback: 'x'.repeat(501),
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('0052 interview outcome state machine', () => {
+  const transition = (from: string, event: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    applicationMachine.transition(from as never, event as never, {}, [] as never);
+
+  it('a scheduled interview can be passed or failed', () => {
+    expect(transition('INTERVIEW_SCHEDULED', 'RECORD_INTERVIEW_PASS')).toBe('INTERVIEW_PASSED');
+    expect(transition('INTERVIEW_SCHEDULED', 'RECORD_INTERVIEW_FAIL')).toBe('INTERVIEW_FAILED');
+    expect(transition('INTERVIEW_POSTPONED', 'RECORD_INTERVIEW_PASS')).toBe('INTERVIEW_PASSED');
+  });
+
+  it('no outcome can be recorded on a shortlisted or cancelled interview', () => {
+    expect(() => transition('SHORTLISTED', 'RECORD_INTERVIEW_PASS')).toThrow(
+      InvalidTransitionError,
+    );
+    expect(() => transition('INTERVIEW_CANCELLED', 'RECORD_INTERVIEW_FAIL')).toThrow(
+      InvalidTransitionError,
+    );
+  });
+
+  it('a passed interview can be referred, a failed one cannot be referred or rescheduled', () => {
+    expect(transition('INTERVIEW_PASSED', 'REFER')).toBe('FORWARDED');
+    expect(() => transition('INTERVIEW_FAILED', 'REFER')).toThrow(InvalidTransitionError);
+    expect(() => transition('INTERVIEW_FAILED', 'SCHEDULE_INTERVIEW')).toThrow(
+      InvalidTransitionError,
+    );
+    expect(() => transition('INTERVIEW_PASSED', 'SCHEDULE_INTERVIEW')).toThrow(
+      InvalidTransitionError,
+    );
+  });
+
+  it('staff can still refer a shortlisted candidate (unchanged)', () => {
+    expect(transition('SHORTLISTED', 'REFER')).toBe('FORWARDED');
+    expect(transition('INTERVIEW_SCHEDULED', 'REFER')).toBe('FORWARDED');
+  });
+});
+
+describe('0052 pass-only referral guard (pure helpers)', () => {
+  const interviewer = makeActor({ roles: ['INTERVIEWER_SCHEDULER'], branchIds: ['b-1'] });
+  const staff = makeActor({ roles: ['STAFF'], branchIds: ['b-1'] });
+  const branchAdmin = makeActor({ roles: ['BRANCH_ADMIN'], branchIds: ['b-1'] });
+  const dual = makeActor({ roles: ['BRANCH_ADMIN', 'INTERVIEWER_SCHEDULER'], branchIds: ['b-1'] });
+
+  it('an interviewer-only actor may refer only from INTERVIEW_PASSED', () => {
+    expect(isInterviewerOnlyReferrer(interviewer)).toBe(true);
+    expect(referableStatusesFor(interviewer)).toEqual(['INTERVIEW_PASSED']);
+  });
+
+  it('staff and branch admins keep their existing referable range, plus PASSED', () => {
+    expect(isInterviewerOnlyReferrer(staff)).toBe(false);
+    expect(isInterviewerOnlyReferrer(branchAdmin)).toBe(false);
+    expect(referableStatusesFor(staff)).toEqual([
+      'SHORTLISTED',
+      'INTERVIEW_SCHEDULED',
+      'INTERVIEW_POSTPONED',
+      'INTERVIEW_PASSED',
+    ]);
+    expect(referableStatusesFor(branchAdmin)).toEqual(referableStatusesFor(staff));
+  });
+
+  it('a dual-role Branch Admin + Interviewer is treated as Staff/BA, not interviewer-only', () => {
+    expect(isInterviewerOnlyReferrer(dual)).toBe(false);
+    expect(referableStatusesFor(dual)).toEqual(referableStatusesFor(staff));
+  });
+});
+
+describe('0052 outcome states stay invisible to employers until referral', () => {
+  it('INTERVIEW_PASSED and INTERVIEW_FAILED are pre-referral states', () => {
+    expect(EMPLOYER_VISIBLE_STATUSES).not.toContain('INTERVIEW_PASSED');
+    expect(EMPLOYER_VISIBLE_STATUSES).not.toContain('INTERVIEW_FAILED');
+    expect(() => assertEmployerCanView('INTERVIEW_PASSED', 'app-1')).toThrow(NotFoundError);
+    expect(() => assertEmployerCanView('INTERVIEW_FAILED', 'app-1')).toThrow(NotFoundError);
   });
 });

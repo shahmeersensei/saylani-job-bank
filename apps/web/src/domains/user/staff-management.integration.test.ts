@@ -476,6 +476,49 @@ describe('staff invitations', () => {
     ).toBe(409);
   });
 
+  it('Super Admin and Branch Admin can invite an Interviewer and Scheduler into a branch', async () => {
+    // Regression: the user_roles_branch_scope check once omitted
+    // INTERVIEWER_SCHEDULER, so these invites passed the permission check
+    // and then failed in Postgres with 23514 ("Scope is not allowed.").
+    const sa = await signInAdmin('superadmin@jobbank.local');
+    const saEmail = uniqueEmail('interviewer-sa');
+    const saInvite = await call(inviteRoute, '/api/v1/users', {
+      method: 'POST',
+      jar: sa,
+      headers: { 'idempotency-key': crypto.randomUUID() },
+      body: {
+        name: 'Sara Interviewer',
+        email: saEmail,
+        title: 'Interviewer Officer',
+        role: 'INTERVIEWER_SCHEDULER',
+        branchId: KHI,
+      },
+    });
+    expect(saInvite.status, JSON.stringify(saInvite.body)).toBe(201);
+
+    const ba = await signInAdmin('branchadmin.khi@jobbank.local');
+    const baEmail = uniqueEmail('interviewer-ba');
+    const baInvite = await call(inviteRoute, '/api/v1/users', {
+      method: 'POST',
+      jar: ba,
+      headers: { 'idempotency-key': crypto.randomUUID() },
+      body: {
+        name: 'Bilal Interviewer',
+        email: baEmail,
+        title: 'Interviewer Officer',
+        role: 'INTERVIEWER_SCHEDULER',
+        branchId: KHI,
+      },
+    });
+    expect(baInvite.status, JSON.stringify(baInvite.body)).toBe(201);
+
+    const [stored] = await db
+      .select()
+      .from(schema.userRoles)
+      .where(eq(schema.userRoles.userId, baInvite.body.data.user.id));
+    expect(stored).toMatchObject({ roleCode: 'INTERVIEWER_SCHEDULER', branchId: KHI });
+  });
+
   it('a resent invitation replaces the old link', async () => {
     const sa = await signInAdmin('superadmin@jobbank.local');
     const email = uniqueEmail('resend');

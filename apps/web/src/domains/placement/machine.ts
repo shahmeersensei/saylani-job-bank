@@ -10,6 +10,8 @@ export type ApplicationEvent =
   | 'RESCHEDULE_INTERVIEW'
   | 'POSTPONE_INTERVIEW'
   | 'CANCEL_INTERVIEW'
+  | 'RECORD_INTERVIEW_PASS'
+  | 'RECORD_INTERVIEW_FAIL'
   | 'REFER'
   | 'SCHEDULE_EMPLOYER_INTERVIEW'
   | 'RESCHEDULE_EMPLOYER_INTERVIEW'
@@ -61,7 +63,11 @@ export const applicationMachine = defineMachine<
   // APPLICANT_REFUSED (OFFER_DECLINED_AFTER_HIRE), because placement owns
   // the offer truth and the match row is only a mirror. The only way out of
   // HIRED is that decline; nothing else resurrects or re-decides a hire.
-  terminal: ['REJECTED', 'EMPLOYER_REJECTED', 'APPLICANT_REFUSED'],
+  // INTERVIEW_FAILED is terminal for the interview stage: a failed (or
+  // no-show) interview cannot be rescheduled or referred. INTERVIEW_PASSED
+  // is NOT terminal — it is the only state an interviewer-only actor may
+  // refer from (see REFER below and the guard in referApplicantToEmployer).
+  terminal: ['REJECTED', 'EMPLOYER_REJECTED', 'APPLICANT_REFUSED', 'INTERVIEW_FAILED'],
   transitions: [
     {
       from: ['SHORTLISTED', ...INTERVIEW_STATES],
@@ -72,7 +78,19 @@ export const applicationMachine = defineMachine<
     { from: INTERVIEW_STATES, event: 'POSTPONE_INTERVIEW', to: 'INTERVIEW_POSTPONED' },
     { from: INTERVIEW_STATES, event: 'CANCEL_INTERVIEW', to: 'INTERVIEW_CANCELLED' },
     {
-      from: ['SHORTLISTED', 'INTERVIEW_SCHEDULED', 'INTERVIEW_POSTPONED'],
+      // 0052 — outcome is recorded only from a scheduled (or postponed)
+      // interview, never from SHORTLISTED or a cancelled one.
+      from: ['INTERVIEW_SCHEDULED', 'INTERVIEW_POSTPONED'],
+      event: 'RECORD_INTERVIEW_PASS',
+      to: 'INTERVIEW_PASSED',
+    },
+    {
+      from: ['INTERVIEW_SCHEDULED', 'INTERVIEW_POSTPONED'],
+      event: 'RECORD_INTERVIEW_FAIL',
+      to: 'INTERVIEW_FAILED',
+    },
+    {
+      from: ['SHORTLISTED', 'INTERVIEW_SCHEDULED', 'INTERVIEW_POSTPONED', 'INTERVIEW_PASSED'],
       event: 'REFER',
       to: 'FORWARDED',
     },

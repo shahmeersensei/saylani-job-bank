@@ -44,6 +44,8 @@ export type ApplicationStatus =
   | 'INTERVIEW_SCHEDULED'
   | 'INTERVIEW_POSTPONED'
   | 'INTERVIEW_CANCELLED'
+  | 'INTERVIEW_PASSED'
+  | 'INTERVIEW_FAILED'
   | 'FORWARDED'
   | 'EMPLOYER_INTERVIEW_SCHEDULED'
   | 'EMPLOYER_INTERVIEW_POSTPONED'
@@ -85,6 +87,12 @@ export interface ApplicationView {
   interviewAt: string | null;
   interviewLocation: string | null;
   interviewNote: string | null;
+  // 0052 — Job Bank interview outcome (null until an outcome is recorded).
+  interviewAttendance: 'ATTENDED' | 'NO_SHOW' | null;
+  interviewResult: 'PASSED' | 'FAILED' | null;
+  interviewFeedback: string | null;
+  interviewOutcomeAt: string | null;
+  interviewOutcomeBy: string | null;
   // Employer interview stage
   employerInterviewAt: string | null;
   employerInterviewLocation: string | null;
@@ -142,6 +150,68 @@ export const updateInterviewStatusSchema = z
   });
 export type UpdateInterviewStatusInput = z.infer<typeof updateInterviewStatusSchema>;
 
+// ─── 0052 — interview outcome ──────────────────────────────────────────
+
+export const INTERVIEW_ATTENDANCES = ['ATTENDED', 'NO_SHOW'] as const;
+export type InterviewAttendance = (typeof INTERVIEW_ATTENDANCES)[number];
+export const INTERVIEW_RESULTS = ['PASSED', 'FAILED'] as const;
+export type InterviewResult = (typeof INTERVIEW_RESULTS)[number];
+
+/**
+ * Outcome of a scheduled Job Bank interview. A no-show is always a fail
+ * (attendance NO_SHOW forces result FAILED); feedback is required when the
+ * candidate fails (≥5 chars, M19-style evidence rule) and optional on a
+ * pass. No new seed reason codes: NO_SHOW is captured by `attendance`,
+ * and a failed performance is described in `feedback`.
+ */
+export const recordInterviewOutcomeSchema = z
+  .object({
+    attendance: z.enum(INTERVIEW_ATTENDANCES),
+    result: z.enum(INTERVIEW_RESULTS),
+    feedback: z.string().trim().max(500).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.attendance === 'NO_SHOW' && v.result !== 'FAILED') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['result'],
+        message: 'A no-show is always recorded as failed',
+      });
+    }
+    if (v.result === 'FAILED' && (v.feedback?.trim().length ?? 0) < 5) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['feedback'],
+        message: 'Feedback is required when the candidate fails (at least 5 characters)',
+      });
+    }
+  });
+export type RecordInterviewOutcomeInput = z.infer<typeof recordInterviewOutcomeSchema>;
+
+/**
+ * True when the actor's only interview/referral power comes from the
+ * INTERVIEWER_SCHEDULER role — i.e. they hold no STAFF / BRANCH_ADMIN role.
+ * A dual-role user (e.g. Branch Admin + Interviewer) is treated as Staff/BA,
+ * not as interviewer-only. Pure helper, unit-tested without a DB.
+ */
+export function isInterviewerOnlyReferrer(actor: Actor): boolean {
+  return (
+    actor.roles.includes('INTERVIEWER_SCHEDULER') &&
+    !actor.roles.some((r) => r === 'STAFF' || r === 'BRANCH_ADMIN')
+  );
+}
+
+/**
+ * Statuses an actor may refer to the employer from. Interviewer-only
+ * actors may refer ONLY from INTERVIEW_PASSED; Staff/BA keep their
+ * existing range, plus PASSED (they may also forward a passed candidate).
+ * Pure helper, unit-tested without a DB; referApplicantToEmployer enforces it.
+ */
+export function referableStatusesFor(actor: Actor): ApplicationStatus[] {
+  if (isInterviewerOnlyReferrer(actor)) return ['INTERVIEW_PASSED'];
+  return ['SHORTLISTED', 'INTERVIEW_SCHEDULED', 'INTERVIEW_POSTPONED', 'INTERVIEW_PASSED'];
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 async function buildView(row: typeof ap.$inferSelect): Promise<ApplicationView> {
@@ -176,6 +246,12 @@ async function buildView(row: typeof ap.$inferSelect): Promise<ApplicationView> 
     interviewAt: row.interviewAt?.toISOString() ?? null,
     interviewLocation: row.interviewLocation,
     interviewNote: row.interviewNote,
+    interviewAttendance:
+      (row.interviewAttendance as ApplicationView['interviewAttendance']) ?? null,
+    interviewResult: (row.interviewResult as ApplicationView['interviewResult']) ?? null,
+    interviewFeedback: row.interviewFeedback,
+    interviewOutcomeAt: row.interviewOutcomeAt?.toISOString() ?? null,
+    interviewOutcomeBy: row.interviewOutcomeBy ?? null,
     employerInterviewAt: row.employerInterviewAt?.toISOString() ?? null,
     employerInterviewLocation: row.employerInterviewLocation,
     employerInterviewNote: row.employerInterviewNote,
@@ -466,6 +542,77 @@ export async function updateInterviewStatus(
   return view;
 }
 
+/**
+ * 0052 — Interviewer / Staff / Branch Admin: record the outcome of a
+ * scheduled Job Bank interview. Only from INTERVIEW_SCHEDULED or
+ * INTERVIEW_POSTPONED (the machine rejects SHORTLISTED, CANCELLED, PASSED
+ * and FAILED alike); a FAILED outcome is terminal for the interview stage,
+ * a PASSED outcome is the interviewer-only actor's only route to referral.
+ */
+export async function recordInterviewOutcome(
+  ctx: SignedIn,
+  applicationId: string,
+  input: RecordInterviewOutcomeInput,
+): Promise<ApplicationView> {
+  assertPermission(ctx.actor, 'interview:record_outcome');
+
+  const [row] = await db.select().from(ap).where(eq(ap.id, applicationId));
+  if (!row) throw new NotFoundError('Application', applicationId);
+
+  if (row.status !== 'INTERVIEW_SCHEDULED' && row.status !== 'INTERVIEW_POSTPONED')
+    throw new ForbiddenError('Record an outcome only for a scheduled interview');
+
+  // Same live-job rule as scheduleInterview: an outcome on a closed job
+  // is moot. Re-checked under the job lock inside the transaction.
+  assertJobLive(await loadJob(db, row.jobId), 'record an interview outcome for this application');
+
+  await assertCityAccess(ctx.actor, row.branchId, {
+    entityType: 'application',
+    entityId: row.id,
+  });
+
+  const event = input.result === 'PASSED' ? 'RECORD_INTERVIEW_PASS' : 'RECORD_INTERVIEW_FAIL';
+  const view = await runCommand(ctx, async ({ tx, audit }) => {
+    assertJobLive(
+      await loadJobForUpdate(tx, row.jobId),
+      'record an interview outcome for this application',
+    );
+    const { to } = await lockAndTransitionApplication(tx, applicationId, event);
+    const [updated] = await tx
+      .update(ap)
+      .set({
+        status: to,
+        interviewAttendance: input.attendance,
+        interviewResult: input.result,
+        interviewFeedback: input.feedback?.trim() ? input.feedback.trim() : null,
+        interviewOutcomeAt: new Date(),
+        interviewOutcomeBy: ctx.actor.userId,
+        updatedAt: new Date(),
+      })
+      .where(eq(ap.id, applicationId))
+      .returning();
+
+    audit({
+      action: 'application.interview_outcome_recorded',
+      entityType: 'application',
+      entityId: applicationId,
+      branchId: row.branchId,
+      metadata: { attendance: input.attendance, result: input.result },
+    });
+    return updated!;
+  }).then(buildView);
+
+  // The applicant hears the outcome (best-effort, post-commit).
+  void notifyApplicantOfInterviewUpdate(
+    ctx,
+    row.applicantId,
+    view,
+    input.result === 'PASSED' ? 'INTERVIEW_PASSED' : 'INTERVIEW_FAILED',
+  ).catch((err) => ctx.log.error('interview outcome notification failed', { applicationId, err }));
+
+  return view;
+}
+
 async function notifyApplicantOfInterviewUpdate(
   ctx: SignedIn,
   applicantId: string,
@@ -480,7 +627,12 @@ async function notifyApplicantOfInterviewUpdate(
   if (!applicantRow) return;
 
   type NotifType =
-    'INTERVIEW_SCHEDULED' | 'INTERVIEW_POSTPONED' | 'INTERVIEW_CANCELLED' | 'INTERVIEW_RESCHEDULED';
+    | 'INTERVIEW_SCHEDULED'
+    | 'INTERVIEW_POSTPONED'
+    | 'INTERVIEW_CANCELLED'
+    | 'INTERVIEW_RESCHEDULED'
+    | 'INTERVIEW_PASSED'
+    | 'INTERVIEW_FAILED';
   const copy: Record<NotifType, { title: string; body: string }> = {
     INTERVIEW_SCHEDULED: {
       title: `Interview scheduled — ${view.jobTitle}`,
@@ -502,6 +654,14 @@ async function notifyApplicantOfInterviewUpdate(
         ? `Your interview is now on ${formatDateTime(view.interviewAt)}${view.interviewLocation ? ` at ${view.interviewLocation}` : ''}.`
         : 'Your interview has been rescheduled.',
     },
+    INTERVIEW_PASSED: {
+      title: `Interview passed — ${view.jobTitle}`,
+      body: `You passed your Job Bank interview for ${view.jobTitle}. Your profile will now be forwarded to ${view.companyName}.`,
+    },
+    INTERVIEW_FAILED: {
+      title: `Interview outcome — ${view.jobTitle}`,
+      body: `Your Job Bank interview for ${view.jobTitle} did not go ahead as hoped. Contact your Job Bank branch for details.`,
+    },
   };
 
   const notifType = (
@@ -511,7 +671,11 @@ async function notifyApplicantOfInterviewUpdate(
         ? 'INTERVIEW_POSTPONED'
         : newStatus === 'INTERVIEW_CANCELLED'
           ? 'INTERVIEW_CANCELLED'
-          : 'INTERVIEW_RESCHEDULED'
+          : newStatus === 'INTERVIEW_PASSED'
+            ? 'INTERVIEW_PASSED'
+            : newStatus === 'INTERVIEW_FAILED'
+              ? 'INTERVIEW_FAILED'
+              : 'INTERVIEW_RESCHEDULED'
   ) satisfies NotifType;
 
   await createNotification(db, {
@@ -531,8 +695,14 @@ export const referApplicantSchema = z.object({
 export type ReferApplicantInput = z.infer<typeof referApplicantSchema>;
 
 /**
- * Staff / Branch Admin: refer a shortlisted / interviewed applicant to the employer
- * by setting status to FORWARDED and notifying both the applicant and the company.
+ * Refer a shortlisted / interviewed applicant to the employer by setting
+ * status to FORWARDED and notifying both the applicant and the company.
+ * Staff / Branch Admin keep their existing range (SHORTLISTED, scheduled
+ * or postponed interviews, plus PASSED). An interviewer-only actor may
+ * refer ONLY from INTERVIEW_PASSED — the pass-only guard for Option B.
+ * The permission alone does not authorise it: a dual-role Staff/BA user
+ * is treated as Staff/BA, an interviewer-only user hitting any other
+ * status gets a clear ForbiddenError, not a silent machine rejection.
  */
 export async function referApplicantToEmployer(
   ctx: SignedIn,
@@ -557,13 +727,12 @@ export async function referApplicantToEmployer(
     entityId: row.id,
   });
 
-  const referable: ApplicationStatus[] = [
-    'SHORTLISTED',
-    'INTERVIEW_SCHEDULED',
-    'INTERVIEW_POSTPONED',
-  ];
-  if (!referable.includes(row.status))
+  const referable = referableStatusesFor(ctx.actor);
+  if (!referable.includes(row.status)) {
+    if (isInterviewerOnlyReferrer(ctx.actor))
+      throw new ForbiddenError('Record a passed interview outcome before referring');
     throw new ForbiddenError('Application must be shortlisted or interviewed to refer');
+  }
 
   // The job's company must still be verified: a referral to a suspended
   // or rejected company must not go out.
@@ -756,7 +925,8 @@ export async function referApplicantToEmployerForJob(
     if (
       existing.status === 'SHORTLISTED' ||
       existing.status === 'INTERVIEW_SCHEDULED' ||
-      existing.status === 'INTERVIEW_POSTPONED'
+      existing.status === 'INTERVIEW_POSTPONED' ||
+      existing.status === 'INTERVIEW_PASSED'
     ) {
       return referApplicantToEmployer(ctx, existing.id, { note: input.note });
     }
@@ -812,7 +982,8 @@ export async function referApplicantToEmployerForJob(
     if (
       raced.status === 'SHORTLISTED' ||
       raced.status === 'INTERVIEW_SCHEDULED' ||
-      raced.status === 'INTERVIEW_POSTPONED'
+      raced.status === 'INTERVIEW_POSTPONED' ||
+      raced.status === 'INTERVIEW_PASSED'
     ) {
       return referApplicantToEmployer(ctx, raced.id, { note: input.note });
     }
@@ -925,8 +1096,9 @@ export async function listApplicationsForApplicant(
 /**
  * Interviews (and candidates awaiting scheduling) in the actor's branch(es)
  * — the Interviewer and Scheduler role's list. SHORTLISTED rows are the
- * "to schedule" queue; INTERVIEW_* rows are the scheduled, postponed and
- * cancelled interviews. Branch-scoped like Staff; Super Admin holds no
+ * "to schedule" queue; INTERVIEW_* rows are the scheduled, postponed,
+ * cancelled and outcome-recorded interviews (PASSED stays until referred,
+ * FAILED stays in Past). Branch-scoped like Staff; Super Admin holds no
  * interview permission, so they never reach this list.
  */
 export interface InterviewListItem {
@@ -941,6 +1113,10 @@ export interface InterviewListItem {
   interviewAt: string | null;
   interviewLocation: string | null;
   interviewNote: string | null;
+  // 0052 — outcome, null until recorded.
+  interviewAttendance: 'ATTENDED' | 'NO_SHOW' | null;
+  interviewResult: 'PASSED' | 'FAILED' | null;
+  interviewFeedback: string | null;
   updatedAt: string;
 }
 
@@ -949,7 +1125,37 @@ const INTERVIEW_PIPELINE_STATUSES: ApplicationStatus[] = [
   'INTERVIEW_SCHEDULED',
   'INTERVIEW_POSTPONED',
   'INTERVIEW_CANCELLED',
+  // 0052 — PASSED stays in the list (awaiting referral); FAILED stays
+  // visible in Past so the outcome is not lost once recorded.
+  'INTERVIEW_PASSED',
+  'INTERVIEW_FAILED',
 ];
+
+/**
+ * Dashboard funnel: candidates this branch's interviewer passed and then
+ * referred to the employer. FORWARDED + interviewResult PASSED is the
+ * precise shape — Staff can also refer straight from SHORTLISTED, and
+ * those rows carry no interview result, so they are not the interviewer's
+ * referrals and must not be counted here. Same branch-scoped guard as
+ * listInterviews; a referred candidate leaves listInterviews (FORWARDED
+ * is not a pipeline status), so the dashboard needs this count to show
+ * the end of the funnel at all.
+ */
+export async function countInterviewerReferrals(actor: Actor): Promise<number> {
+  assertPermission(actor, 'interview:schedule_jobbank');
+  assertRole(actor, 'STAFF', 'BRANCH_ADMIN', 'INTERVIEWER_SCHEDULER');
+  const [row] = await db
+    .select({ value: count() })
+    .from(ap)
+    .where(
+      and(
+        eq(ap.status, 'FORWARDED'),
+        eq(ap.interviewResult, 'PASSED'),
+        branchScope(actor, ap.branchId),
+      ),
+    );
+  return row?.value ?? 0;
+}
 
 export async function listInterviews(actor: Actor): Promise<InterviewListItem[]> {
   assertPermission(actor, 'interview:schedule_jobbank');
@@ -993,6 +1199,10 @@ export async function listInterviews(actor: Actor): Promise<InterviewListItem[]>
       interviewAt: row.interviewAt?.toISOString() ?? null,
       interviewLocation: row.interviewLocation,
       interviewNote: row.interviewNote,
+      interviewAttendance:
+        (row.interviewAttendance as InterviewListItem['interviewAttendance']) ?? null,
+      interviewResult: (row.interviewResult as InterviewListItem['interviewResult']) ?? null,
+      interviewFeedback: row.interviewFeedback,
       updatedAt: row.updatedAt.toISOString(),
     };
   });

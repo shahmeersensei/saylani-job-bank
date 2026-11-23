@@ -1033,6 +1033,10 @@ export interface ApplicantStaffView extends ApplicantProfile {
     shortlist: boolean;
     scheduleInterview: boolean;
     referToEmployer: boolean;
+    /** 0052 — holds interview:record_outcome (interviewer, staff, branch admin). */
+    recordInterviewOutcome: boolean;
+    /** 0052 — interviewer-only actor: their referral is pass-only. */
+    referPassedOnly: boolean;
   };
 }
 
@@ -1452,6 +1456,13 @@ export async function getApplicantForStaff(
       scheduleInterview:
         hasPermission(actor, 'interview:schedule_jobbank') && row.status === 'ACTIVE',
       referToEmployer: hasPermission(actor, 'match_case:refer') && row.status === 'ACTIVE',
+      recordInterviewOutcome:
+        hasPermission(actor, 'interview:record_outcome') && row.status === 'ACTIVE',
+      // 0052 — interviewer-only referral is pass-only; dual-role Staff/BA
+      // users are treated as Staff/BA (see isInterviewerOnlyReferrer).
+      referPassedOnly:
+        actor.roles.includes('INTERVIEWER_SCHEDULER') &&
+        !actor.roles.some((r) => r === 'STAFF' || r === 'BRANCH_ADMIN'),
     },
   };
 }

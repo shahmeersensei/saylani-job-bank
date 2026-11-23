@@ -78,30 +78,44 @@ describe('permission matrix encodes the PRD rules', () => {
   });
 
   it('Job Bank staff, branch admins and interview schedulers run Job Bank interviews', () => {
-    expect(holders('match_case:refer')).toEqual(['BRANCH_ADMIN', 'STAFF']);
+    // 0052 — Option B: the interviewer also refers, but only candidates he
+    // passed (enforced in referApplicantToEmployer, not by this list alone).
+    expect(holders('match_case:refer')).toEqual(['BRANCH_ADMIN', 'INTERVIEWER_SCHEDULER', 'STAFF']);
     expect(holders('interview:schedule_jobbank')).toEqual([
+      'BRANCH_ADMIN',
+      'INTERVIEWER_SCHEDULER',
+      'STAFF',
+    ]);
+    expect(holders('interview:record_outcome')).toEqual([
       'BRANCH_ADMIN',
       'INTERVIEWER_SCHEDULER',
       'STAFF',
     ]);
   });
 
-  it('the Interviewer and Scheduler role only reads the pipeline and schedules interviews', () => {
+  it('the Interviewer and Scheduler role runs the interview stage end-to-end (0052)', () => {
     expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).toEqual([
       'branch:read',
       'applicant:read',
       'job:read',
       'match_case:read',
+      'match_case:refer',
       'interview:schedule_jobbank',
+      'interview:record_outcome',
     ]);
-    // Read-only on the pipeline: no referring, no employer decisions,
-    // no job/company/staff management.
+    // Still no shortlisting, no employer decisions, no job/company/staff
+    // management — the referral is pass-only, enforced server-side.
+    expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('match_case:manage');
     expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('decision:employer');
     expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('job:manage');
     expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('job:refer');
     expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('applicant:manage');
+    expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('applicant:create');
+    expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('applicant:verify_identity');
     expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('company:onboard');
+    expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('placement:manage');
     expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('user:manage');
+    expect(ROLE_PERMISSIONS.INTERVIEWER_SCHEDULER).not.toContain('branch:manage');
     expect(homePathFor(['INTERVIEWER_SCHEDULER'])).toBe('/interviewer-scheduler');
   });
 

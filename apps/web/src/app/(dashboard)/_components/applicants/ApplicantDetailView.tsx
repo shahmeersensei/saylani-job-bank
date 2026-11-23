@@ -52,7 +52,12 @@ import { DOCUMENT_STATUS_PILL, IDENTITY_PILL } from './labels';
 import { openDocument } from './open-document';
 import { ApplicantPhoto } from './ApplicantPhoto';
 import type { ProfileLabels } from './lists';
-import { ScheduleInterviewDialog, UpdateInterviewDialog } from './InterviewDialogs';
+import {
+  RecordOutcomeDialog,
+  ReferToEmployerDialog,
+  ScheduleInterviewDialog,
+  UpdateInterviewDialog,
+} from './InterviewDialogs';
 
 function Card({
   title,
@@ -611,101 +616,6 @@ function ShortlistDialog({
   );
 }
 
-// ─── Refer to employer dialog ─────────────────────────────────────────────
-
-function ReferToEmployerDialog({
-  applicationId,
-  jobTitle,
-  companyName,
-}: {
-  applicationId: string;
-  jobTitle: string;
-  companyName: string;
-}) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [noteError, setNoteError] = useState<string | undefined>(undefined);
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await apiFetch(`/api/v1/applications/${applicationId}/refer`, {
-        method: 'POST',
-        body: { ...(note ? { note } : {}) },
-      });
-      toast.success('Applicant referred to employer');
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      // Audit 2026-11-11 (M-05): a too-long note failed with only a
-      // generic alert; surface the field issue on the note itself.
-      if (err instanceof ApiClientError && err.issueFor('note')) {
-        setNoteError(err.issueFor('note'));
-      } else {
-        setError(errorMessage(err));
-        toast.error(errorMessage(err));
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal
-      title="Refer to employer"
-      open={open}
-      onOpenChange={setOpen}
-      trigger={
-        <Button size="sm" variant="secondary" leftIcon={<ArrowRightLeft />}>
-          Refer to employer
-        </Button>
-      }
-    >
-      <form className="grid gap-4" onSubmit={submit} noValidate>
-        <div
-          className="rounded-lg px-3 py-2 text-sm"
-          style={{ background: 'var(--surface-muted)' }}
-        >
-          <p className="text-fg-muted">
-            Referring this applicant to <strong className="text-fg">{companyName}</strong> for{' '}
-            <strong className="text-fg">{jobTitle}</strong>. They will be notified immediately.
-          </p>
-        </div>
-        <FormField label="Note (optional)" error={noteError}>
-          <Textarea
-            rows={2}
-            placeholder="Any context for the employer or internal record…"
-            value={note}
-            maxLength={500}
-            onChange={(e) => {
-              setNote(e.target.value);
-              setNoteError(undefined);
-              setError(null);
-            }}
-          />
-        </FormField>
-        {error && (
-          <p className="text-danger text-sm" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button type="submit" loading={saving}>
-            Confirm referral
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 // ─── AI-ranked jobs for referral ────────────────────────────────────────
 
 const MATCH_STRENGTH: Record<
@@ -858,6 +768,8 @@ const APPLICATION_STATUS_LABELS: Record<
   INTERVIEW_SCHEDULED: { label: 'Interview scheduled', tone: 'warning' },
   INTERVIEW_POSTPONED: { label: 'Postponed', tone: 'warning' },
   INTERVIEW_CANCELLED: { label: 'Interview cancelled', tone: 'neutral' },
+  INTERVIEW_PASSED: { label: 'Interview passed', tone: 'success' },
+  INTERVIEW_FAILED: { label: 'Interview failed', tone: 'danger' },
   FORWARDED: { label: 'Referred', tone: 'success' },
   EMPLOYER_INTERVIEW_SCHEDULED: { label: 'Employer interview', tone: 'warning' },
   EMPLOYER_INTERVIEW_POSTPONED: { label: 'Employer interview postponed', tone: 'warning' },
@@ -876,17 +788,26 @@ const INTERVIEW_STATUSES = new Set([
   'INTERVIEW_CANCELLED',
 ]);
 
+/** Outcomes can be recorded only from a scheduled (or postponed) interview. */
+const OUTCOME_STATUSES = new Set(['INTERVIEW_SCHEDULED', 'INTERVIEW_POSTPONED']);
+
 function ApplicationsCard({
   applicant: _applicant,
   applications,
   canScheduleInterview,
   canReferToEmployer,
+  canRecordInterviewOutcome,
+  referPassedOnly,
 }: {
   applicant: ApplicantStaffView;
   applications: ApplicationView[];
   /** True for staff/branch-admin; false for super-admin (read-only). */
   canScheduleInterview: boolean;
   canReferToEmployer: boolean;
+  /** 0052 — holds interview:record_outcome (interviewer, staff, branch admin). */
+  canRecordInterviewOutcome: boolean;
+  /** 0052 — true for interviewer-only actors: refer is pass-only for them. */
+  referPassedOnly: boolean;
 }) {
   if (applications.length === 0) {
     return (
@@ -920,6 +841,15 @@ function ApplicationsCard({
                 </p>
               )}
               {app.interviewNote && <p className="text-fg-muted text-xs">{app.interviewNote}</p>}
+              {app.interviewResult && (
+                <p className="text-fg-muted text-xs">
+                  Interview outcome: <span className="font-medium">{app.interviewResult}</span>
+                  {app.interviewAttendance
+                    ? ` · ${app.interviewAttendance === 'NO_SHOW' ? 'No-show' : 'Attended'}`
+                    : ''}
+                  {app.interviewFeedback ? ` — ${app.interviewFeedback}` : ''}
+                </p>
+              )}
               {app.employerInterviewAt && (
                 <p className="text-fg-muted text-xs">
                   Employer interview: {formatDateTime(app.employerInterviewAt)}
@@ -938,7 +868,7 @@ function ApplicationsCard({
                 </p>
               )}
               {app.note && <p className="text-fg-muted text-xs">Note: {app.note}</p>}
-              {(canScheduleInterview || canReferToEmployer) && (
+              {(canScheduleInterview || canReferToEmployer || canRecordInterviewOutcome) && (
                 <div className="flex flex-wrap justify-end gap-2">
                   {canScheduleInterview && app.status === 'SHORTLISTED' && (
                     <ScheduleInterviewDialog applicationId={app.id} />
@@ -946,10 +876,16 @@ function ApplicationsCard({
                   {canScheduleInterview && INTERVIEW_STATUSES.has(app.status) && (
                     <UpdateInterviewDialog applicationId={app.id} />
                   )}
+                  {canRecordInterviewOutcome && OUTCOME_STATUSES.has(app.status) && (
+                    <RecordOutcomeDialog applicationId={app.id} />
+                  )}
                   {canReferToEmployer &&
-                    (app.status === 'SHORTLISTED' ||
-                      app.status === 'INTERVIEW_SCHEDULED' ||
-                      app.status === 'INTERVIEW_POSTPONED') && (
+                    (referPassedOnly
+                      ? app.status === 'INTERVIEW_PASSED'
+                      : app.status === 'SHORTLISTED' ||
+                        app.status === 'INTERVIEW_SCHEDULED' ||
+                        app.status === 'INTERVIEW_POSTPONED' ||
+                        app.status === 'INTERVIEW_PASSED') && (
                       <ReferToEmployerDialog
                         applicationId={app.id}
                         jobTitle={app.jobTitle}
@@ -1276,6 +1212,8 @@ export function ApplicantDetailView({
           applications={existingApplications}
           canScheduleInterview={!!applicant.can.scheduleInterview}
           canReferToEmployer={!!applicant.can.referToEmployer}
+          canRecordInterviewOutcome={!!applicant.can.recordInterviewOutcome}
+          referPassedOnly={!!applicant.can.referPassedOnly}
         />
       )}
 

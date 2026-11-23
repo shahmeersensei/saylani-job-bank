@@ -5,6 +5,12 @@ export const APPLICATION_STATUSES = [
   'INTERVIEW_SCHEDULED',
   'INTERVIEW_POSTPONED',
   'INTERVIEW_CANCELLED',
+  // 0052 — Job Bank interview outcome (Option B, end-to-end interviewer):
+  // recorded by the interviewer (or Staff/BA) after a scheduled interview.
+  // PASSED is the only interviewer-referrable state; FAILED is terminal
+  // for the interview stage (no reschedule, no referral).
+  'INTERVIEW_PASSED',
+  'INTERVIEW_FAILED',
   'FORWARDED',
   'EMPLOYER_INTERVIEW_SCHEDULED',
   'EMPLOYER_INTERVIEW_POSTPONED',
@@ -36,6 +42,17 @@ export const applications = pgTable(
     interviewLocation: text('interview_location'),
     interviewNote: text('interview_note'),
     scheduledBy: uuid('scheduled_by'),
+    // 0052 — Job Bank interview outcome, recorded after a scheduled
+    // interview (see recordInterviewOutcome). All nullable: rows created
+    // before 0052, and rows not yet interviewed, have no outcome.
+    // attendance: 'ATTENDED' | 'NO_SHOW'; result: 'PASSED' | 'FAILED'
+    // (a no-show is always FAILED). feedback is the interviewer's note
+    // (required when FAILED, ≥5 chars — M19-style evidence rule).
+    interviewAttendance: text('interview_attendance'),
+    interviewResult: text('interview_result'),
+    interviewFeedback: text('interview_feedback'),
+    interviewOutcomeAt: timestamp('interview_outcome_at', { withTimezone: true }),
+    interviewOutcomeBy: uuid('interview_outcome_by'),
     // Employer interview stage
     employerInterviewAt: timestamp('employer_interview_at', { withTimezone: true }),
     employerInterviewLocation: text('employer_interview_location'),

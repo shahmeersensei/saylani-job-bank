@@ -105,6 +105,11 @@ export function navigationFor(
               label: 'Interviews',
               icon: Calendar,
             },
+            {
+              href: '/interviewer-scheduler/applicants',
+              label: 'Applicants',
+              icon: Contact,
+            },
           ],
         },
       ];

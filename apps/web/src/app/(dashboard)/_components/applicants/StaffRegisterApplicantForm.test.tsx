@@ -83,6 +83,8 @@ const applicant: ApplicantStaffView = {
     shortlist: false,
     scheduleInterview: false,
     referToEmployer: false,
+    recordInterviewOutcome: false,
+    referPassedOnly: false,
   },
 };
 

@@ -42,4 +42,5 @@ export const CHECK_CONSTRAINT_MESSAGES: Record<string, string> = {
   company_documents_size_positive: 'Document size must be greater than zero.',
   company_verifications_state_valid: 'Verification state is not an allowed value.',
   verification_history_event_valid: 'Verification event is not an allowed value.',
+  user_roles_branch_scope: 'A branch-scoped role must name a branch, and a global role must not.',
 };
