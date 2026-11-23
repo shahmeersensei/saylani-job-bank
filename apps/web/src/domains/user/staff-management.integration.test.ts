@@ -767,7 +767,10 @@ describe('managing staff accounts', () => {
   it('resetting a lost authenticator signs them out and makes them enrol again', async () => {
     const sa = await signInAdmin('superadmin@jobbank.local');
     const person = await inviteAndActivate(sa, 'VERIFIER', LHR);
-    await enrollTwoFactor(person.email, person.jar);
+    // inviteAndActivate already enrolled the verifier (2FA is mandatory for
+    // them). Enrolling again here would fail: the setup token on the jar
+    // died once the first enrolment completed, and a setup token wins over
+    // the live session on the enrol route.
     // Audit 2026-11-11 (M-28): the acting admin's password is required — a
     // wrong password refuses the reset and leaves 2FA in place.
     const wrongPassword = await call(reset2faRoute, '/x', {
@@ -789,7 +792,9 @@ describe('managing staff accounts', () => {
       method: 'POST',
       body: { email: person.email, password: getSeedDevPassword() },
     });
-    expect(relogin.body.data.kind).toBe('signed_in');
+    // Verifiers are 2FA-required now: after the reset there is no
+    // authenticator left, so sign-in ends in enrolment, not a session.
+    expect(relogin.body.data.kind).toBe('two_factor_setup_required');
   });
 });
 
