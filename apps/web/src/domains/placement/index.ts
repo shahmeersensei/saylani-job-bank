@@ -1,7 +1,7 @@
 'server-only';
 import { schema } from '@jobbank/db';
 import type { PaginationMeta } from '@jobbank/shared';
-import { and, count, desc, eq, inArray, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { runCommand } from '@/domains/shared/audit';
 import { formatDateTime } from '@/lib/format/date';
@@ -223,23 +223,68 @@ async function buildView(row: typeof ap.$inferSelect): Promise<ApplicationView> 
     .from(schema.jobs)
     .where(eq(schema.jobs.id, row.jobId));
 
-  let companyName = '';
-  const companyId = jobRow?.companyId ?? '';
+  let company: Pick<typeof schema.companies.$inferSelect, 'tradeName' | 'legalName'> | undefined;
   if (jobRow) {
     const [c] = await db
-      .select({ name: schema.companies.tradeName, legal: schema.companies.legalName })
+      .select({ tradeName: schema.companies.tradeName, legalName: schema.companies.legalName })
       .from(schema.companies)
       .where(eq(schema.companies.id, jobRow.companyId));
-    companyName = c?.name ?? c?.legal ?? '';
+    company = c;
   }
 
+  return toView(row, jobRow, company);
+}
+
+/**
+ * Batched views for the list endpoints: ONE jobs query + ONE companies
+ * query for the whole page, instead of two queries per row. listInterviews
+ * runs on every dashboard refresh (every 30s via DashboardAutoRefresh),
+ * so the per-row lookups Copilot flagged grew with historical data —
+ * this keeps the refresh at a constant number of queries.
+ */
+async function buildViews(rows: (typeof ap.$inferSelect)[]): Promise<ApplicationView[]> {
+  if (rows.length === 0) return [];
+  const jobs = await db
+    .select({
+      id: schema.jobs.id,
+      title: schema.jobs.title,
+      companyId: schema.jobs.companyId,
+    })
+    .from(schema.jobs)
+    .where(inArray(schema.jobs.id, [...new Set(rows.map((r) => r.jobId))]));
+  const jobById = new Map(jobs.map((j) => [j.id, j]));
+  const companyIds = [...new Set(jobs.map((j) => j.companyId))];
+  const companies =
+    companyIds.length === 0
+      ? []
+      : await db
+          .select({
+            id: schema.companies.id,
+            tradeName: schema.companies.tradeName,
+            legalName: schema.companies.legalName,
+          })
+          .from(schema.companies)
+          .where(inArray(schema.companies.id, companyIds));
+  const companyById = new Map(companies.map((c) => [c.id, c]));
+  return rows.map((row) => {
+    const jobRow = jobById.get(row.jobId);
+    return toView(row, jobRow, jobRow ? companyById.get(jobRow.companyId) : undefined);
+  });
+}
+
+/** Pure row → view mapping, shared by the single-row and batched loaders. */
+function toView(
+  row: typeof ap.$inferSelect,
+  jobRow: Pick<typeof schema.jobs.$inferSelect, 'title' | 'companyId'> | undefined,
+  company: Pick<typeof schema.companies.$inferSelect, 'tradeName' | 'legalName'> | undefined,
+): ApplicationView {
   return {
     id: row.id,
     applicantId: row.applicantId,
     jobId: row.jobId,
     jobTitle: jobRow?.title ?? '',
-    companyName,
-    companyId,
+    companyName: company?.tradeName ?? company?.legalName ?? '',
+    companyId: jobRow?.companyId ?? '',
     branchId: row.branchId,
     status: row.status,
     note: row.note,
@@ -1088,7 +1133,7 @@ export async function listApplicationsForApplicant(
     : [{ total: 0 }];
   const base = db.select().from(ap).where(where).orderBy(desc(ap.createdAt));
   const rows = query ? await base.limit(query.limit).offset(query.offset) : await base;
-  const items = await Promise.all(rows.map(buildView));
+  const items = await buildViews(rows);
   if (!query) return items;
   return { items, pagination: paginationMeta(query, totalRow?.total ?? 0) };
 }
@@ -1133,10 +1178,14 @@ const INTERVIEW_PIPELINE_STATUSES: ApplicationStatus[] = [
 
 /**
  * Dashboard funnel: candidates this branch's interviewer passed and then
- * referred to the employer. FORWARDED + interviewResult PASSED is the
- * precise shape — Staff can also refer straight from SHORTLISTED, and
- * those rows carry no interview result, so they are not the interviewer's
- * referrals and must not be counted here. Same branch-scoped guard as
+ * referred to the employer. interviewResult PASSED + a status only
+ * reachable after a referral (REFERRED_STATUSES) is the precise shape —
+ * Staff can also refer straight from SHORTLISTED, and those rows carry no
+ * interview result, so they are not the interviewer's referrals and must
+ * not be counted here. Counting FORWARDED alone lost referrals the moment
+ * the employer moved the application onward (employer interview, hold,
+ * offer, hire): the referral already happened, so the count must not
+ * depend on the current status. Same branch-scoped guard as
  * listInterviews; a referred candidate leaves listInterviews (FORWARDED
  * is not a pipeline status), so the dashboard needs this count to show
  * the end of the funnel at all.
@@ -1149,12 +1198,45 @@ export async function countInterviewerReferrals(actor: Actor): Promise<number> {
     .from(ap)
     .where(
       and(
-        eq(ap.status, 'FORWARDED'),
         eq(ap.interviewResult, 'PASSED'),
+        inArray(ap.status, REFERRED_STATUSES),
         branchScope(actor, ap.branchId),
       ),
     );
   return row?.value ?? 0;
+}
+
+/**
+ * Monthly Job Bank interviews, Jan..Dec of `year`, in ONE grouped query —
+ * the interviewer chart's values. Buckets by the interview date
+ * (interviewAt in PKT), not by applicant registration, and counts EVERY
+ * interview-dated application in the branch — including ones that already
+ * left the pipeline (referred, hired, on hold). The old chart bucketed
+ * listInterviews rows, so a referred candidate's interview month vanished
+ * from the chart the moment they were referred. Same branch-scoped guard
+ * as listInterviews, same PKT year window as monthlyApplicantCounts.
+ */
+export async function monthlyInterviewCounts(actor: Actor, year: number): Promise<number[]> {
+  assertPermission(actor, 'interview:schedule_jobbank');
+  assertRole(actor, 'STAFF', 'BRANCH_ADMIN', 'INTERVIEWER_SCHEDULER');
+  // PKT year window as UTC instants: 1 Jan 00:00 PKT = 31 Dec 19:00 UTC.
+  const start = new Date(Date.UTC(year, 0, 1) - 5 * 60 * 60 * 1000);
+  const end = new Date(Date.UTC(year + 1, 0, 1) - 5 * 60 * 60 * 1000);
+
+  const monthExpr = sql<number>`extract(month from ${ap.interviewAt} at time zone 'Asia/Karachi')`;
+  const rows = await db
+    .select({ month: monthExpr, value: count() })
+    .from(ap)
+    .where(
+      and(branchScope(actor, ap.branchId), gte(ap.interviewAt, start), lt(ap.interviewAt, end)),
+    )
+    .groupBy(monthExpr);
+
+  const values = Array.from({ length: 12 }, () => 0);
+  for (const row of rows) {
+    if (row.month >= 1 && row.month <= 12) values[row.month - 1] = row.value;
+  }
+  return values;
 }
 
 export async function listInterviews(actor: Actor): Promise<InterviewListItem[]> {
@@ -1173,7 +1255,7 @@ export async function listInterviews(actor: Actor): Promise<InterviewListItem[]>
     .orderBy(desc(ap.updatedAt));
   if (rows.length === 0) return [];
   const [views, applicants] = await Promise.all([
-    Promise.all(rows.map(buildView)),
+    buildViews(rows),
     db
       .select({ id: schema.applicants.id, fullName: schema.applicants.fullName })
       .from(schema.applicants)
@@ -1274,7 +1356,7 @@ export async function listMyApplications(
     : [{ total: 0 }];
   const base = db.select().from(ap).where(where).orderBy(desc(ap.updatedAt));
   const rows = query ? await base.limit(query.limit).offset(query.offset) : await base;
-  const items = await Promise.all(rows.map(buildView));
+  const items = await buildViews(rows);
   if (!query) return items;
   return { items, pagination: paginationMeta(query, totalRow?.total ?? 0) };
 }

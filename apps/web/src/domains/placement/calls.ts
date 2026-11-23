@@ -17,6 +17,11 @@ const CALL_MESSAGES: Record<string, string> = {
   INTERVIEW_SCHEDULED: 'Tell them about their Job Bank interview.',
   INTERVIEW_POSTPONED: 'Their Job Bank interview was postponed.',
   INTERVIEW_CANCELLED: 'Their Job Bank interview was cancelled.',
+  // 0052 outcomes: counter-registered candidates have no portal, so the
+  // only way they learn the result is a staff phone call. Without these
+  // two rows a passed/failed candidate never appeared in the call queue.
+  INTERVIEW_PASSED: 'They passed their Job Bank interview.',
+  INTERVIEW_FAILED: 'They did not pass their Job Bank interview.',
   EMPLOYER_INTERVIEW_SCHEDULED: 'Tell them about their employer interview.',
   EMPLOYER_INTERVIEW_POSTPONED: 'Their employer interview was postponed.',
   EMPLOYER_INTERVIEW_CANCELLED: 'Their employer interview was cancelled.',

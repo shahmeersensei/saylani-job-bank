@@ -28,7 +28,12 @@ import { listApplicants, getMyProfile, monthlyApplicantCounts } from '@/domains/
 import { countCompaniesOnboardedByMonth, listCompanies } from '@/domains/company';
 import { countEmployerCandidates, countHiresByMonth, listJobsForEmployer } from '@/domains/job';
 import { listMyNotifications } from '@/domains/notifications';
-import { countInterviewerReferrals, listInterviews, listMyApplications } from '@/domains/placement';
+import {
+  countInterviewerReferrals,
+  listInterviews,
+  listMyApplications,
+  monthlyInterviewCounts,
+} from '@/domains/placement';
 import { listStaff } from '@/domains/user';
 import { bucketByMonth, pktYearMonth } from './monthlySeries';
 import { formatDate } from '@/lib/format/date';
@@ -569,9 +574,10 @@ export async function WelcomePanel({ role }: { role: Role }) {
     // branch-scoped list the Interviews page renders, plus the referrals
     // that already left that list (FORWARDED + PASSED). Nothing here is
     // invented: an empty pipeline renders zeros, not sample data.
-    const [interviews, referred] = await Promise.all([
+    const [interviews, referred, interviewMonths] = await Promise.all([
       listInterviews(actor),
       countInterviewerReferrals(actor),
+      monthlyInterviewCounts(actor, year),
     ]);
     const now = new Date();
     const pktDay = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' });
@@ -700,10 +706,10 @@ export async function WelcomePanel({ role }: { role: Role }) {
         status: a.status,
       };
     });
-    chartValues = bucketByMonth(
-      interviews.filter((i) => i.interviewAt).map((i) => i.interviewAt as string),
-      year,
-    );
+    // Monthly chart: every interview-dated application in the branch,
+    // including ones that already left the pipeline (referred, hired).
+    // Bucketing listInterviews rows lost those months on referral.
+    chartValues = interviewMonths;
     chartLabel = 'Interviews Scheduled';
   } else if (role === 'EMPLOYER') {
     // Employer dashboard: real counts over the employer's OWN postings
