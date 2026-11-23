@@ -28,7 +28,13 @@ import { listApplicants, getMyProfile, monthlyApplicantCounts } from '@/domains/
 import { countCompaniesOnboardedByMonth, listCompanies } from '@/domains/company';
 import { countEmployerCandidates, countHiresByMonth, listJobsForEmployer } from '@/domains/job';
 import { listMyNotifications } from '@/domains/notifications';
-import { countInterviewerReferrals, listInterviews, listMyApplications } from '@/domains/placement';
+import {
+  countInterviewerReferrals,
+  interviewPipelineCounts,
+  listInterviews,
+  listMyApplications,
+  monthlyInterviewCounts,
+} from '@/domains/placement';
 import { listStaff } from '@/domains/user';
 import { bucketByMonth, pktYearMonth } from './monthlySeries';
 import { formatDate } from '@/lib/format/date';
@@ -569,26 +575,24 @@ export async function WelcomePanel({ role }: { role: Role }) {
     // branch-scoped list the Interviews page renders, plus the referrals
     // that already left that list (FORWARDED + PASSED). Nothing here is
     // invented: an empty pipeline renders zeros, not sample data.
-    const [interviews, referred] = await Promise.all([
-      listInterviews(actor),
+    const [interviews, referred, interviewMonths, pipelineCounts] = await Promise.all([
+      // Activity needs only the 5 most recent rows. The pipeline numbers
+      // come from the grouped count query (MEDIUM-2): deriving them from
+      // listInterviews rows meant every refresh loaded the whole
+      // unbounded pipeline. Every scheduled/postponed interview counts,
+      // not just future ones: a row whose time has passed but whose
+      // outcome is not recorded yet is still work.
+      listInterviews(actor, 5),
       countInterviewerReferrals(actor),
+      monthlyInterviewCounts(actor, year),
+      interviewPipelineCounts(actor),
     ]);
-    const now = new Date();
-    const pktDay = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' });
-    const toSchedule = interviews.filter((i) => i.status === 'SHORTLISTED');
-    // Every scheduled/postponed interview, not just future ones: a row
-    // whose time has passed but whose outcome is not recorded yet is
-    // still work, and must not vanish from the pipeline.
-    const scheduled = interviews.filter(
-      (i) => i.status === 'INTERVIEW_SCHEDULED' || i.status === 'INTERVIEW_POSTPONED',
-    );
-    const upcoming = scheduled.filter((i) => i.interviewAt && new Date(i.interviewAt) > now);
-    const upcomingToday = upcoming.filter(
-      (i) => i.interviewAt && pktDay(new Date(i.interviewAt)) === pktDay(now),
-    );
-    const passed = interviews.filter((i) => i.status === 'INTERVIEW_PASSED');
-    const failed = interviews.filter((i) => i.status === 'INTERVIEW_FAILED');
-    const total = interviews.length;
+    const toSchedule = pipelineCounts.toSchedule;
+    const scheduled = pipelineCounts.scheduled;
+    const upcomingToday = pipelineCounts.upcomingToday;
+    const passed = pipelineCounts.passed;
+    const failed = pipelineCounts.failed;
+    const total = pipelineCounts.total;
     // Funnel denominator: pipeline rows in hand + referrals already made.
     // Referred candidates are not in listInterviews, so without this the
     // pipeline bars would share a denominator that excludes the funnel's
@@ -597,30 +601,30 @@ export async function WelcomePanel({ role }: { role: Role }) {
     main = {
       icon: Calendar,
       label: 'Interviews to schedule',
-      value: fmt(toSchedule.length),
+      value: fmt(toSchedule),
       trend: {
         dir: 'up',
-        text: `${fmt(upcomingToday.length)} today · ${fmt(passed.length)} passed awaiting referral`,
+        text: `${fmt(upcomingToday)} today · ${fmt(passed)} passed awaiting referral`,
       },
       subTitle: 'Interview Pipeline',
       subItems: [
-        { icon: Calendar, label: 'To schedule', value: fmt(toSchedule.length), status: 'active' },
+        { icon: Calendar, label: 'To schedule', value: fmt(toSchedule), status: 'active' },
         {
           icon: Clock,
           label: 'Upcoming today',
-          value: fmt(upcomingToday.length),
+          value: fmt(upcomingToday),
           status: 'active',
         },
         {
           icon: CheckCircle2,
           label: 'Passed awaiting referral',
-          value: fmt(passed.length),
+          value: fmt(passed),
           status: 'active',
         },
         {
           icon: Users,
           label: 'Failed / No-show',
-          value: fmt(failed.length),
+          value: fmt(failed),
           status: 'inactive',
         },
       ],
@@ -629,14 +633,14 @@ export async function WelcomePanel({ role }: { role: Role }) {
       {
         icon: Calendar,
         label: 'To schedule',
-        value: fmt(toSchedule.length),
+        value: fmt(toSchedule),
         sub: 'shortlisted candidates',
         color: '#1a5fac',
       },
       {
         icon: CheckCircle2,
         label: 'Passed awaiting referral',
-        value: fmt(passed.length),
+        value: fmt(passed),
         sub: 'refer them to the employer',
         color: '#0f766e',
       },
@@ -647,28 +651,28 @@ export async function WelcomePanel({ role }: { role: Role }) {
         {
           icon: Calendar,
           label: 'To schedule',
-          current: toSchedule.length,
+          current: toSchedule,
           total: Math.max(funnelTotal, 1),
           color: '#1a5fac',
         },
         {
           icon: Clock,
           label: 'Interviews scheduled',
-          current: scheduled.length,
+          current: scheduled,
           total: Math.max(funnelTotal, 1),
           color: '#0d7a3e',
         },
         {
           icon: CheckCircle2,
           label: 'Passed awaiting referral',
-          current: passed.length,
+          current: passed,
           total: Math.max(funnelTotal, 1),
           color: '#b45309',
         },
         {
           icon: Users,
           label: 'Failed / No-show',
-          current: failed.length,
+          current: failed,
           total: Math.max(funnelTotal, 1),
           color: '#be123c',
         },
@@ -700,10 +704,10 @@ export async function WelcomePanel({ role }: { role: Role }) {
         status: a.status,
       };
     });
-    chartValues = bucketByMonth(
-      interviews.filter((i) => i.interviewAt).map((i) => i.interviewAt as string),
-      year,
-    );
+    // Monthly chart: every interview-dated application in the branch,
+    // including ones that already left the pipeline (referred, hired).
+    // Bucketing listInterviews rows lost those months on referral.
+    chartValues = interviewMonths;
     chartLabel = 'Interviews Scheduled';
   } else if (role === 'EMPLOYER') {
     // Employer dashboard: real counts over the employer's OWN postings

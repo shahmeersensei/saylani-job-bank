@@ -17,6 +17,11 @@ const CALL_MESSAGES: Record<string, string> = {
   INTERVIEW_SCHEDULED: 'Tell them about their Job Bank interview.',
   INTERVIEW_POSTPONED: 'Their Job Bank interview was postponed.',
   INTERVIEW_CANCELLED: 'Their Job Bank interview was cancelled.',
+  // 0052 outcomes: counter-registered candidates have no portal, so the
+  // only way they learn the result is a staff phone call. Without these
+  // two rows a passed/failed candidate never appeared in the call queue.
+  INTERVIEW_PASSED: 'They passed their Job Bank interview.',
+  INTERVIEW_FAILED: 'They did not pass their Job Bank interview.',
   EMPLOYER_INTERVIEW_SCHEDULED: 'Tell them about their employer interview.',
   EMPLOYER_INTERVIEW_POSTPONED: 'Their employer interview was postponed.',
   EMPLOYER_INTERVIEW_CANCELLED: 'Their employer interview was cancelled.',
@@ -56,7 +61,15 @@ export async function listCandidateCalls(actor: Actor): Promise<CallListItem[]> 
     .where(
       and(
         isNotNull(a.counterRegisteredBy),
-        inArray(ap.status, CALL_STATUSES),
+        // Audit 2026-11-23 (MEDIUM-3): a passed candidate stays in the
+        // queue after referral — FORWARDED is not a call status, so
+        // without this the item vanished the moment the interviewer
+        // referred, even if staff never phoned the candidate. The item
+        // clears when markCandidateCalled records it at FORWARDED.
+        or(
+          inArray(ap.status, CALL_STATUSES),
+          and(eq(ap.status, 'FORWARDED'), eq(ap.interviewResult, 'PASSED')),
+        ),
         or(isNull(ap.lastCallStatus), ne(ap.lastCallStatus, sql`${ap.status}`)),
         scope,
       ),
@@ -111,7 +124,12 @@ export async function listCandidateCalls(actor: Actor): Promise<CallListItem[]> 
         phone,
         jobId: app.jobId,
         jobTitle,
-        message: CALL_MESSAGES[app.status]!,
+        // MEDIUM-3: a referred passed candidate keeps a call item until
+        // staff mark it called — the message says what changed.
+        message:
+          app.status === 'FORWARDED' && app.interviewResult === 'PASSED'
+            ? 'They passed their Job Bank interview and were referred to the employer.'
+            : CALL_MESSAGES[app.status]!,
         applicationId: app.id,
         matchOffer: false,
         interviewAt: (employer ? app.employerInterviewAt : app.interviewAt)?.toISOString() ?? null,
